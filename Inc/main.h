@@ -102,6 +102,12 @@ void Error_Handler(void);
 #define ADC2_IN9_PWR_DET_GPIO_Port GPIOB
 #define S_SCK_Pin GPIO_PIN_10
 #define S_SCK_GPIO_Port GPIOB
+#define DRV_C_N_Pin GPIO_PIN_13
+#define DRV_C_N_GPIO_Port GPIOB
+#define DRV_B_N_Pin GPIO_PIN_14
+#define DRV_B_N_GPIO_Port GPIOB
+#define DRV_A_N_Pin GPIO_PIN_15
+#define DRV_A_N_GPIO_Port GPIOB
 #define DRV_CAL_Pin GPIO_PIN_6
 #define DRV_CAL_GPIO_Port GPIOC
 #define DRV_EN_Pin GPIO_PIN_7
