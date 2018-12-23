@@ -148,12 +148,12 @@ void app_main(void)
 #else
     printf("\nstart app_main...\n");
 #endif
-    debug_init();
+    debug_init(&app_conf.dbg_en, &app_conf.dbg_dst);
     load_conf();
     device_init();
     common_service_init();
     app_motor_init();
-    
+
     gpio_set_value(&drv_en, 1);
     delay_systick(50);
     d_debug("drv 02: %04x\n", drv_read_reg(0x02));
@@ -165,7 +165,7 @@ void app_main(void)
     HAL_ADC_Start(&hadc3);
     HAL_ADCEx_InjectedStart_IT(&hadc1);
 
-    printf("start pwm...\n");
+    d_info("start pwm...\n");
     HAL_TIM_PWM_Start(&htim1,TIM_CHANNEL_1);
     HAL_TIM_PWM_Start(&htim1,TIM_CHANNEL_2);
     HAL_TIM_PWM_Start(&htim1,TIM_CHANNEL_3);
@@ -173,9 +173,9 @@ void app_main(void)
 
     __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, 100);
     __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_2, 500);
-    __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_3, 4000);
+    __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_3, 550);
     __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_4, 100);
-    printf("pwm on.\n");
+    d_info("pwm on.\n");
     set_led_state(LED_POWERON);
     //delay_systick(500);
     //__HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, 4095);
@@ -195,7 +195,7 @@ void app_main(void)
 #endif
 
         //sensor_read();
-        d_debug("drv: %08x\n", drv_read_reg(0x01) << 16 | drv_read_reg(0x00));
+        //d_debug("drv: %08x\n", drv_read_reg(0x01) << 16 | drv_read_reg(0x00));
 
 
         cdnet_intf_routine(); // handle cdnet
@@ -213,7 +213,7 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
     uint32_t v1 = HAL_ADCEx_InjectedGetValue(&hadc1, 1);
     uint32_t v2 = HAL_ADCEx_InjectedGetValue(&hadc2, 1);
     uint32_t v3 = HAL_ADCEx_InjectedGetValue(&hadc3, 1);
-    d_debug("@%p %d %d %d\n", hadc, v1, v2, v3);
+    //d_debug("@%p %d %d %d\n", hadc, v1, v2, v3);
 
     //HAL_ADCEx_InjectedStart_IT(&hadc1);
     //HAL_ADCEx_InjectedStart_IT(&hadc2);

@@ -14,9 +14,15 @@ app_conf_t app_conf = {
         .bl_wait = 30, // wait 3 sec
 
         .rs485_net = 0,
-        .rs485_mac = 0xdf,
-        .rs485_baudrate_low = 1000000,
-        .rs485_baudrate_high = 10000000
+        .rs485_mac = 2,
+        .rs485_baudrate_low = 115200,
+        .rs485_baudrate_high = 115200,
+
+        .dbg_en = true,
+        .dbg_dst = {
+                .addr.cd_addr8 = {0x80, 0x00, 0x00},
+                .port = 9
+        }
 };
 
 

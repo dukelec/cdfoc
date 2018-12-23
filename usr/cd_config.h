@@ -32,6 +32,7 @@
 
 #define CDUART_IRQ_SAFE
 #define CDUART_IDLE_TIME    (500000 / SYSTICK_US_DIV) // 500 ms
+#define CDNET_IRQ_SAFE
 
 #define SEQ_TIMEOUT         (500000 / SYSTICK_US_DIV) // 500 ms
 

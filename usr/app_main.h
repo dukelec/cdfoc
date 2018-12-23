@@ -13,7 +13,6 @@
 #include "cdnet_dispatch.h"
 #include "cdbus_uart.h"
 #include "cdctl_it.h"
-#include "modbus_crc.h"
 
 #define APP_CONF_ADDR       0x0801F800 // last page
 
@@ -25,25 +24,18 @@ typedef struct {
     uint8_t         rs485_mac;
     uint32_t        rs485_baudrate_low;
     uint32_t        rs485_baudrate_high;
-} __attribute__((packed)) app_conf_t;
 
+    bool            dbg_en;
+    cd_sockaddr_t   dbg_dst;
+} app_conf_t;
 
 typedef enum {
-    ST_OFF = 0,
-    ST_STOP,
-    ST_WAIT,
-    ST_RUN
+    ST_STOP = 0,
+    ST_CALIBRATION,
+    ST_CONST_CURRENT,
+    ST_CONST_SPEED,
+    ST_POSITION
 } state_t;
-
-typedef struct {
-    list_node_t node;
-
-    int pos;
-    int period;
-    int accel;
-    int time;
-} cmd_t;
-
 
 typedef enum {
     LED_POWERON = 0,
@@ -60,6 +52,7 @@ void load_conf(void);
 void save_conf(void);
 void common_service_init(void);
 void common_service_routine(void);
+void debug_init(bool *en, cd_sockaddr_t *dst);
 
 void set_led_state(led_state_t state);
 
