@@ -82,6 +82,7 @@ void Error_Handler(void);
 /* Private defines -----------------------------------------------------------*/
 #define CDCTL_INT_N_Pin GPIO_PIN_0
 #define CDCTL_INT_N_GPIO_Port GPIOC
+#define CDCTL_INT_N_EXTI_IRQn EXTI0_IRQn
 #define S_NSS_Pin GPIO_PIN_1
 #define S_NSS_GPIO_Port GPIOC
 #define S_MISO_Pin GPIO_PIN_2
