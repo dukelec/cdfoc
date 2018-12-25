@@ -106,7 +106,7 @@ static void p10_service_routine(void)
         cdnet_socket_sendto(&sock10, pkt);
     } else if (pkt->len && pkt->dat[0] == 0x62) {
         d_debug("p10 ser: stay in bootloader\n");
-        app_conf.bl_wait = 0xff;
+        csa.bl_wait = 0xff;
         pkt->len = 1;
         pkt->dat[0] = 0x80;
         pkt->dst = pkt->src;

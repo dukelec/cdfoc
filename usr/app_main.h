@@ -13,21 +13,13 @@
 #include "cdnet_dispatch.h"
 #include "cdbus_uart.h"
 #include "cdctl_it.h"
+#include "pid_m.h"
 
 #define APP_CONF_ADDR       0x0801F800 // last page
 
-typedef struct {
-    uint16_t        magic_code; // 0xcdcd
-    bool            bl_wait; // run app after timeout (unit 0.1s), 0xff: never
+#define CURRENT_LOOP_FREQ   (168000000 / 4096 / 2)
+#define DRV_PWM_HALF        2048
 
-    uint8_t         rs485_net;
-    uint8_t         rs485_mac;
-    uint32_t        rs485_baudrate_low;
-    uint32_t        rs485_baudrate_high;
-
-    bool            dbg_en;
-    cd_sockaddr_t   dbg_dst;
-} app_conf_t;
 
 typedef enum {
     ST_STOP = 0,
@@ -44,7 +36,40 @@ typedef enum {
 } led_state_t;
 
 
-extern app_conf_t app_conf;
+typedef struct {
+    uint16_t        magic_code; // 0xcdcd
+    bool            bl_wait; // run app after timeout (unit 0.1s), 0xff: never
+
+    uint8_t         rs485_net;
+    uint8_t         rs485_mac;
+    uint32_t        rs485_baudrate_low;
+    uint32_t        rs485_baudrate_high;
+
+    bool            dbg_en;
+    cd_sockaddr_t   dbg_dst;
+
+    pid_m_t         pid_cur;
+    pid_m_t         pid_speed;
+    pid_m_t         pid_pos;
+
+    float           peak_cur_threshold;
+    int32_t         peak_cur_duration;
+
+    uint16_t        loop_msk;
+
+    // end of eeprom
+
+    uint16_t        loop_cnt;
+    uint16_t        encoder_val;
+    float           angle_elec;
+
+    state_t         state;
+
+    int32_t         peak_cur_cnt;
+
+} csa_t; // config status area
+
+extern csa_t csa;
 
 void app_main(void);
 void load_conf_early(void);
@@ -59,5 +84,15 @@ void set_led_state(led_state_t state);
 void app_motor(void);
 void app_motor_init(void);
 void limit_det_isr(void);
+
+uint16_t encoder_read(void);
+
+extern ADC_HandleTypeDef hadc1;
+extern ADC_HandleTypeDef hadc2;
+extern ADC_HandleTypeDef hadc3;
+extern TIM_HandleTypeDef htim1;
+
+extern gpio_t led_r;
+extern gpio_t led_g;
 
 #endif

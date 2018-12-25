@@ -9,21 +9,13 @@
 
 #include "app_main.h"
 
-extern ADC_HandleTypeDef hadc1;
-extern ADC_HandleTypeDef hadc2;
-extern ADC_HandleTypeDef hadc3;
 extern SPI_HandleTypeDef hspi1;
 extern SPI_HandleTypeDef hspi2;
 extern SPI_HandleTypeDef hspi3;
 extern UART_HandleTypeDef huart1;
-extern TIM_HandleTypeDef htim1;
 
-static gpio_t led_r = { .group = LED_RED_GPIO_Port, .num = LED_RED_Pin };
-static gpio_t led_g = { .group = LED_GRN_GPIO_Port, .num = LED_GRN_Pin };
-
-static gpio_t drv_a_n = { .group = DRV_A_N_GPIO_Port, .num = DRV_A_N_Pin };
-static gpio_t drv_b_n = { .group = DRV_B_N_GPIO_Port, .num = DRV_B_N_Pin };
-static gpio_t drv_c_n = { .group = DRV_C_N_GPIO_Port, .num = DRV_C_N_Pin };
+gpio_t led_r = { .group = LED_RED_GPIO_Port, .num = LED_RED_Pin };
+gpio_t led_g = { .group = LED_GRN_GPIO_Port, .num = LED_GRN_Pin };
 
 static gpio_t drv_en = { .group = DRV_EN_GPIO_Port, .num = DRV_EN_Pin };
 static gpio_t drv_nss = { .group = DRV_NSS_GPIO_Port, .num = DRV_NSS_Pin };
@@ -40,7 +32,7 @@ static spi_t r_spi = { .hspi = &hspi1, .ns_pin = &r_ns };
 static cd_frame_t frame_alloc[FRAME_MAX];
 static list_head_t frame_free_head = {0};
 
-#define PACKET_MAX 10
+#define PACKET_MAX 50
 static cdnet_packet_t packet_alloc[PACKET_MAX];
 
 static cdctl_dev_t r_dev = {0};    // RS485
@@ -55,10 +47,10 @@ static void device_init(void)
     for (i = 0; i < PACKET_MAX; i++)
         list_put(&cdnet_free_pkts, &packet_alloc[i].node);
 
-    cdctl_dev_init(&r_dev, &frame_free_head, app_conf.rs485_mac,
-            app_conf.rs485_baudrate_low, app_conf.rs485_baudrate_high,
+    cdctl_dev_init(&r_dev, &frame_free_head, csa.rs485_mac,
+            csa.rs485_baudrate_low, csa.rs485_baudrate_high,
             &r_spi, &r_rst_n, &r_int_n);
-    cdnet_intf_init(&n_intf, &r_dev.cd_dev, app_conf.rs485_net, app_conf.rs485_mac);
+    cdnet_intf_init(&n_intf, &r_dev.cd_dev, csa.rs485_net, csa.rs485_mac);
     cdnet_intf_register(&n_intf);
 }
 
@@ -100,7 +92,7 @@ static void jump_to_app(void)
 #endif
 
 
-static int sensor_read(void)
+uint16_t encoder_read(void)
 {
     uint16_t buf[2];
     int ret = 0;
@@ -115,9 +107,9 @@ static int sensor_read(void)
     gpio_set_value(&s_nss, 1);
     GPIOC->MODER |= 1 << (3 * 2 + 1);
 
-    d_debug("%04x %04x\n", buf[0], buf[1]);
+    //d_debug("%04x %04x\n", buf[0], buf[1]);
 
-    return ret;
+    return buf[0] & 0x7fff;
 }
 
 static uint16_t drv_read_reg(uint8_t reg)
@@ -144,11 +136,11 @@ static void drv_write_reg(uint8_t reg, uint16_t val)
 void app_main(void)
 {
 #ifdef BOOTLOADER
-    printf("\nstart app_main (bl_wait: %d)...\n", app_conf.bl_wait);
+    printf("\nstart app_main (bl_wait: %d)...\n", csa.bl_wait);
 #else
     printf("\nstart app_main...\n");
 #endif
-    debug_init(&app_conf.dbg_en, &app_conf.dbg_dst);
+    debug_init(&csa.dbg_en, &csa.dbg_dst);
     load_conf();
     device_init();
     common_service_init();
@@ -166,15 +158,15 @@ void app_main(void)
     HAL_ADCEx_InjectedStart_IT(&hadc1);
 
     d_info("start pwm...\n");
-    HAL_TIM_PWM_Start(&htim1,TIM_CHANNEL_1);
-    HAL_TIM_PWM_Start(&htim1,TIM_CHANNEL_2);
-    HAL_TIM_PWM_Start(&htim1,TIM_CHANNEL_3);
-    HAL_TIM_PWM_Start(&htim1,TIM_CHANNEL_4);
-
-    __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, 100);
-    __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_2, 500);
-    __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_3, 550);
+    __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, DRV_PWM_HALF);
+    __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_2, DRV_PWM_HALF);
+    __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_3, DRV_PWM_HALF);
     __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_4, 100);
+    HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
+    HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_2);
+    HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_3);
+    HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_4);
+
     d_info("pwm on.\n");
     set_led_state(LED_POWERON);
     //delay_systick(500);
@@ -189,12 +181,12 @@ void app_main(void)
 
     while (true) {
 #ifdef BOOTLOADER
-        if (app_conf.bl_wait != 0xff &&
-                get_systick() - boot_time > app_conf.bl_wait * 100000 / SYSTICK_US_DIV)
+        if (csa.bl_wait != 0xff &&
+                get_systick() - boot_time > csa.bl_wait * 100000 / SYSTICK_US_DIV)
             jump_to_app();
 #endif
 
-        //sensor_read();
+        //encoder_read();
         //d_debug("drv: %08x\n", drv_read_reg(0x01) << 16 | drv_read_reg(0x00));
 
 
@@ -203,22 +195,6 @@ void app_main(void)
         app_motor();
         debug_flush();
     }
-}
-
-
-
-
-void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
-{
-    uint32_t v1 = HAL_ADCEx_InjectedGetValue(&hadc1, 1);
-    uint32_t v2 = HAL_ADCEx_InjectedGetValue(&hadc2, 1);
-    uint32_t v3 = HAL_ADCEx_InjectedGetValue(&hadc3, 1);
-    //d_debug("@%p %d %d %d\n", hadc, v1, v2, v3);
-
-    //HAL_ADCEx_InjectedStart_IT(&hadc1);
-    //HAL_ADCEx_InjectedStart_IT(&hadc2);
-    //HAL_ADCEx_InjectedStart_IT(&hadc3);
-    gpio_set_value(&led_r, !gpio_get_value(&led_r));
 }
 
 
@@ -243,5 +219,5 @@ void HAL_SPI_TxCpltCallback(SPI_HandleTypeDef *hspi)
 }
 void HAL_SPI_ErrorCallback(SPI_HandleTypeDef *hspi)
 {
-    d_error("spi error...\n");
+    printf("spi error...\n");
 }

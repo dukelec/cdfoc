@@ -71,7 +71,8 @@ cdnet/utils/hex_dump.c \
 usr/config.c \
 usr/common_services.c \
 usr/app_main.c \
-usr/app_motor.c
+usr/app_motor.c \
+usr/pid_m.c
 
 # ASM sources
 ASM_SOURCES =  \
@@ -111,7 +112,7 @@ FPU = -mfpu=fpv4-sp-d16
 FLOAT-ABI = -mfloat-abi=hard
 
 # mcu
-MCU = $(CPU) -mthumb $(FPU) $(FLOAT-ABI)
+MCU = $(CPU) -mthumb $(FPU) $(FLOAT-ABI) -Wdouble-promotion # -u _printf_float
 
 # macros for gcc
 # AS defines

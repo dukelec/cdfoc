@@ -9,7 +9,7 @@
 
 #include "app_main.h"
 
-app_conf_t app_conf = {
+csa_t csa = {
         .magic_code = 0xcdcd,
         .bl_wait = 30, // wait 3 sec
 
@@ -22,28 +22,53 @@ app_conf_t app_conf = {
         .dbg_dst = {
                 .addr.cd_addr8 = {0x80, 0x00, 0x00},
                 .port = 9
-        }
+        },
+
+        .pid_cur =  {
+                .kp = 0, .ki = 200,
+                .out_min = DRV_PWM_HALF * -0.9,
+                .out_max = DRV_PWM_HALF * 0.9,
+                .period = 1.0 / CURRENT_LOOP_FREQ
+        },
+        .pid_speed = {
+                .kp = 1000, .ki = 100000.0,
+                .out_min = -9000,
+                .out_max = 9000, // limit output current
+                .period = 5.0 / CURRENT_LOOP_FREQ
+        },
+        .pid_pos = {
+                .kp = 0.001, .ki = 0.01, .kd = 0,
+                .out_min = -100,
+                .out_max = 100, // limit output speed
+                .period = 25.0 / CURRENT_LOOP_FREQ
+        },
+
+        .loop_msk = 0x01ff,
+
+        .loop_cnt = 0,
+
+        .state = ST_CALIBRATION
 };
 
 
 void load_conf_early(void)
 {
 #if 0
-    app_conf_t app_tmp;
-    memcpy(&app_tmp, (void *)APP_CONF_ADDR, sizeof(app_conf_t));
+    csa_t app_tmp;
+    memcpy(&app_tmp, (void *)APP_CONF_ADDR, sizeof(csa_t));
     if (app_tmp.magic_code == 0xcdcd)
-        memcpy(&app_conf, &app_tmp, sizeof(app_conf_t));
+        memcpy(&csa, &app_tmp, sizeof(csa_t));
 #endif
 }
 
 void load_conf(void)
 {
 #if 0
-    app_conf_t app_tmp;
-    memcpy(&app_tmp, (void *)APP_CONF_ADDR, sizeof(app_conf_t));
+    csa_t app_tmp;
+    memcpy(&app_tmp, (void *)APP_CONF_ADDR, sizeof(csa_t));
     if (app_tmp.magic_code == 0xcdcd) {
         d_info("conf: load from flash\n");
-        memcpy(&app_conf, &app_tmp, sizeof(app_conf_t));
+        memcpy(&csa, &app_tmp, sizeof(csa_t));
     } else {
         d_info("conf: use default\n");
     }
@@ -69,8 +94,8 @@ void save_conf(void)
         d_info("conf: failed to erase flash\n");
 
     uint32_t *dst_dat = (uint32_t *)APP_CONF_ADDR;
-    uint32_t *src_dat = (uint32_t *)&app_conf;
-    uint8_t cnt = (sizeof(app_conf_t) + 3) / 4;
+    uint32_t *src_dat = (uint32_t *)&csa;
+    uint8_t cnt = (sizeof(csa_t) + 3) / 4;
     uint8_t i;
 
     for (i = 0; ret == HAL_OK && i < cnt; i++)
