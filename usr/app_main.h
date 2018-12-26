@@ -15,6 +15,12 @@
 #include "cdctl_it.h"
 #include "pid_m.h"
 
+// printf float value without enable "-u _printf_float"
+// e.g.: printf("%d.%.2d\n", P_2F(2.14));
+#define P_2F(x) (int)(x), abs(lroundf(((x)-(int)(x))*100))  // "%d.%.2d"
+#define P_3F(x) (int)(x), abs(lroundf(((x)-(int)(x))*1000)) // "%d.%.3d"
+
+
 #define APP_CONF_ADDR       0x0801F800 // last page
 
 #define CURRENT_LOOP_FREQ   (168000000 / 4096 / 2)
@@ -61,7 +67,10 @@ typedef struct {
 
     uint16_t        loop_cnt;
     uint16_t        encoder_val;
-    float           angle_elec;
+    float           angle_elec_in;
+    float           angle_elec_out;
+    float           current_in;
+    float           current_out;
 
     state_t         state;
 

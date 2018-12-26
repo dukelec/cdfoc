@@ -47,7 +47,8 @@ csa_t csa = {
 
         .loop_cnt = 0,
 
-        .state = ST_CALIBRATION
+        .state = ST_STOP,
+        .angle_elec_out = 0
 };
 
 

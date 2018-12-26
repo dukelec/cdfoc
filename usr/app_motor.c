@@ -41,9 +41,12 @@ void app_motor(void)
 void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
 {
 
-    static float in_idle_pid_cur_a, in_idle_pid_cur_b;
+    static float ia_idle, ib_idle, ic_idle;
     int16_t out_pwm_u = 0, out_pwm_v = 0, out_pwm_w = 0;
+    bool dbg_en = (csa.loop_cnt & csa.loop_msk) == 0;
 
+    if (csa.loop_cnt == 0xffff)
+        csa.state = ST_CALIBRATION;
 
     // bit mask for 2048: 0x7ff
     // 2048 × 7 = 14336
@@ -55,17 +58,15 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
     if (csa.encoder_val >= 0x7fff)
         csa.encoder_val -= 0x7fff;
 
-    uint16_t encoder_sub = csa.encoder_val % (uint16_t)(0x7fff/11.0+0.5);
+    uint16_t encoder_sub = csa.encoder_val % lroundf(0x7fff/11.0);
 
-    float angle_mech = csa.encoder_val*360.0f/0x7fff;
-    csa.angle_elec = encoder_sub*360.0f/(0x7fff/11.0f);
+    float angle_mech = csa.encoder_val*((float)M_PI*2/0x7fff);
+    csa.angle_elec_in = encoder_sub*((float)M_PI*2/(0x7fff/11.0f));
 
-    if ((csa.loop_cnt & csa.loop_msk) == 0) {
-        d_debug("a: %d, %d | %d.%.2d,  %d.%.2d\n",
-                csa.encoder_val, encoder_sub,
-                (int)(angle_mech), (int)((angle_mech - (int)angle_mech)*100),
-                (int)(csa.angle_elec), (int)((csa.angle_elec - (int)csa.angle_elec)*100));
-    }
+    if (dbg_en)
+        d_debug("a %d.%.2d %d.%.2d %d.%.2d",
+                //csa.encoder_val, encoder_sub,
+                P_2F(angle_mech), P_2F(csa.angle_elec_in), P_2F(csa.angle_elec_out));
 
     //append_dprintf(DBG_POSITION, "pos:%08lx %08lx ", in_pos, in_pos & 0x7ff);
 
@@ -91,20 +92,27 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
     }
 #endif
 
-#if 0
-    if (control_mode != M_STOP) {
-        float ia = (float)AdcResult.ADCRESULT2 * ADC2MA - in_idle_pid_cur_a;
-        float ib = (float)AdcResult.ADCRESULT1 * ADC2MA - in_idle_pid_cur_b;
-        float ic = -ia - ib;
+    if (csa.state != ST_STOP) {
+        float ia = ia_idle - HAL_ADCEx_InjectedGetValue(&hadc1, 1); // 1, 2
+        float ib = ib_idle - HAL_ADCEx_InjectedGetValue(&hadc3, 1); // 3, 1
+        float ic = ic_idle - HAL_ADCEx_InjectedGetValue(&hadc2, 1);
+        float ic_ = -ia - ib;
 
         float i_alpha = ia;
-        float i_beta = (ia + ib * 2) / 1.732050808; // √3
+        float i_beta = (ia + ib * 2) / 1.732050808f; // √3
 
-        if (control_mode == M_CALIBRATION)
-            angle_elec = sub_angle_manual;
+        if (csa.state != ST_CALIBRATION)
+            csa.angle_elec_out = csa.angle_elec_in;
+        if (dbg_en) {
+            csa.angle_elec_out += 0.01f;
+            if (csa.angle_elec_out >= (float)M_PI*2)
+                csa.angle_elec_out -= (float)M_PI*2;
+        }
 
-        in_current = -i_alpha * sin(angle_elec) + i_beta * cos(angle_elec); // i_sq
+        csa.current_in = -i_alpha * sinf(csa.angle_elec_out) + i_beta * cosf(csa.angle_elec_out); // i_sq
+        float i_sd = i_alpha * cosf(csa.angle_elec_out) + i_beta * sinf(csa.angle_elec_out); // i_sd
 
+        /*
         if (in_current > peak_cur_threshold) {
             if (++peak_cur_cnt >= peak_cur_duration) {
                 error_flag = ERR_CUR_PROTECT;
@@ -114,16 +122,21 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
             }
         } else
             peak_cur_cnt = 0;
-
-        append_dprintf(DBG_CURRENT, "ad:%.2f %.2f %.2f %.2f ", ia, ib, ic, in_current);
+        */
+        if (dbg_en)
+            d_debug_c(", in %d.%.2d %d.%.2d %d.%.2d %d.%.2d",
+                    P_2F(ia), P_2F(ib), P_2F(ic), P_2F(ic_));
+        if (dbg_en)
+            d_debug_c(", i %d.%.2d, %d.%.2d", P_2F(csa.current_in), P_2F(i_sd));
     } else {
         // TODO: add filter
-        in_idle_pid_cur_a = (float)AdcResult.ADCRESULT2 * ADC2MA;
-        in_idle_pid_cur_b = (float)AdcResult.ADCRESULT1 * ADC2MA;
-        //append_dprintf(DBG_CURRENT, "adc idle: %.2f %.2f", in_idle_pid_cur_u, in_idle_pid_cur_v);
+        ia_idle = HAL_ADCEx_InjectedGetValue(&hadc1, 1);
+        ib_idle = HAL_ADCEx_InjectedGetValue(&hadc2, 1);
+        ic_idle = HAL_ADCEx_InjectedGetValue(&hadc3, 1);
+        if (dbg_en)
+            d_debug_c(", in %d.%.2d %d.%.2d %d.%.2d",
+                    P_2F(ia_idle), P_2F(ib_idle), P_2F(ic_idle));
     }
-
-#endif
 
     // current --> pwm
     if (csa.state != ST_STOP) {
@@ -147,17 +160,12 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
 #endif
 
         float out_voltage = 300;
-        static float angle = 0;
 
-        if ((csa.loop_cnt & csa.loop_msk) == 0) {
-            angle += (float)(M_PI / 180.0 * 0.5);
-        }
+        float v_alpha = -out_voltage * sinf(csa.angle_elec_out);
+        float v_beta =  out_voltage * cosf(csa.angle_elec_out);
 
-        float v_alpha = -out_voltage * sinf(angle);
-        float v_beta =  out_voltage * cosf(angle);
-
-        out_pwm_u = (int16_t)(v_alpha + 0.5f);
-        out_pwm_v = (int16_t)(-v_alpha / 2 + v_beta * 0.866025404f + 0.5f); // (√3÷2)
+        out_pwm_u = lroundf(v_alpha);
+        out_pwm_v = lroundf(-v_alpha / 2 + v_beta * 0.866025404f); // (√3÷2)
         out_pwm_w = -out_pwm_u - out_pwm_v;
 
         /*
@@ -165,11 +173,8 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
         append_dprintf(DBG_CURRENT, "v:%.2f %.2f %d ", pid_cur_v.target, pid_cur_v.i_term, out_pwm_v);
         append_dprintf(DBG_CURRENT, "w:%d", out_pwm_w);
         */
-        if ((csa.loop_cnt & csa.loop_msk) == 0) {
-            d_debug("a: %d, uvw: %d %d %d\n",
-                    (int)(angle*180.0f/(float)M_PI),
-                    out_pwm_u, out_pwm_v, out_pwm_w);
-        }
+        if (dbg_en)
+            d_debug_c(", o %d %d %d\n", out_pwm_u, out_pwm_v, out_pwm_w);
 
         //append_dprintf(DBG_CURRENT, "uvw:%d %d %d", out_pwm_u, out_pwm_v, out_pwm_w);
     } else {
@@ -180,17 +185,10 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
         pid_reset(&pid_pos, in_pos, 0);
         peak_cur_cnt = 0;
 #endif
+        if (dbg_en)
+            d_debug_c("\n");
     }
 
-    uint32_t v1 = HAL_ADCEx_InjectedGetValue(&hadc1, 1);
-    uint32_t v2 = HAL_ADCEx_InjectedGetValue(&hadc2, 1);
-    uint32_t v3 = HAL_ADCEx_InjectedGetValue(&hadc3, 1);
-    if ((csa.loop_cnt & csa.loop_msk) == 0)
-        d_debug("adc: %p %d %d %d\n", hadc, v1, v2, v3);
-
-    //HAL_ADCEx_InjectedStart_IT(&hadc1);
-    //HAL_ADCEx_InjectedStart_IT(&hadc2);
-    //HAL_ADCEx_InjectedStart_IT(&hadc3);
     gpio_set_value(&led_r, !gpio_get_value(&led_r));
 
 

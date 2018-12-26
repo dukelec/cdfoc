@@ -26,7 +26,6 @@
 #define DEBUG
 #define VERBOSE
 #define DBG_STR_LEN         100
-#define DBG_LEN             100
 #define DBG_TX_IT
 //#define LIST_DEBUG
 
