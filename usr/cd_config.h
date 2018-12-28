@@ -10,16 +10,6 @@
 #ifndef __CD_CONFIG_H__
 #define __CD_CONFIG_H__
 
-#include <errno.h>
-#include <sys/unistd.h> // STDOUT_FILENO, STDERR_FILENO
-#include <string.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <stdarg.h>
-#include <stdbool.h>
-#include <stddef.h>     // provide offsetof, NULL
-#include <stdint.h>
-
 #define ARCH_SPI
 #define CD_LIST_IT
 
