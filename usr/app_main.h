@@ -17,8 +17,8 @@
 
 // printf float value without enable "-u _printf_float"
 // e.g.: printf("%d.%.2d\n", P_2F(2.14));
-#define P_2F(x) (int)(x), abs(lroundf(((x)-(int)(x))*100))  // "%d.%.2d"
-#define P_3F(x) (int)(x), abs(lroundf(((x)-(int)(x))*1000)) // "%d.%.3d"
+#define P_2F(x) (int)(x), abs(((x)-(int)(x))*100)  // "%d.%.2d"
+#define P_3F(x) (int)(x), abs(((x)-(int)(x))*1000) // "%d.%.3d"
 
 
 #define APP_CONF_ADDR       0x0801F800 // last page
