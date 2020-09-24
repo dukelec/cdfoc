@@ -9,9 +9,9 @@
  */
 
 #include "cd_utils.h"
-#include "pid_m.h"
+#include "pid_f.h"
 
-float pid_compute(pid_m_t *pid, float input)
+float pid_f_compute(pid_f_t *pid, float input)
 {
     float error, delta_input, output;
 
@@ -28,7 +28,7 @@ float pid_compute(pid_m_t *pid, float input)
     return output;
 }
 
-float pid_compute_no_d(pid_m_t *pid, float input)
+float pid_f_compute_no_d(pid_f_t *pid, float input)
 {
     float error, output;
 
@@ -43,17 +43,17 @@ float pid_compute_no_d(pid_m_t *pid, float input)
 }
 
 
-void pid_reset(pid_m_t *pid, float input, float output)
+void pid_f_reset(pid_f_t *pid, float input, float output)
 {
     pid->last_input = input;
     pid->i_term = clip(output, pid->out_min, pid->out_max);
 }
 
-void pid_init(pid_m_t *pid, bool reset)
+void pid_f_init(pid_f_t *pid, bool reset)
 {
     pid->_ki = pid->ki * pid->period;
     pid->_kd = pid->kd / pid->period;
 
     if (reset)
-        pid_reset(pid, 0, 0);
+        pid_f_reset(pid, 0, 0);
 }

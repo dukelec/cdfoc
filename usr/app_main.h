@@ -13,7 +13,8 @@
 #include "cdnet_dispatch.h"
 #include "cdbus_uart.h"
 #include "cdctl_it.h"
-#include "pid_m.h"
+#include "pid_f.h"
+#include "pid_i.h"
 
 // printf float value without enable "-u _printf_float"
 // e.g.: printf("%d.%.2d\n", P_2F(2.14));
@@ -54,9 +55,9 @@ typedef struct {
     bool            dbg_en;
     cd_sockaddr_t   dbg_dst;
 
-    pid_m_t         pid_cur;
-    pid_m_t         pid_speed;
-    pid_m_t         pid_pos;
+    pid_f_t         pid_cur;
+    pid_f_t         pid_speed;
+    pid_i_t         pid_pos;
 
     float           peak_cur_threshold;
     int32_t         peak_cur_duration;

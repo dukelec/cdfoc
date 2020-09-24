@@ -8,8 +8,8 @@
  * Modified by: Duke Fong <duke@dukelec.com>
  */
 
-#ifndef __PID_M_H__
-#define __PID_M_H__
+#ifndef __PID_I_H__
+#define __PID_I_H__
 
 typedef struct {
     // configuration
@@ -17,25 +17,26 @@ typedef struct {
     float out_min, out_max;
     float period;
 
-    float target;
+    int target;
 
     // runtime and internal
-    float i_term, last_input;
+    float i_term;
+    int last_input;
     float _ki, _kd;
-} pid_m_t;
+} pid_i_t;
 
-float pid_compute(pid_m_t *pid, float input);
+float pid_i_compute(pid_i_t *pid, int input);
 
-float pid_compute_no_d(pid_m_t *pid, float input);
+float pid_i_compute_no_d(pid_i_t *pid, int input);
 
-inline void pid_set_target(pid_m_t *pid, float target)
+inline void pid_i_set_target(pid_i_t *pid, int target)
 {
     pid->target = target;
 }
 
-void pid_reset(pid_m_t *pid, float input, float output);
+void pid_i_reset(pid_i_t *pid, int input, float output);
 
 // invoke after ki or kd changed
-void pid_init(pid_m_t *pid, bool reset);
+void pid_i_init(pid_i_t *pid, bool reset);
 
 #endif

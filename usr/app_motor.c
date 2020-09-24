@@ -15,9 +15,9 @@ static cdnet_socket_t speed_sock = { .port = 21 };
 
 void app_motor_init(void)
 {
-    pid_init(&csa.pid_cur, true);
-    pid_init(&csa.pid_speed, true);
-    pid_init(&csa.pid_pos, true);
+    pid_f_init(&csa.pid_cur, true);
+    pid_f_init(&csa.pid_speed, true);
+    pid_i_init(&csa.pid_pos, true);
 }
 
 
@@ -137,8 +137,8 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
 
         // calculate angle
         if (csa.state != ST_CALIBRATION) {
-            pid_set_target(&csa.pid_cur, 100); // TODO: only set once after modified
-            i_sq_out = pid_compute_no_d(&csa.pid_cur, csa.current_in);
+            pid_f_set_target(&csa.pid_cur, 100); // TODO: only set once after modified
+            i_sq_out = pid_f_compute_no_d(&csa.pid_cur, csa.current_in);
             i_alpha = -i_sq_out * sin_angle_elec_in;
             i_beta =  i_sq_out * cos_angle_elec_in;
         } else {
