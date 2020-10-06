@@ -55,8 +55,9 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
     //in_pos = EQep1Regs.QPOSCNT;
     //float angle_elec = 2.0 * PI * ((in_pos & 0x7ff) / 2048.0);
 
-    uint16_t encoder_ori = encoder_read() << 1;
-    csa.encoder_val = 0xfffe - (encoder_ori - 0x58d8);
+    uint16_t encoder_ori = encoder_read();
+    //csa.encoder_val = 0xfffe - (encoder_ori - 0x58d8);
+    csa.encoder_val =  0xffff - (encoder_ori - 0xf510);
 
     static int32_t pos = 0;
 
@@ -72,10 +73,10 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
             d_debug("%04x %08x", encoder_ori, pos);
 
 
-    uint16_t encoder_sub = csa.encoder_val % lroundf(0x10000/11.0);
+    uint16_t encoder_sub = csa.encoder_val % lroundf(0x10000/21.0f);
 
     float angle_mech = csa.encoder_val*((float)M_PI*2/0x10000);
-    csa.angle_elec_in = encoder_sub*((float)M_PI*2/(0x10000/11.0f));
+    csa.angle_elec_in = encoder_sub*((float)M_PI*2/(0x10000/21.0f));
     sin_angle_elec_in = sinf(csa.angle_elec_in);
     cos_angle_elec_in = cosf(csa.angle_elec_in);
 
@@ -96,11 +97,15 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
         /*
         if (csa.state != ST_CALIBRATION)
             csa.angle_elec_out = csa.angle_elec_in;
-        if (dbg_en) {
-            csa.angle_elec_out += 0.01f;
+        */
+        /*
+        //if (dbg_en) {
+            csa.angle_elec_out += 0.001f;
             if (csa.angle_elec_out >= (float)M_PI*2)
                 csa.angle_elec_out -= (float)M_PI*2;
-        }*/
+            //csa.angle_elec_out = 0;
+        //}
+        */
 
         csa.current_in = -i_alpha * sin_angle_elec_in + i_beta * cos_angle_elec_in; // i_sq
         float i_sd = i_alpha * cos_angle_elec_in + i_beta * sin_angle_elec_in; // i_sd
@@ -137,12 +142,12 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
 
         // calculate angle
         if (csa.state != ST_CALIBRATION) {
-            pid_f_set_target(&csa.pid_cur, 100); // TODO: only set once after modified
+            pid_f_set_target(&csa.pid_cur, 700); // TODO: only set once after modified
             i_sq_out = pid_f_compute_no_d(&csa.pid_cur, csa.current_in);
             i_alpha = -i_sq_out * sin_angle_elec_in;
             i_beta =  i_sq_out * cos_angle_elec_in;
         } else {
-            i_sq_out = 500; ///
+            i_sq_out = 200; ///
             i_alpha = -i_sq_out * sinf(csa.angle_elec_out);
             i_beta =  i_sq_out * cosf(csa.angle_elec_out);
         }

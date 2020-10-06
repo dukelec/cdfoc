@@ -20,6 +20,7 @@ gpio_t led_g = { .group = LED_GRN_GPIO_Port, .num = LED_GRN_Pin };
 static gpio_t drv_en = { .group = DRV_EN_GPIO_Port, .num = DRV_EN_Pin };
 static gpio_t drv_nss = { .group = DRV_NSS_GPIO_Port, .num = DRV_NSS_Pin };
 static gpio_t s_nss = { .group = S_NSS_GPIO_Port, .num = S_NSS_Pin };
+static spi_t s_spi = { .hspi = &hspi2, .ns_pin = &s_nss };
 
 uart_t debug_uart = { .huart = &huart1 };
 
@@ -94,22 +95,12 @@ static void jump_to_app(void)
 
 uint16_t encoder_read(void)
 {
-    uint16_t buf[2];
-    int ret = 0;
-
-    buf[0] = 0x8021;
-
-    gpio_set_value(&s_nss, 0);
-    ret = HAL_SPI_Transmit(&hspi2, (uint8_t *)buf, 1, HAL_MAX_DELAY);
-
-    GPIOC->MODER &= ~(1 << (3 * 2 + 1));
-    ret = HAL_SPI_Receive(&hspi2, (uint8_t *)buf, 2, HAL_MAX_DELAY);
-    gpio_set_value(&s_nss, 1);
-    GPIOC->MODER |= 1 << (3 * 2 + 1);
-
-    //d_debug("%04x %04x\n", buf[0], buf[1]);
-
-    return buf[0] & 0x7fff;
+    uint8_t buf[4];
+    spi_mem_read(&s_spi, 0xa6, buf, 2); // 4
+    //uint32_t ret_val = buf[0] << 16 | buf[1] << 8 | buf[2] << 0;// | buf[3];
+    uint16_t ret_val = buf[0] << 8 | buf[1]; // | buf[2] << 0;// | buf[3];
+    //d_debug("= %08x\n", ret_val);
+    return ret_val;
 }
 
 static uint16_t drv_read_reg(uint8_t reg)
