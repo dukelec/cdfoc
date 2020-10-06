@@ -12,9 +12,9 @@
 static char cpu_id[25];
 static char info_str[100];
 
-static cdnet_socket_t sock1 = { .port = 1 };
-static cdnet_socket_t sock10 = { .port = 10 };
-static cdnet_socket_t sock11 = { .port = 11 };
+static cdn_sock_t sock1 = { .port = 1, .ns = &dft_ns };
+static cdn_sock_t sock10 = { .port = 10, .ns = &dft_ns };
+static cdn_sock_t sock11 = { .port = 11, .ns = &dft_ns };
 
 
 static void get_uid(char *buf)
@@ -35,9 +35,9 @@ static void init_info_str(void)
     // M: model; S: serial string; HW: hardware version; SW: software version
     get_uid(cpu_id);
 #ifdef BOOTLOADER
-    sprintf(info_str, "M: motor master (bl); S: %s; SW: %s", cpu_id, SW_VER);
+    sprintf(info_str, "M: mdrv (bl); S: %s; SW: %s", cpu_id, SW_VER);
 #else
-    sprintf(info_str, "M: motor master; S: %s; SW: %s", cpu_id, SW_VER);
+    sprintf(info_str, "M: mdrv; S: %s; SW: %s", cpu_id, SW_VER);
 #endif
     d_info("info: %s\n", info_str);
 }
@@ -46,55 +46,30 @@ static void init_info_str(void)
 // device info
 static void p1_service_routine(void)
 {
-    uint16_t max_time = 0;
-    uint16_t wait_time = 0;
-    uint8_t mac_start = 0;
-    uint8_t mac_end = 255;
-    char string[100] = "";
-
-    cdnet_packet_t *pkt = cdnet_socket_recvfrom(&sock1);
+    cdn_pkt_t *pkt = cdn_sock_recvfrom(&sock1);
     if (!pkt)
         return;
 
-    if (pkt->len && (pkt->dat[0] == 0x40 || pkt->dat[0] == 0x41)) {
-        if (pkt->dat[0] == 0x41) {
-            max_time = *(uint16_t *)(pkt->dat + 1);
-            wait_time = rand() / (RAND_MAX / max_time);
-            mac_start = pkt->dat[3];
-            mac_end = pkt->dat[4];
-            strncpy(string, (char *)pkt->dat + 5, pkt->len - 5);
-        }
-
-        d_debug("dev_info: wait %d (%d), [%d, %d], str: %s\n",
-                wait_time, max_time, mac_start, mac_end, string);
-
-        cdnet_intf_t *intf = cdnet_route_search(&pkt->src.addr, NULL);
-        uint8_t intf_mac = intf->mac;
-
-        if (clip(intf_mac, mac_start, mac_end) == intf_mac &&
-                strstr(info_str, string) != NULL) {
-            uint32_t t_last = get_systick();
-            while (get_systick() - t_last < wait_time * 1000 / SYSTICK_US_DIV);
-            pkt->dat[0] = 0x80;
-            strcpy((char *)pkt->dat + 1, info_str);
-            pkt->len = strlen(info_str) + 1;
-            pkt->dst = pkt->src;
-            cdnet_socket_sendto(&sock1, pkt);
-            return;
-        }
+    if (pkt->len == 1 && pkt->dat[0] == 0) {
+        pkt->dat[0] = 0x80;
+        strcpy((char *)pkt->dat + 1, info_str);
+        pkt->len = strlen(info_str) + 1;
+        pkt->dst = pkt->src;
+        cdn_sock_sendto(&sock1, pkt);
+        return;
     }
     d_debug("p1 ser: ignore\n");
-    list_put(&cdnet_free_pkts, &pkt->node);
+    list_put(&dft_ns.free_pkts, &pkt->node);
 }
 
 
 // device control
 static void p10_service_routine(void)
 {
-    cdnet_packet_t *pkt = cdnet_socket_recvfrom(&sock10);
+    cdn_pkt_t *pkt = cdn_sock_recvfrom(&sock10);
     if (!pkt)
         return;
-
+/*
     if (pkt->len && (pkt->dat[0] == 0x60 || pkt->dat[0] == 0x20)) {
         NVIC_SystemReset(); // TODO: return before reset
     } else if (pkt->len && pkt->dat[0] == 0x61) {
@@ -111,9 +86,9 @@ static void p10_service_routine(void)
         pkt->dat[0] = 0x80;
         pkt->dst = pkt->src;
         cdnet_socket_sendto(&sock10, pkt);
-    }
+    } */
     d_debug("p10 ser: ignore\n");
-    list_put(&cdnet_free_pkts, &pkt->node);
+    list_put(&dft_ns.free_pkts, &pkt->node);
 }
 
 // flash memory manipulation
@@ -123,7 +98,7 @@ static void p11_service_routine(void)
     // read:  0x40, addr_32, len_8   | return [0x80, data]
     // write: 0x61, addr_32 + [data] | return [0x80] on success
 #if 0
-    cdnet_packet_t *pkt = cdnet_socket_recvfrom(&sock11);
+    cdn_pkt_t *pkt = cdn_sock_recvfrom(&sock11);
     if (!pkt)
         return;
 
@@ -198,9 +173,9 @@ static void p11_service_routine(void)
 
 void common_service_init(void)
 {
-    cdnet_socket_bind(&sock1, NULL);
-    cdnet_socket_bind(&sock10, NULL);
-    cdnet_socket_bind(&sock11, NULL);
+    cdn_sock_bind(&sock1);
+    cdn_sock_bind(&sock10);
+    cdn_sock_bind(&sock11);
     init_info_str();
 }
 

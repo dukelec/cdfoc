@@ -10,8 +10,8 @@
 #include "math.h"
 #include "app_main.h"
 
-static cdnet_socket_t pos_sock = { .port = 20 };
-static cdnet_socket_t speed_sock = { .port = 21 };
+static cdn_sock_t pos_sock = { .port = 20, .ns = &dft_ns };
+static cdn_sock_t speed_sock = { .port = 21, .ns = &dft_ns };
 
 void app_motor_init(void)
 {

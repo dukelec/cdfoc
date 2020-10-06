@@ -10,6 +10,7 @@
 #ifndef __DEBUG_CONFIG_H__
 #define __DEBUG_CONFIG_H__
 
+#include "arch_wrapper.h"
 
 static inline
 void dbg_transmit(uart_t *uart, const uint8_t *buf, uint16_t len)

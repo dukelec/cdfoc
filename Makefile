@@ -60,9 +60,9 @@ Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_cortex.c \
 Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal.c \
 Src/system_stm32f4xx.c \
 cdnet/dispatch/cdnet_dispatch.c \
+cdnet/dispatch/helper.c \
 cdnet/parser/cdnet_l0.c \
 cdnet/parser/cdnet_l1.c \
-cdnet/parser/cdnet_l2.c \
 cdnet/dev/cdctl_it.c \
 cdnet/utils/cd_list.c \
 cdnet/utils/rbtree.c \

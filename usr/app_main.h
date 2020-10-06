@@ -11,6 +11,7 @@
 #define __APP_MAIN_H__
 
 #include "cdnet_dispatch.h"
+#include "cd_debug.h"
 #include "cdbus_uart.h"
 #include "cdctl_it.h"
 #include "pid_f.h"
@@ -45,15 +46,20 @@ typedef enum {
 
 typedef struct {
     uint16_t        magic_code; // 0xcdcd
-    bool            bl_wait; // run app after timeout (unit 0.1s), 0xff: never
+    uint8_t         conf_ver;
+    uint8_t         bl_wait; // run app after timeout (unit 0.1s), 0xff: never
 
-    uint8_t         rs485_net;
-    uint8_t         rs485_mac;
-    uint32_t        rs485_baudrate_low;
-    uint32_t        rs485_baudrate_high;
+    uint8_t         bus_mode; // a, bs, trad
+    uint8_t         bus_net;
+    uint8_t         bus_mac;
+    uint32_t        bus_baud_low;
+    uint32_t        bus_baud_high;
+    uint16_t        bus_tx_premit_len;
+    uint16_t        bus_max_idle_len;
+
 
     bool            dbg_en;
-    cd_sockaddr_t   dbg_dst;
+    cdn_sockaddr_t  dbg_dst;
 
     pid_f_t         pid_cur;
     pid_f_t         pid_speed;
@@ -63,6 +69,11 @@ typedef struct {
     int32_t         peak_cur_duration;
 
     uint16_t        loop_msk;
+
+    int32_t         pos_offset;
+
+    uint32_t        di_map;
+    uint32_t        do_map;
 
     // end of eeprom
 
@@ -87,7 +98,6 @@ void load_conf(void);
 void save_conf(void);
 void common_service_init(void);
 void common_service_routine(void);
-void debug_init(bool *en, cd_sockaddr_t *dst);
 
 void set_led_state(led_state_t state);
 
@@ -104,5 +114,6 @@ extern TIM_HandleTypeDef htim1;
 
 extern gpio_t led_r;
 extern gpio_t led_g;
+extern cdn_ns_t dft_ns;
 
 #endif

@@ -13,14 +13,14 @@ csa_t csa = {
         .magic_code = 0xcdcd,
         .bl_wait = 30, // wait 3 sec
 
-        .rs485_net = 0,
-        .rs485_mac = 2,
-        .rs485_baudrate_low = 115200,
-        .rs485_baudrate_high = 115200,
+        .bus_net = 0,
+        .bus_mac = 2,
+        .bus_baud_low = 115200,
+        .bus_baud_high = 115200,
 
         .dbg_en = true,
         .dbg_dst = {
-                .addr.cd_addr8 = {0x80, 0x00, 0x00},
+                .addr = {0x80, 0x00, 0x00},
                 .port = 9
         },
 

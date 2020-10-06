@@ -34,10 +34,10 @@ static cd_frame_t frame_alloc[FRAME_MAX];
 static list_head_t frame_free_head = {0};
 
 #define PACKET_MAX 50
-static cdnet_packet_t packet_alloc[PACKET_MAX];
+static cdn_pkt_t packet_alloc[PACKET_MAX];
 
-static cdctl_dev_t r_dev = {0};    // RS485
-static cdnet_intf_t n_intf = {0};  // CDNET
+static cdctl_dev_t r_dev = {0};    // CDBUS
+cdn_ns_t dft_ns = {0};             // CDNET
 
 
 static void device_init(void)
@@ -46,13 +46,14 @@ static void device_init(void)
     for (i = 0; i < FRAME_MAX; i++)
         list_put(&frame_free_head, &frame_alloc[i].node);
     for (i = 0; i < PACKET_MAX; i++)
-        list_put(&cdnet_free_pkts, &packet_alloc[i].node);
+        list_put(&dft_ns.free_pkts, &packet_alloc[i].node);
 
-    cdctl_dev_init(&r_dev, &frame_free_head, csa.rs485_mac,
-            csa.rs485_baudrate_low, csa.rs485_baudrate_high,
+    cdctl_dev_init(&r_dev, &frame_free_head, csa.bus_mac,
+            csa.bus_baud_low, csa.bus_baud_high,
             &r_spi, &r_rst_n, &r_int_n);
-    cdnet_intf_init(&n_intf, &r_dev.cd_dev, csa.rs485_net, csa.rs485_mac);
-    cdnet_intf_register(&n_intf);
+    dft_ns.intfs[0].dev = &r_dev.cd_dev;
+    dft_ns.intfs[0].net = csa.bus_net;
+    dft_ns.intfs[0].mac = csa.bus_mac;
 }
 
 void set_led_state(led_state_t state)
@@ -68,13 +69,13 @@ void set_led_state(led_state_t state)
         break;
     case LED_WARN:
         gpio_set_value(&led_r, 1);
-        gpio_set_value(&led_g, 0);
+        gpio_set_value(&led_g, 1);
         break;
     default:
     case LED_ERROR:
         is_err = true;
         gpio_set_value(&led_r, 1);
-        gpio_set_value(&led_g, 1);
+        gpio_set_value(&led_g, 0);
         break;
     }
 }
@@ -131,7 +132,7 @@ void app_main(void)
 #else
     printf("\nstart app_main...\n");
 #endif
-    debug_init(&csa.dbg_en, &csa.dbg_dst);
+    debug_init(&dft_ns, &csa.dbg_dst, &csa.dbg_en);
     load_conf();
     device_init();
     common_service_init();
@@ -181,7 +182,7 @@ void app_main(void)
         //d_debug("drv: %08x\n", drv_read_reg(0x01) << 16 | drv_read_reg(0x00));
 
 
-        cdnet_intf_routine(); // handle cdnet
+        cdn_routine(&dft_ns); // handle cdnet
         common_service_routine();
         app_motor();
         debug_flush();
