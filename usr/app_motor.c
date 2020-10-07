@@ -42,12 +42,12 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
 {
 
     static float ia_idle, ib_idle, ic_idle;
-    float sin_angle_elec_in, cos_angle_elec_in; // reduce the amount of calculations
+    float sin_angle_elec_sen, cos_angle_elec_sen; // reduce the amount of calculations
     int16_t out_pwm_u = 0, out_pwm_v = 0, out_pwm_w = 0;
     bool dbg_en = (csa.loop_cnt & csa.loop_msk) == 0;
 
     if (csa.loop_cnt == 0xffff)
-        csa.state = ST_CONST_CURRENT;
+        csa.state = ST_CONST_SPEED;
 
     // bit mask for 2048: 0x7ff
     // 2048 × 7 = 14336
@@ -56,34 +56,34 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
     //float angle_elec = 2.0 * PI * ((in_pos & 0x7ff) / 2048.0);
 
     uint16_t encoder_ori = encoder_read();
-    //csa.encoder_val = 0xfffe - (encoder_ori - 0x58d8);
-    csa.encoder_val =  0xffff - (encoder_ori - 0xf510);
+    //csa.encoder_sen = 0xfffe - (encoder_ori - 0x58d8);
+    //csa.encoder_sen =  0xffff - (encoder_ori - 0x429f);
+    //csa.encoder_sen =  0xffff - (0x429f - encoder_ori);
+    csa.encoder_sen =  (encoder_ori - 0x4590);
 
-    static int32_t pos = 0;
-
-    if (abs((uint16_t)(pos & 0xffff) - csa.encoder_val) > 0x10000/2) {
-        if (csa.encoder_val < 0x10000/2)
-            pos += 0x10000;
+    if (abs((uint16_t)(csa.pos_sen & 0xffff) - csa.encoder_sen) > 0x10000/2) {
+        if (csa.encoder_sen < 0x10000/2)
+            csa.pos_sen += 0x10000;
         else
-            pos -= 0x10000;
+            csa.pos_sen -= 0x10000;
     }
-    pos  = (pos & 0xffff0000) | csa.encoder_val;
+    csa.pos_sen  = (csa.pos_sen & 0xffff0000) | csa.encoder_sen;
 
     if (dbg_en)
-            d_debug("%04x %08x", encoder_ori, pos);
+            d_debug("%04x %08x", encoder_ori, csa.pos_sen);
 
 
-    uint16_t encoder_sub = csa.encoder_val % lroundf(0x10000/21.0f);
+    uint16_t encoder_sub = csa.encoder_sen % lroundf(0x10000/21.0f);
 
-    float angle_mech = csa.encoder_val*((float)M_PI*2/0x10000);
-    csa.angle_elec_in = encoder_sub*((float)M_PI*2/(0x10000/21.0f));
-    sin_angle_elec_in = sinf(csa.angle_elec_in);
-    cos_angle_elec_in = cosf(csa.angle_elec_in);
+    float angle_mech = csa.encoder_sen*((float)M_PI*2/0x10000);
+    csa.angle_elec_sen = encoder_sub*((float)M_PI*2/(0x10000/21.0f));
+    sin_angle_elec_sen = sinf(csa.angle_elec_sen);
+    cos_angle_elec_sen = cosf(csa.angle_elec_sen);
 
     if (dbg_en)
         d_debug_c(" a %d.%.2d %d.%.2d %d.%.2d",
-                //csa.encoder_val, encoder_sub,
-                P_2F(angle_mech), P_2F(csa.angle_elec_in), P_2F(csa.angle_elec_out));
+                //csa.encoder_sen, encoder_sub,
+                P_2F(angle_mech), P_2F(csa.angle_elec_sen), P_2F(csa.cali_angle_elec));
 
     if (csa.state != ST_STOP) {
         float ia = HAL_ADCEx_InjectedGetValue(&hadc1, 1) - ia_idle;
@@ -95,20 +95,24 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
         float i_beta = (ia + ib * 2) / 1.732050808f; // √3
 
         /*
-        if (csa.state != ST_CALIBRATION)
-            csa.angle_elec_out = csa.angle_elec_in;
-        */
-        /*
-        //if (dbg_en) {
-            csa.angle_elec_out += 0.001f;
-            if (csa.angle_elec_out >= (float)M_PI*2)
-                csa.angle_elec_out -= (float)M_PI*2;
-            //csa.angle_elec_out = 0;
-        //}
+        if (csa.state != ST_CALI)
+            csa.cali_angle_elec = csa.angle_elec_sen;
         */
 
-        csa.current_in = -i_alpha * sin_angle_elec_in + i_beta * cos_angle_elec_in; // i_sq
-        float i_sd = i_alpha * cos_angle_elec_in + i_beta * sin_angle_elec_in; // i_sd
+
+        /*
+        //if (dbg_en) {
+            csa.cali_angle_elec += 0.002f;
+            if (csa.cali_angle_elec >= (float)M_PI*2)
+                csa.cali_angle_elec -= (float)M_PI*2;
+            //csa.cali_angle_elec = 0;
+        //}
+         *
+         */
+
+
+        csa.current_sen = -i_alpha * sin_angle_elec_sen + i_beta * cos_angle_elec_sen; // i_sq
+        float i_sd = i_alpha * cos_angle_elec_sen + i_beta * sin_angle_elec_sen; // i_sd
 
         /*
         if (in_current > peak_cur_threshold) {
@@ -125,7 +129,7 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
             d_debug_c(", in %5d.%.2d %5d.%.2d %5d.%.2d %5d.%.2d",
                     P_2F(ia), P_2F(ib), P_2F(ic), P_2F(ic_));
         if (dbg_en)
-            d_debug_c(", i %5d.%.2d, %5d.%.2d", P_2F(csa.current_in), P_2F(i_sd));
+            d_debug_c(", i %5d.%.2d, %5d.%.2d", P_2F(csa.current_sen), P_2F(i_sd));
     } else {
         // TODO: add filter
         ia_idle = HAL_ADCEx_InjectedGetValue(&hadc1, 1);
@@ -141,15 +145,15 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
         float i_sq_out, i_alpha, i_beta;
 
         // calculate angle
-        if (csa.state != ST_CALIBRATION) {
-            pid_f_set_target(&csa.pid_cur, 700); // TODO: only set once after modified
-            i_sq_out = pid_f_compute_no_d(&csa.pid_cur, csa.current_in);
-            i_alpha = -i_sq_out * sin_angle_elec_in;
-            i_beta =  i_sq_out * cos_angle_elec_in;
+        if (csa.state != ST_CALI) {
+            pid_f_set_target(&csa.pid_cur, csa.current_cal); // TODO: only set once after modified
+            i_sq_out = pid_f_compute_no_d(&csa.pid_cur, csa.current_sen);
+            i_alpha = -i_sq_out * sin_angle_elec_sen;
+            i_beta =  i_sq_out * cos_angle_elec_sen;
         } else {
             i_sq_out = 200; ///
-            i_alpha = -i_sq_out * sinf(csa.angle_elec_out);
-            i_beta =  i_sq_out * cosf(csa.angle_elec_out);
+            i_alpha = -i_sq_out * sinf(csa.cali_angle_elec);
+            i_beta =  i_sq_out * cosf(csa.cali_angle_elec);
         }
 
         out_pwm_u = lroundf(i_alpha);
@@ -168,7 +172,7 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
 #if 0
         pid_reset(&pid_cur, 0.0, 0.0);
         pid_reset(&pid_speed, 0.0, 0.0);
-        pid_reset(&pid_pos, in_pos, 0);
+        pid_reset(&pid_pos, csa.pos_sen, 0);
         peak_cur_cnt = 0;
 #endif
         if (dbg_en)
@@ -181,24 +185,28 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
     __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_2, DRV_PWM_HALF - out_pwm_v); // TIM1_CH2: B
     __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, DRV_PWM_HALF - out_pwm_w); // TIM1_CH1: C
 
-#if 0
+#if 1
     // speed filter, output in_speed for speed loop
     {
         const float coeffs[5] = {0.1, 0.15, 0.2, 0.25, 0.3};
         static float speed_avg = 0.0;
         static int speed_filt_cnt = 0;
-        static int in_pos_last = 0;
+        static int pos_sen_last = 0;
 
-        float speed = (in_pos_last - in_pos) * CURRENT_LOOP_FREQ / 14336.0;
-        in_pos_last = in_pos;
+        float speed = (pos_sen_last - csa.pos_sen) * CURRENT_LOOP_FREQ * 60 / 0x10000;
+        pos_sen_last = csa.pos_sen;
 
         speed_avg += speed * coeffs[speed_filt_cnt++];
 
         if (speed_filt_cnt == 5) {
-            in_speed = speed_avg;
-            speed_filt_cnt = 0;
+            csa.speed_sen = speed_avg;
             speed_avg = 0;
-            speed_loop_compute();
+            speed_filt_cnt = 0;
+
+            csa.speed_cal = csa.state == ST_CONST_SPEED ? -1 : 0;
+
+            pid_f_set_target(&csa.pid_speed, csa.speed_cal); // TODO: only set once after modified
+            csa.current_cal = pid_f_compute_no_d(&csa.pid_speed, csa.speed_sen);
         }
     }
 #endif

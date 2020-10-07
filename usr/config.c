@@ -8,6 +8,7 @@
  */
 
 #include "app_main.h"
+#include "math.h"
 
 csa_t csa = {
         .magic_code = 0xcdcd,
@@ -31,9 +32,9 @@ csa_t csa = {
                 .period = 1.0 / CURRENT_LOOP_FREQ
         },
         .pid_speed = {
-                .kp = 1000, .ki = 100000.0,
-                .out_min = -9000,
-                .out_max = 9000, // limit output current
+                .kp = 100, .ki = 5000.0,
+                .out_min = -2000,
+                .out_max = 2000, // limit output current
                 .period = 5.0 / CURRENT_LOOP_FREQ
         },
         .pid_pos = {
@@ -48,7 +49,7 @@ csa_t csa = {
         .loop_cnt = 0,
 
         .state = ST_STOP,
-        .angle_elec_out = 0
+        .cali_angle_elec = (float)M_PI/2
 };
 
 

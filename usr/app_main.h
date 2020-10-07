@@ -31,10 +31,11 @@
 
 typedef enum {
     ST_STOP = 0,
-    ST_CALIBRATION,
+    ST_CALI,
     ST_CONST_CURRENT,
     ST_CONST_SPEED,
-    ST_POSITION
+    ST_POSITION,
+    ST_POS_TC
 } state_t;
 
 typedef enum {
@@ -49,13 +50,13 @@ typedef struct {
     uint8_t         conf_ver;
     uint8_t         bl_wait; // run app after timeout (unit 0.1s), 0xff: never
 
-    uint8_t         bus_mode; // a, bs, trad
+    //uint8_t         bus_mode; // a, bs, trad
     uint8_t         bus_net;
     uint8_t         bus_mac;
     uint32_t        bus_baud_low;
     uint32_t        bus_baud_high;
-    uint16_t        bus_tx_premit_len;
-    uint16_t        bus_max_idle_len;
+    //uint16_t        bus_tx_premit_len;
+    //uint16_t        bus_max_idle_len;
 
 
     bool            dbg_en;
@@ -70,6 +71,7 @@ typedef struct {
 
     uint16_t        loop_msk;
 
+    uint16_t        encoder_offset;
     int32_t         pos_offset;
 
     uint32_t        di_map;
@@ -77,15 +79,23 @@ typedef struct {
 
     // end of eeprom
 
-    uint16_t        loop_cnt;
-    uint16_t        encoder_val;
-    float           angle_elec_in;
-    float           angle_elec_out;
-    float           current_in;
-    float           current_out;
-
     state_t         state;
 
+    float           cali_angle_elec;
+    float           cali_current;
+    float           cali_angle_step; // increase cali_angle_elec
+
+    uint16_t        encoder_sen;
+    float           angle_elec_sen;
+
+    float           current_sen;
+    float           current_cal;
+    float           speed_sen;
+    float           speed_cal;
+    int32_t         pos_sen;
+    int32_t         pos_cal;
+
+    uint16_t        loop_cnt;
     int32_t         peak_cur_cnt;
 
 } csa_t; // config status area

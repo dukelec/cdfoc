@@ -132,6 +132,7 @@ void app_main(void)
 #else
     printf("\nstart app_main...\n");
 #endif
+
     debug_init(&dft_ns, &csa.dbg_dst, &csa.dbg_en);
     load_conf();
     device_init();
