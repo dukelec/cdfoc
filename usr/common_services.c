@@ -30,6 +30,18 @@ static void get_uid(char *buf)
     buf[24] = '\0';
 }
 
+static int get_sector(uint32_t addr)
+{
+    if (addr < 0x08000000 || addr > 0x080fffff)
+        return -1;
+    addr &= 0xfffff;
+    if (addr <= 0xffff)
+        return addr / (16 * 1024);
+    if (addr <= 0x1ffff)
+        return 4;
+    return addr / (128 * 1024) + 4;
+}
+
 static void init_info_str(void)
 {
     // M: model; S: serial string; HW: hardware version; SW: software version
@@ -69,105 +81,103 @@ static void p10_service_routine(void)
     cdn_pkt_t *pkt = cdn_sock_recvfrom(&sock10);
     if (!pkt)
         return;
-/*
-    if (pkt->len && (pkt->dat[0] == 0x60 || pkt->dat[0] == 0x20)) {
-        NVIC_SystemReset(); // TODO: return before reset
-    } else if (pkt->len && pkt->dat[0] == 0x61) {
+
+    pkt->len = 1;
+    pkt->dat[0] = 0x80;
+    pkt->dst = pkt->src;
+
+    if (pkt->len && pkt->dat[0] == 0x20) {
+        cdn_sock_sendto(&sock10, pkt);
+        delay_systick(50000 / SYSTICK_US_DIV);
+        // TODO: return before reset for cdnet seq
+        NVIC_SystemReset();
+
+    } else if (pkt->len && pkt->dat[0] == 0x21) {
         d_debug("p10 ser: save config to flash\n");
         save_conf();
-        pkt->len = 1;
-        pkt->dat[0] = 0x80;
-        pkt->dst = pkt->src;
-        cdnet_socket_sendto(&sock10, pkt);
-    } else if (pkt->len && pkt->dat[0] == 0x62) {
+        cdn_sock_sendto(&sock10, pkt);
+
+    } else if (pkt->len && pkt->dat[0] == 0x22) {
         d_debug("p10 ser: stay in bootloader\n");
-        csa.bl_wait = 0xff;
-        pkt->len = 1;
-        pkt->dat[0] = 0x80;
-        pkt->dst = pkt->src;
-        cdnet_socket_sendto(&sock10, pkt);
-    } */
-    d_debug("p10 ser: ignore\n");
-    list_put(&dft_ns.free_pkts, &pkt->node);
+        //csa.bl_wait = 0xff;
+        cdn_sock_sendto(&sock10, pkt);
+
+    } else {
+        d_debug("p10 ser: ignore\n");
+        list_put(&dft_ns.free_pkts, &pkt->node);
+    }
 }
 
 // flash memory manipulation
 static void p11_service_routine(void)
 {
-    // erase: 0x6f, addr_32, len_32  | return [0x80] on success
-    // read:  0x40, addr_32, len_8   | return [0x80, data]
-    // write: 0x61, addr_32 + [data] | return [0x80] on success
-#if 0
+    // erase: 0x2f, addr_32, len_32  | return [0x80] on success
+    // read:  0x00, addr_32, len_8   | return [0x80, data]
+    // write: 0x20, addr_32 + [data] | return [0x80] on success
+
     cdn_pkt_t *pkt = cdn_sock_recvfrom(&sock11);
     if (!pkt)
         return;
 
-    if (pkt->dat[0] == 0x6f && pkt->len == 9) {
-        uint8_t ret;
-        uint32_t err_page = 0;
+    if (pkt->dat[0] == 0x2f && pkt->len == 9) {
+        int ret = -1;
+        uint32_t err_sector = 0xffffffff;
         FLASH_EraseInitTypeDef f;
         uint32_t addr = *(uint32_t *)(pkt->dat + 1);
         uint32_t len = *(uint32_t *)(pkt->dat + 5);
 
-        f.TypeErase = FLASH_TYPEERASE_PAGES;
-        f.PageAddress = addr;
-        f.NbPages = (len + FLASH_PAGE_SIZE - 1) / FLASH_PAGE_SIZE;
+        f.TypeErase = FLASH_TYPEERASE_SECTORS;
+        f.Sector = get_sector(addr);
+        f.NbSectors = get_sector(addr + len) - get_sector(addr) + 1;
+        f.VoltageRange = FLASH_VOLTAGE_RANGE_3;
 
-        ret = HAL_FLASH_Unlock();
-        if (ret == HAL_OK)
-            ret = HAL_FLASHEx_Erase(&f, &err_page);
-        ret |= HAL_FLASH_Lock();
+        if (get_sector(addr) >= 0 && get_sector(addr + len) >= 0) {
+            ret = HAL_FLASH_Unlock();
+            if (ret == HAL_OK)
+                ret = HAL_FLASHEx_Erase(&f, &err_sector);
+            ret |= HAL_FLASH_Lock();
+            d_debug("nvm erase: %08x +%08x, %08x, ret: %d\n", addr, len, err_sector, ret);
+        } else {
+            d_debug("nvm erase: error sector\n");
+        }
 
-        d_debug("nvm erase: %08x +%08x, %08x, ret: %d\n",
-                addr, len, err_page, ret);
         pkt->len = 1;
         pkt->dat[0] = ret == HAL_OK ? 0x80 : 0x81;
 
-    } else if (pkt->dat[0] == 0x40 && pkt->len == 6) {
+    } else if (pkt->dat[0] == 0x00 && pkt->len == 6) {
         uint32_t *src_dat = (uint32_t *) *(uint32_t *)(pkt->dat + 1);
-        uint8_t len = pkt->dat[5];
-        uint8_t cnt = (len + 3) / 4;
-
+        uint8_t len = min(pkt->dat[5], CDN_MAX_DAT - 1);
         uint32_t *dst_dat = (uint32_t *)(pkt->dat + 1);
-        uint8_t i;
-
-        cnt = min(cnt, CDNET_MAX_DAT / 4);
-
-        for (i = 0; i < cnt; i++)
-            *(dst_dat + i) = *(src_dat + i);
-        d_debug("nvm read: %08x %d(%d)\n", src_dat, len, cnt);
+        memcpy(dst_dat, src_dat, len);
+        d_debug("nvm read: %08x %d\n", src_dat, len);
         pkt->dat[0] = 0x80;
-        pkt->len = min(cnt * 4, len) + 1;
+        pkt->len = len + 1;
 
-    } else if (pkt->dat[0] == 0x61 && pkt->len > 5) {
-        uint8_t ret;
+    } else if (pkt->dat[0] == 0x20 && pkt->len > 5) {
+        int ret;
         uint32_t *dst_dat = (uint32_t *) *(uint32_t *)(pkt->dat + 1);
         uint8_t len = pkt->len - 5;
         uint8_t cnt = (len + 3) / 4;
         uint32_t *src_dat = (uint32_t *)(pkt->dat + 5);
-        uint8_t i;
 
         ret = HAL_FLASH_Unlock();
-        for (i = 0; ret == HAL_OK && i < cnt; i++)
-            ret = HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD,
-                    (uint32_t)(dst_dat + i), *(src_dat + i));
+        for (int i = 0; ret == HAL_OK && i < cnt; i++)
+            ret = HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, (uint32_t)(dst_dat + i), *(src_dat + i));
         ret |= HAL_FLASH_Lock();
 
-        d_debug("nvm write: %08x %d(%d), ret: %d\n",
-                dst_dat, pkt->len - 5, cnt, ret);
+        d_debug("nvm write: %08x %d(%d), ret: %d\n", dst_dat, pkt->len - 5, cnt, ret);
         pkt->len = 1;
         pkt->dat[0] = ret == HAL_OK ? 0x80 : 0x81;
 
     } else {
-        list_put(&cdnet_free_pkts, &pkt->node);
+        list_put(&dft_ns.free_pkts, &pkt->node);
         d_warn("nvm: wrong cmd, len: %d\n", pkt->len);
         return;
     }
 
     pkt->dst = pkt->src;
-    cdnet_socket_sendto(&sock11, pkt);
+    cdn_sock_sendto(&sock11, pkt);
     return;
-#endif
 }
 
 
