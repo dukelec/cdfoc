@@ -10,9 +10,20 @@
 #include "app_main.h"
 #include "math.h"
 
+regr_t regr_wa[] = {
+        { .offset = offsetof(csa_t, bus_net), .size = offsetof(csa_t, pid_pos) - offsetof(csa_t, bus_net) },
+        { .offset = offsetof(csa_t, pid_pos), .size = offsetof(pid_i_t, target) },
+        { .offset = offsetof(csa_t, pid_speed), .size = offsetof(pid_f_t, target) },
+        { .offset = offsetof(csa_t, pid_speed), .size = offsetof(pid_f_t, target) },
+        { .offset = offsetof(csa_t, peak_cur_threshold),
+                .size = offsetof(csa_t, ori_encoder) - offsetof(csa_t, peak_cur_threshold) }
+};
+
+int regr_wa_num = sizeof(regr_wa) / sizeof(regr_t);
+
+
 csa_t csa = {
         .magic_code = 0xcdcd,
-        .bl_wait = 30, // wait 3 sec
 
         .bus_net = 0,
         .bus_mac = 2,
@@ -44,7 +55,10 @@ csa_t csa = {
                 .period = 25.0 / CURRENT_LOOP_FREQ
         },
 
-        .loop_msk = 0x01ff,
+
+        .bias_encoder = 0x4590,
+
+        .dbg_str_msk = 0x1fff, // 0x01ff,
 
         .loop_cnt = 0,
 

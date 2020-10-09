@@ -1,43 +1,15 @@
-#include <math.h>
-#include <errno.h>
-#include <sys/unistd.h> // STDOUT_FILENO, STDERR_FILENO
-#include <string.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <stdarg.h>
-#include <stdbool.h>
-#include <stddef.h>     // provide offsetof, NULL
-#include <stdint.h>
+/*
+ * Software License Agreement (BSD License)
+ *
+ * Copyright (c) 2017, DUKELEC, Inc.
+ * All rights reserved.
+ *
+ * Author: Duke Fong <duke@dukelec.com>
+ */
 
-#define P_2F(x) (int)(x), abs(((x)-(int)(x))*100)  // "%d.%.2d"
-#ifndef sign
-#define sign(a) ({                  \
-        typeof(a) __a = (a);        \
-        __a < 0 ? -1 : (__a > 0);   \
-    })
-#endif
-#ifndef max
-#define max(a, b) ({                \
-        typeof(a) __a = (a);        \
-        typeof(b) __b = (b);        \
-        __a > __b ? __a : __b;      \
-    })
-#endif
-#ifndef min
-#define min(a, b) ({                \
-        typeof(a) __a = (a);        \
-        typeof(b) __b = (b);        \
-        __a < __b ? __a : __b;      \
-    })
-#endif
-#ifndef clip
-#define clip(a, b, c) ({                            \
-        typeof(a) __a = (a);                        \
-        typeof(b) __b = (b);                        \
-        typeof(c) __c = (c);                        \
-        __a < __b ? __b : (__a > __c ? __c : __a);  \
-    })
-#endif
+#include <math.h>
+#include "cd_utils.h"
+#include "cd_debug.h"
 
 
 int t_curve_plan(float v_s, float v_e, float s, float v_unsign, float a_unsign,
@@ -50,12 +22,12 @@ int t_curve_plan(float v_s, float v_e, float s, float v_unsign, float a_unsign,
     float s_s = (powf(v_c, 2) - powf(v_s, 2)) / (a_s * 2);
     float s_e = (powf(v_e, 2) - powf(v_c, 2)) / (a_e * 2);
     
-    fprintf(stderr, "s_s: %f, s_e: %f\n", s_s, s_e);
+    //fprintf(stderr, "s_s: %f, s_e: %f\n", s_s, s_e);
     
     if (sign(s) * s >= sign(s) * (s_s + s_e)) {
         float s_c = s - s_s - s_e;
         float t_c = s_c / v_c;
-        fprintf(stderr, "s_c: %f, t_c: %f\n", s_c, t_c);
+        //fprintf(stderr, "s_c: %f, t_c: %f\n", s_c, t_c);
         
         s_seg[0] = s_s;
         s_seg[1] = s_c;
@@ -73,7 +45,7 @@ int t_curve_plan(float v_s, float v_e, float s, float v_unsign, float a_unsign,
     
     if (a_s != a_e) {
         float v_c_real = sign(v_c) * sqrtf(a_s * s + (powf(v_s, 2) + powf(v_e, 2)) / 2.0f);
-        fprintf(stderr, "v_c_real: %f\n", v_c_real);
+        //fprintf(stderr, "v_c_real: %f\n", v_c_real);
         
         s_seg[0] = (powf(v_c_real, 2) - powf(v_s, 2)) / (a_s * 2);
         s_seg[1] = 0;
@@ -92,7 +64,7 @@ int t_curve_plan(float v_s, float v_e, float s, float v_unsign, float a_unsign,
     
     {
         float a_urgent = (powf(v_e, 2) - powf(v_s, 2)) / (s * 2);
-        fprintf(stderr, "a_urgent: %f\n", a_urgent);
+        //fprintf(stderr, "a_urgent: %f\n", a_urgent);
         
         s_seg[0] = 0;
         s_seg[1] = 0;
@@ -117,7 +89,7 @@ int t_curve_step(const float *s_seg, const float *t_seg, const float *a_seg,
     float v_c_real = v_s + a_seg[0] * t_seg[0];
     
     if (t_cur > t_seg[0] + t_seg[1] + t_seg[2]) {
-        fprintf(stderr, "t_cur out of range %f %f\n", t_cur, t_seg[0] + t_seg[1] + t_seg[2]);
+        //fprintf(stderr, "t_cur out of range %f %f\n", t_cur, t_seg[0] + t_seg[1] + t_seg[2]);
         return -1;
     }
     
@@ -144,7 +116,7 @@ int t_curve_step(const float *s_seg, const float *t_seg, const float *a_seg,
     return 0;
 }
 
-
+#if 0
 int main(void)
 {
     int i = 0;
@@ -174,3 +146,4 @@ int main(void)
     }
     printf("]\n");
 }
+#endif

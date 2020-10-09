@@ -46,61 +46,86 @@ typedef enum {
 
 
 typedef struct {
+    uint16_t        offset;
+    uint16_t        size;
+} regr_t; // reg range
+
+
+typedef struct {
     uint16_t        magic_code; // 0xcdcd
     uint8_t         conf_ver;
-    uint8_t         bl_wait; // run app after timeout (unit 0.1s), 0xff: never
 
-    //uint8_t         bus_mode; // a, bs, trad
+    //uint8_t       bus_mode; // a, bs, trad
     uint8_t         bus_net;
     uint8_t         bus_mac;
     uint32_t        bus_baud_low;
     uint32_t        bus_baud_high;
-    //uint16_t        bus_tx_premit_len;
-    //uint16_t        bus_max_idle_len;
-
+    //uint16_t      bus_tx_premit_len;
+    //uint16_t      bus_max_idle_len;
 
     bool            dbg_en;
     cdn_sockaddr_t  dbg_dst;
 
-    pid_f_t         pid_cur;
-    pid_f_t         pid_speed;
     pid_i_t         pid_pos;
+    pid_f_t         pid_speed;
+    pid_f_t         pid_cur;
 
     float           peak_cur_threshold;
     int32_t         peak_cur_duration;
 
-    uint16_t        loop_msk;
+    uint16_t        bias_encoder;
+    int32_t         bias_pos;
 
-    uint16_t        encoder_offset;
-    int32_t         pos_offset;
+    regr_t          d_set[10];
+    regr_t          d_ret[10];
+    //uint8_t       dbg_raw_max[3]; // data group per pkt
+    //regr_t        dbg_raw[3][10]; // for periods corresponding to 3 loops
+    uint16_t        dbg_str_msk;    // for period string debug
 
-    uint32_t        di_map;
-    uint32_t        do_map;
+    int32_t         tc_pos;
+    float           tc_speed;
+    float           tc_accel;
 
-    // end of eeprom
-
-    state_t         state;
+    int32_t         cal_pos;
+    float           cal_speed;
+    float           cal_current;
 
     float           cali_angle_elec;
     float           cali_current;
     float           cali_angle_step; // increase cali_angle_elec
 
-    uint16_t        encoder_sen;
-    float           angle_elec_sen;
+    // end of eeprom
 
-    float           current_sen;
-    float           current_cal;
-    float           speed_sen;
-    float           speed_cal;
-    int32_t         pos_sen;
-    int32_t         pos_cal;
+    state_t         state;
+    uint16_t        err_flag;
 
-    uint16_t        loop_cnt;
+    uint16_t        ori_encoder;
+    int32_t         ori_pos;
+
+    uint16_t        sen_encoder;
+    int32_t         sen_pos;
+    float           sen_speed;
+    float           sen_angle_elec;
+    float           sen_current;
+
+    uint32_t        loop_cnt;
     int32_t         peak_cur_cnt;
+
+    // for t_curve
+    bool            tc_run;
+    float           tc_s_cur;
+    float           tc_v_cur;
+    int             tc_cnt;
+    int             tc_steps;
+    int32_t         tc_s_s;
+    float           tc_v_s;
+    float           tc_s_seg[3], tc_t_seg[3], tc_a_seg[3];
 
 } csa_t; // config status area
 
 extern csa_t csa;
+extern regr_t regr_wa[]; // writable list
+extern int regr_wa_num;
 
 void app_main(void);
 void load_conf_early(void);

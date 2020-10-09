@@ -69,13 +69,13 @@ void set_led_state(led_state_t state)
         break;
     case LED_WARN:
         gpio_set_value(&led_r, 1);
-        gpio_set_value(&led_g, 1);
+        gpio_set_value(&led_g, 0);
         break;
     default:
     case LED_ERROR:
         is_err = true;
         gpio_set_value(&led_r, 1);
-        gpio_set_value(&led_g, 0);
+        gpio_set_value(&led_g, 1);
         break;
     }
 }
