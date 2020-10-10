@@ -10,9 +10,6 @@
 #include "math.h"
 #include "app_main.h"
 
-static cdn_sock_t pos_sock = { .port = 20, .ns = &dft_ns };
-static cdn_sock_t speed_sock = { .port = 21, .ns = &dft_ns };
-
 void app_motor_init(void)
 {
     pid_f_init(&csa.pid_cur, true);
@@ -21,20 +18,8 @@ void app_motor_init(void)
 }
 
 
-static void pos_mode_service_routine(void)
-{
-}
-
-static void speed_mode_service_routine(void)
-{
-}
-
-
 void app_motor(void)
 {
-    pos_mode_service_routine();
-    speed_mode_service_routine();
-
 }
 
 

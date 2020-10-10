@@ -76,8 +76,8 @@ typedef struct {
     uint16_t        bias_encoder;
     int32_t         bias_pos;
 
-    regr_t          d_set[10];
-    regr_t          d_ret[10];
+    regr_t          dio_set[10];
+    regr_t          dio_ret[10];
     //uint8_t       dbg_raw_max[3]; // data group per pkt
     //regr_t        dbg_raw[3][10]; // for periods corresponding to 3 loops
     uint16_t        dbg_str_msk;    // for period string debug

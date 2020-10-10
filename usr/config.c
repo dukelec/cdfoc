@@ -58,6 +58,13 @@ csa_t csa = {
 
         .bias_encoder = 0x4590,
 
+        .dio_set = {
+                { .offset = offsetof(csa_t, tc_pos), .size = 4 }
+        },
+        .dio_ret = {
+                { .offset = offsetof(csa_t, cal_pos), .size = 4 }
+        },
+
         .dbg_str_msk = 0x1fff, // 0x01ff,
 
         .loop_cnt = 0,
