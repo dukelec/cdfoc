@@ -23,7 +23,8 @@
 #define P_3F(x) (int)(x), abs(((x)-(int)(x))*1000) // "%d.%.3d"
 
 
-#define APP_CONF_ADDR       0x0801F800 // last page
+#define APP_CONF_ADDR       0x0800c000 // sector 3
+#define APP_CONF_VER        0x0001
 
 #define CURRENT_LOOP_FREQ   (168000000 / 4096 / 2)
 #define DRV_PWM_HALF        2048
@@ -53,7 +54,7 @@ typedef struct {
 
 typedef struct {
     uint16_t        magic_code; // 0xcdcd
-    uint8_t         conf_ver;
+    uint16_t        conf_ver;
 
     //uint8_t       bus_mode; // a, bs, trad
     uint8_t         bus_net;
@@ -83,12 +84,8 @@ typedef struct {
     uint16_t        dbg_str_msk;    // for period string debug
 
     int32_t         tc_pos;
-    float           tc_speed;
-    float           tc_accel;
-
-    int32_t         cal_pos;
-    float           cal_speed;
-    float           cal_current;
+    uint32_t        tc_speed;
+    uint32_t        tc_accel;
 
     float           cali_angle_elec;
     float           cali_current;
@@ -96,17 +93,24 @@ typedef struct {
 
     // end of eeprom
 
+    bool            conf_from;   // 0: default, 1: load from flash
     state_t         state;
     uint16_t        err_flag;
 
     uint16_t        ori_encoder;
     int32_t         ori_pos;
 
+    int16_t         delta_encoder;
+    uint16_t        noc_encoder; // no compensation
     uint16_t        sen_encoder;
     int32_t         sen_pos;
-    float           sen_speed;
-    float           sen_angle_elec;
+    int32_t         sen_speed;
     float           sen_current;
+    float           sen_angle_elec;
+
+    int32_t         cal_pos;
+    int32_t         cal_speed;
+    int32_t         cal_current;
 
     uint32_t        loop_cnt;
     int32_t         peak_cur_cnt;
@@ -128,19 +132,24 @@ extern regr_t regr_wa[]; // writable list
 extern int regr_wa_num;
 
 void app_main(void);
-void load_conf_early(void);
 void load_conf(void);
-void save_conf(void);
+int save_conf(void);
+void csa_list_show(void);
+
 void common_service_init(void);
 void common_service_routine(void);
 
 void set_led_state(led_state_t state);
 
-void app_motor(void);
 void app_motor_init(void);
 void limit_det_isr(void);
 
 uint16_t encoder_read(void);
+
+int t_curve_plan(float v_s, float v_e, float s, float v_unsign, float a_unsign,
+                float *s_seg, float *t_seg, float *a_seg);
+int t_curve_step(const float *s_seg, const float *t_seg, const float *a_seg,
+        float v_s, float t_cur, float *v_cur, float *s_cur);
 
 extern ADC_HandleTypeDef hadc1;
 extern ADC_HandleTypeDef hadc2;

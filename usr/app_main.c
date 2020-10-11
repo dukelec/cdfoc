@@ -81,7 +81,7 @@ void set_led_state(led_state_t state)
 }
 
 #ifdef BOOTLOADER
-#define APP_ADDR 0x08010000 // offset: 64KB
+#define APP_ADDR 0x08010000 // sector 4
 
 static void jump_to_app(void)
 {
@@ -137,7 +137,8 @@ void app_main(void)
     load_conf();
     device_init();
     common_service_init();
-    app_motor_init();
+    d_info("conf: %s\n", csa.conf_from ? "load from flash" : "use default");
+    csa_list_show();
 
     gpio_set_value(&drv_en, 1);
     delay_systick(50);
@@ -145,6 +146,7 @@ void app_main(void)
     drv_write_reg(0x02, drv_read_reg(0x02) | 0x1 << 5);
     d_debug("drv 02: %04x\n", drv_read_reg(0x02));
 
+    app_motor_init();
     HAL_ADC_Start(&hadc1);
     HAL_ADC_Start(&hadc2);
     HAL_ADC_Start(&hadc3);
@@ -162,11 +164,6 @@ void app_main(void)
 
     d_info("pwm on.\n");
     set_led_state(LED_POWERON);
-    //delay_systick(500);
-    //__HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, 4095);
-    //__HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_2, 4095);
-    //__HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_3, 4095);
-    //while(1);
 
 #ifdef BOOTLOADER
     uint32_t boot_time = get_systick();
@@ -182,10 +179,8 @@ void app_main(void)
         //encoder_read();
         //d_debug("drv: %08x\n", drv_read_reg(0x01) << 16 | drv_read_reg(0x00));
 
-
         cdn_routine(&dft_ns); // handle cdnet
         common_service_routine();
-        app_motor();
         debug_flush();
     }
 }

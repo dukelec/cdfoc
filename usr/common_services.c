@@ -8,6 +8,7 @@
  */
 
 #include "app_main.h"
+#include <math.h>
 
 static char cpu_id[25];
 static char info_str[100];
@@ -96,7 +97,7 @@ static void p10_service_routine(void)
 
     } else if (pkt->len && pkt->dat[0] == 0x21) {
         d_debug("p10 ser: save config to flash\n");
-        save_conf();
+        pkt->dat[0] |= save_conf();
         cdn_sock_sendto(&sock10, pkt);
 
     } else if (pkt->len && pkt->dat[0] == 0x22) {
@@ -265,6 +266,39 @@ static void p13_service_routine(void)
         pkt->len = dst_dat - pkt->dat;
         pkt->dat[0] = 0x80;
         d_debug("dio: i %d, o %d\n", src_dat - pkt->dat, pkt->len);
+
+        if (csa.state == ST_POS_TC) {
+            int32_t sen_pos_ = csa.sen_pos;
+            float sen_speed_ = csa.sen_speed;
+            float s_seg[3], t_seg[3], a_seg[3];
+
+            int ret = t_curve_plan(sen_speed_, 0, csa.tc_pos - sen_pos_, csa.tc_speed, csa.tc_accel,
+                    s_seg, t_seg, a_seg);
+
+            if (ret < 0) {
+                pkt->dat[0] = 0x81;
+                d_debug("dio: curve_plan error\n");
+
+            } else {
+                local_irq_save(flags);
+
+                csa.tc_steps = lroundf((t_seg[0] + t_seg[1] + t_seg[2]) * CURRENT_LOOP_FREQ / 25); // t_segs / period
+
+                if (csa.tc_steps > 1) {
+                    csa.tc_s_s = sen_pos_;
+                    csa.tc_v_s = sen_speed_; // encoder steps / sec
+                    memcpy(csa.tc_s_seg, s_seg, 12);
+                    memcpy(csa.tc_t_seg, t_seg, 12);
+                    memcpy(csa.tc_a_seg, a_seg, 12);
+                    csa.tc_cnt = 0;
+                    csa.tc_run = true;
+                } else {
+                    csa.tc_run = false;
+                    csa.cal_pos = csa.tc_pos;
+                }
+                local_irq_restore(flags);
+            }
+        }
 
     } else {
         list_put(&dft_ns.free_pkts, &pkt->node);

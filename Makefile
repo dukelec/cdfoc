@@ -74,6 +74,7 @@ usr/app_main.c \
 usr/app_motor.c \
 usr/pid_i.c \
 usr/pid_f.c \
+usr/t_curve.c \
 Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_exti.c
 
 # ASM sources
