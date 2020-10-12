@@ -50,7 +50,6 @@ static inline void position_loop_compute(void)
     }
 
     csa.cal_speed = lroundf(pid_i_compute(&csa.pid_pos, csa.sen_pos));
-
 }
 
 static inline void speed_loop_compute(void)
@@ -64,10 +63,6 @@ static inline void speed_loop_compute(void)
     speed_avg += speed * coeffs[speed_filt_cnt++];
 
     if (speed_filt_cnt == 5) {
-        if (++sub_cnt == 5) {
-            sub_cnt = 0;
-            position_loop_compute();
-        }
 
         csa.sen_speed = lroundf(speed_avg);
         speed_avg = 0;
@@ -76,11 +71,15 @@ static inline void speed_loop_compute(void)
         if (csa.state < ST_CONST_SPEED) {
             pid_f_reset(&csa.pid_speed, csa.sen_speed, 0);
             csa.cal_speed = csa.sen_speed;
-            return;
+        } else {
+            pid_f_set_target(&csa.pid_speed, csa.cal_speed); // TODO: only set once after modified
+            csa.cal_current = -lroundf(pid_f_compute_no_d(&csa.pid_speed, csa.sen_speed));
         }
 
-        pid_f_set_target(&csa.pid_speed, csa.cal_speed); // TODO: only set once after modified
-        csa.cal_current = -lroundf(pid_f_compute_no_d(&csa.pid_speed, csa.sen_speed));
+        if (++sub_cnt == 5) {
+            sub_cnt = 0;
+            position_loop_compute();
+        }
     }
 }
 
@@ -92,9 +91,10 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
     float sin_sen_angle_elec, cos_sen_angle_elec; // reduce the amount of calculations
     int16_t out_pwm_u = 0, out_pwm_v = 0, out_pwm_w = 0;
     bool dbg_str = (csa.loop_cnt & csa.dbg_str_msk) == 0;
+    //dbg_str = 0;
 
     if (csa.loop_cnt == 0xffff) {
-        csa.state = ST_POS_TC; //////////////////////////////
+        csa.state = ST_CALI; //////////////////////////////
         //csa.cal_current = 600;
         //csa.cal_speed = 1000;
     }
@@ -103,12 +103,15 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
     csa.noc_encoder = csa.ori_encoder - csa.bias_encoder;
     int16_t delta_enc = csa.noc_encoder - last_encoder;
 
+#if 0
     if (abs(delta_enc) < 1000 || skip_cnt != 0) { // a good value?
         if (dbg_str && abs(delta_enc) >= 1000)
             d_debug("rst! big delta_enc: %d (%x - %x) | %d\n",
                     delta_enc, csa.noc_encoder, last_encoder, csa.delta_encoder);
         csa.delta_encoder = delta_enc;
-        csa.sen_encoder = csa.noc_encoder + DIV_ROUND_CLOSEST(delta_enc * 1, 8); // 4Bytes 5.25M, 1/8 CURRENT_LOOP
+        // (4Bytes 5.25M, 1/8 CURRENT_LOOP) was wrong
+        // encoder lock data at start of first byte
+        csa.sen_encoder = csa.noc_encoder + DIV_ROUND_CLOSEST(delta_enc * 1, 8);
         last_encoder = csa.noc_encoder;
         skip_cnt = 0;
     } else { // skip wrong sensor value
@@ -119,6 +122,11 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
         last_encoder += csa.delta_encoder;
         skip_cnt++;
     }
+#else
+    csa.sen_encoder = csa.noc_encoder;
+    csa.delta_encoder = delta_enc;
+    last_encoder = csa.noc_encoder;
+#endif
 
     if (abs((uint16_t)(csa.ori_pos & 0xffff) - csa.sen_encoder) > 0x10000/2) {
         if (csa.sen_encoder < 0x10000/2)
@@ -128,8 +136,6 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
     }
     csa.ori_pos = (csa.ori_pos & 0xffff0000) | csa.sen_encoder;
     csa.sen_pos = csa.ori_pos - csa.bias_pos;
-
-    speed_loop_compute();
 
     if (dbg_str)
             d_debug("%04x %d %08x", csa.ori_encoder, delta_enc, csa.sen_pos);
@@ -236,5 +242,6 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
     __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_2, DRV_PWM_HALF - out_pwm_v); // TIM1_CH2: B
     __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, DRV_PWM_HALF - out_pwm_w); // TIM1_CH1: C
 
+    speed_loop_compute();
     csa.loop_cnt++;
 }

@@ -268,8 +268,12 @@ static void p13_service_routine(void)
         d_debug("dio: i %d, o %d\n", src_dat - pkt->dat, pkt->len);
 
         if (csa.state == ST_POS_TC) {
+
+            local_irq_save(flags);
             int32_t sen_pos_ = csa.sen_pos;
             float sen_speed_ = csa.sen_speed;
+            local_irq_restore(flags);
+
             float s_seg[3], t_seg[3], a_seg[3];
 
             int ret = t_curve_plan(sen_speed_, 0, csa.tc_pos - sen_pos_, csa.tc_speed, csa.tc_accel,

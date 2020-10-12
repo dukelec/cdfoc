@@ -38,21 +38,21 @@ csa_t csa = {
         },
 
         .pid_cur =  {
-                .kp = 0, .ki = 200,
+                .kp = 0, .ki = 400,
                 .out_min = DRV_PWM_HALF * -0.9,
                 .out_max = DRV_PWM_HALF * 0.9,
                 .period = 1.0 / CURRENT_LOOP_FREQ
         },
         .pid_speed = {
-                .kp = 0.1, .ki = 5.0,
-                .out_min = -2000,
-                .out_max = 2000, // limit output current
+                .kp = 0.02, .ki = 5,
+                .out_min = -3000,
+                .out_max = 3000, // limit output current
                 .period = 5.0 / CURRENT_LOOP_FREQ
         },
         .pid_pos = {
-                .kp = 50, .ki = 100, .kd = 0,
-                .out_min = -2000000,
-                .out_max = 2000000, // limit output speed
+                .kp = 60, .ki = 20, .kd = 0,
+                .out_min = -5000000,
+                .out_max = 5000000, // limit output speed
                 .period = 25.0 / CURRENT_LOOP_FREQ
         },
 
@@ -68,7 +68,7 @@ csa_t csa = {
         .dbg_str_msk = 0x1fff, // 0x01ff,
 
         .tc_speed = 500000,
-        .tc_accel = 2000000,
+        .tc_accel = 600000,
 
         .cali_angle_elec = (float)M_PI/2,
         .cali_current = 200,
