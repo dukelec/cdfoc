@@ -38,6 +38,7 @@ float pid_i_compute_no_d(pid_i_t *pid, int input)
 
     pid->i_term += pid->_ki * error;
     pid->i_term = clip(pid->i_term, pid->out_min, pid->out_max);
+    pid->last_input = input;
 
     output = pid->kp * error + pid->i_term;
     output = clip(output, pid->out_min, pid->out_max);

@@ -211,8 +211,18 @@ static void p12_service_routine(void)
             regr_t *regr = regr_wa + i;
             uint16_t start = clip(offset, regr->offset, regr->offset + regr->size - 1);
             uint16_t end = clip(offset + len - 1, regr->offset, regr->offset + regr->size - 1);
-            if (start == end)
+            if (start == end && start != offset) {
+                //d_debug("csa i%d: [%x, %x], [%x, %x] -> [%x, %x]\n",
+                //        i, regr->offset, regr->offset + regr->size - 1,
+                //        offset, offset + len - 1,
+                //        start, end);
                 continue;
+            }
+
+            //d_debug("csa @ %p, %p <- %p, len %d, dat[0]: %x\n",
+            //        &csa, ((void *) &csa) + start, src_dat + (start - offset), end - start + 1,
+            //        *(src_dat + (start - offset)));
+
             local_irq_save(flags);
             memcpy(((void *) &csa) + start, src_dat + (start - offset), end - start + 1);
             local_irq_restore(flags);
@@ -234,28 +244,28 @@ static void p12_service_routine(void)
 }
 
 
-// data io
+// qxchg
 static void p13_service_routine(void)
 {
     cdn_pkt_t *pkt = cdn_sock_recvfrom(&sock13);
     if (!pkt)
         return;
 
-    if (pkt->dat[0] == 0x00 && pkt->len >= 1) {
+    if (pkt->dat[0] == 0x20 && pkt->len >= 1) {
         uint8_t *src_dat = pkt->dat + 1;
         uint8_t *dst_dat = pkt->dat + 1;
         uint32_t flags;
 
         local_irq_save(flags);
         for (int i = 0; i < 10; i++) {
-            regr_t *regr = csa.dio_set + i;
+            regr_t *regr = csa.qxchg_set + i;
             if (!regr->size)
                 break;
             memcpy(((void *) &csa) + regr->offset, src_dat, regr->size);
             src_dat += regr->size;
         }
         for (int i = 0; i < 10; i++) {
-            regr_t *regr = csa.dio_ret + i;
+            regr_t *regr = csa.qxchg_ret + i;
             if (!regr->size)
                 break;
             memcpy(dst_dat, ((void *) &csa) + regr->offset, regr->size);
@@ -303,6 +313,20 @@ static void p13_service_routine(void)
                 local_irq_restore(flags);
             }
         }
+
+    } else if (pkt->dat[0] == 0x00 && pkt->len == 1) {
+            uint8_t *dst_dat = pkt->dat + 1;
+            uint32_t flags;
+
+            local_irq_save(flags);
+            for (int i = 0; i < 10; i++) {
+                regr_t *regr = csa.qxchg_ro + i;
+                if (!regr->size)
+                    break;
+                memcpy(dst_dat, ((void *) &csa) + regr->offset, regr->size);
+                dst_dat += regr->size;
+            }
+            local_irq_restore(flags);
 
     } else {
         list_put(&dft_ns.free_pkts, &pkt->node);

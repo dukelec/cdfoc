@@ -29,6 +29,9 @@
 #define CURRENT_LOOP_FREQ   (168000000 / 4096 / 2)
 #define DRV_PWM_HALF        2048
 
+#define FRAME_MAX           10
+#define PACKET_MAX          300
+
 
 typedef enum {
     ST_STOP = 0,
@@ -64,9 +67,6 @@ typedef struct {
     //uint16_t      bus_tx_premit_len;
     //uint16_t      bus_max_idle_len;
 
-    bool            dbg_en;
-    cdn_sockaddr_t  dbg_dst;
-
     pid_i_t         pid_pos;
     pid_f_t         pid_speed;
     pid_f_t         pid_cur;
@@ -77,11 +77,20 @@ typedef struct {
     uint16_t        bias_encoder;
     int32_t         bias_pos;
 
-    regr_t          dio_set[10];
-    regr_t          dio_ret[10];
-    //uint8_t       dbg_raw_max[3]; // data group per pkt
-    //regr_t        dbg_raw[3][10]; // for periods corresponding to 3 loops
-    uint16_t        dbg_str_msk;    // for period string debug
+    regr_t          qxchg_set[10];
+    regr_t          qxchg_ret[10];
+    regr_t          qxchg_ro[10];
+
+    bool            dbg_en;
+    cdn_sockaddr_t  dbg_dst;
+    uint8_t         dbg_str_msk;
+    uint16_t        dbg_str_skip;     // for period string debug
+
+    cdn_sockaddr_t  dbg_raw_dst;
+    uint8_t         dbg_raw_msk;
+    uint8_t         dbg_raw_th;      // len threshold (+ 1 samples < pkt size)
+    uint8_t         dbg_raw_skip[4]; // take samples every few times
+    regr_t          dbg_raw[4][10];  // for: cur, speed, pos, tcurve
 
     int32_t         tc_pos;
     uint32_t        tc_speed;
@@ -93,9 +102,13 @@ typedef struct {
 
     // end of eeprom
 
-    bool            conf_from;   // 0: default, 1: load from flash
     state_t         state;
     uint16_t        err_flag;
+
+    int32_t         cal_pos;
+    int32_t         cal_speed;
+    int32_t         cal_current;
+    float           cal_i_sq;
 
     uint16_t        ori_encoder;
     int32_t         ori_pos;
@@ -108,10 +121,7 @@ typedef struct {
     float           sen_current;
     float           sen_angle_elec;
 
-    int32_t         cal_pos;
-    int32_t         cal_speed;
-    int32_t         cal_current;
-
+    bool            conf_from;   // 0: default, 1: load from flash
     uint32_t        loop_cnt;
     int32_t         peak_cur_cnt;
 
@@ -142,6 +152,7 @@ void common_service_routine(void);
 void set_led_state(led_state_t state);
 
 void app_motor_init(void);
+void app_motor_routine(void);
 void limit_det_isr(void);
 
 uint16_t encoder_read(void);
@@ -159,5 +170,6 @@ extern TIM_HandleTypeDef htim1;
 extern gpio_t led_r;
 extern gpio_t led_g;
 extern cdn_ns_t dft_ns;
+extern list_head_t frame_free_head;
 
 #endif

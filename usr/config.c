@@ -16,7 +16,7 @@ regr_t regr_wa[] = {
         { .offset = offsetof(csa_t, pid_speed), .size = offsetof(pid_f_t, target) },
         { .offset = offsetof(csa_t, pid_speed), .size = offsetof(pid_f_t, target) },
         { .offset = offsetof(csa_t, peak_cur_threshold),
-                .size = offsetof(csa_t, ori_encoder) - offsetof(csa_t, peak_cur_threshold) }
+                .size = offsetof(csa_t, cal_i_sq) - offsetof(csa_t, peak_cur_threshold) }
 };
 
 int regr_wa_num = sizeof(regr_wa) / sizeof(regr_t);
@@ -28,17 +28,11 @@ csa_t csa = {
 
         .bus_net = 0,
         .bus_mac = 254,
-        .bus_baud_low = 115200,
-        .bus_baud_high = 115200,
-
-        .dbg_en = true,
-        .dbg_dst = {
-                .addr = {0x80, 0x00, 0x00},
-                .port = 9
-        },
+        .bus_baud_low = 1000000,
+        .bus_baud_high = 2000000,
 
         .pid_cur =  {
-                .kp = 0, .ki = 400,
+                .kp = 0.1, .ki = 400,
                 .out_min = DRV_PWM_HALF * -0.9,
                 .out_max = DRV_PWM_HALF * 0.9,
                 .period = 1.0 / CURRENT_LOOP_FREQ
@@ -58,21 +52,55 @@ csa_t csa = {
 
         .bias_encoder = 0x4590,
 
-        .dio_set = {
+        .qxchg_set = {
                 { .offset = offsetof(csa_t, tc_pos), .size = 4 }
         },
-        .dio_ret = {
+        .qxchg_ret = {
                 { .offset = offsetof(csa_t, cal_pos), .size = 8 }
         },
 
-        .dbg_str_msk = 0x1fff, // 0x01ff,
+        .dbg_en = true,
+        .dbg_dst = { .addr = {0x80, 0x00, 0x00}, .port = 9 },
+        .dbg_str_msk = 0xff,
+        .dbg_str_skip = 0x1fff, // 0x01ff,
+
+        .dbg_raw_dst = { .addr = {0x80, 0x00, 0x00}, .port = 8 },
+        .dbg_raw_msk = 0,
+        .dbg_raw_th = 200,
+        .dbg_raw_skip = { 0, 0, 0, 0 },
+        .dbg_raw = {
+                { // cur : target, i_term, last_input, cal_i_sq,
+                        { .offset = offsetof(csa_t, pid_cur) + offsetof(pid_f_t, target), .size = 4 * 3 },
+                        { .offset = offsetof(csa_t, cal_i_sq), .size = 4 },
+                        { .offset = offsetof(csa_t, ori_encoder), .size = 2 },
+                        { .offset = offsetof(csa_t, delta_encoder), .size = 2 }
+                }, { // speed
+                        { .offset = offsetof(csa_t, pid_speed) + offsetof(pid_f_t, target), .size = 4 },
+                        { .offset = offsetof(csa_t, pid_speed) + offsetof(pid_f_t, last_input), .size = 4 },
+                        { .offset = offsetof(csa_t, pid_speed) + offsetof(pid_f_t, i_term), .size = 4 },
+                        { .offset = offsetof(csa_t, cal_current), .size = 4 }
+                }, { // pos
+                        { .offset = offsetof(csa_t, pid_pos) + offsetof(pid_i_t, target), .size = 4 },
+                        { .offset = offsetof(csa_t, pid_pos) + offsetof(pid_i_t, last_input), .size = 4 },
+                        { .offset = offsetof(csa_t, pid_pos) + offsetof(pid_i_t, i_term), .size = 4 },
+                        { .offset = offsetof(csa_t, cal_speed), .size = 4 }
+                }, { // t_curve
+                        { .offset = offsetof(csa_t, tc_run), .size = 1 },
+                        { .offset = offsetof(csa_t, tc_s_cur), .size = 4 },
+                        { .offset = offsetof(csa_t, tc_v_cur), .size = 4 },
+                        { .offset = offsetof(csa_t, sen_pos), .size = 4 },
+                        { .offset = offsetof(csa_t, sen_speed), .size = 4 },
+                        { .offset = offsetof(csa_t, cal_pos), .size = 4 }
+                }
+        },
 
         .tc_speed = 500000,
         .tc_accel = 600000,
 
         .cali_angle_elec = (float)M_PI/2,
         .cali_current = 200,
-        .cali_angle_step = 0.002f
+        //.cali_angle_step = 0.003f // @ ic-MU3 10KHz spi
+        //.cali_angle_step = 0
 };
 
 
@@ -122,22 +150,22 @@ int save_conf(void)
 
 
 #define CSA_SHOW(_x) \
-        d_info("  " #_x " : 0x%04x, len: %d\n", offsetof(csa_t, _x), sizeof(csa._x));
+        d_info("   R_" #_x " = 0x%04x # len: %d\n", offsetof(csa_t, _x), sizeof(csa._x));
 
 #define CSA_SHOW_SUB(_x, _y_t, _y) \
-        d_info("  " #_x "." #_y " : 0x%04x, len: %d\n", offsetof(csa_t, _x) + offsetof(_y_t, _y), sizeof(csa._x._y));
+        d_info("   R_" #_x "_" #_y " = 0x%04x # len: %d\n", offsetof(csa_t, _x) + offsetof(_y_t, _y), sizeof(csa._x._y));
 
 void csa_list_show(void)
 {
     d_info("csa_list_show:\n\n");
 
+    CSA_SHOW(conf_ver);
+    d_info("\n");
+
     CSA_SHOW(bus_net);
     CSA_SHOW(bus_mac);
     CSA_SHOW(bus_baud_low);
     CSA_SHOW(bus_baud_high);
-    CSA_SHOW(dbg_en);
-    CSA_SHOW_SUB(dbg_dst, cdn_sockaddr_t, addr);
-    CSA_SHOW_SUB(dbg_dst, cdn_sockaddr_t, port);
     d_info("\n");
 
     CSA_SHOW_SUB(pid_pos, pid_i_t, kp);
@@ -166,9 +194,23 @@ void csa_list_show(void)
 
     CSA_SHOW(bias_encoder);
     CSA_SHOW(bias_pos);
-    CSA_SHOW(dio_set);
-    CSA_SHOW(dio_ret);
+    CSA_SHOW(qxchg_set);
+    CSA_SHOW(qxchg_ret);
+    d_info("\n");
+
+    CSA_SHOW(dbg_en);
+    CSA_SHOW_SUB(dbg_dst, cdn_sockaddr_t, addr);
+    CSA_SHOW_SUB(dbg_dst, cdn_sockaddr_t, port);
     CSA_SHOW(dbg_str_msk);
+    CSA_SHOW(dbg_str_skip);
+    d_info("\n");
+
+    CSA_SHOW_SUB(dbg_raw_dst, cdn_sockaddr_t, addr);
+    CSA_SHOW_SUB(dbg_raw_dst, cdn_sockaddr_t, port);
+    CSA_SHOW(dbg_raw_msk);
+    CSA_SHOW(dbg_raw_th);
+    CSA_SHOW(dbg_raw_skip);
+    CSA_SHOW(dbg_raw);
     d_info("\n");
 
     CSA_SHOW(tc_pos);

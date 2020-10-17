@@ -11,6 +11,8 @@
 #include "app_main.h"
 
 static uint16_t last_encoder;
+static cdn_sock_t sock8 = { .port = 8, .ns = &dft_ns }; // raw debug
+static list_head_t raw_pend = { 0 };
 
 
 void app_motor_init(void)
@@ -20,15 +22,88 @@ void app_motor_init(void)
     pid_i_init(&csa.pid_pos, true);
 
     last_encoder = encoder_read();
+    cdn_sock_bind(&sock8);
 }
+
+void app_motor_routine(void)
+{
+    if (frame_free_head.len > 1) {
+        cdn_pkt_t *pkt = cdn_pkt_get(&raw_pend);
+        if (pkt)
+            cdn_sock_sendto(&sock8, pkt);
+    }
+}
+
+static void raw_dbg(int idx)
+{
+    static cdn_pkt_t *pkt_raw[4] = { NULL };
+    static uint8_t skip_cnt[4] = { 0 };
+    static bool pkt_less = false;
+
+    if (!(csa.dbg_raw_msk & (1 << idx))) {
+        skip_cnt[idx] = 0;
+        if (pkt_raw[idx]) {
+            list_put(&dft_ns.free_pkts, &pkt_raw[idx]->node);
+            pkt_raw[idx] = NULL;
+        }
+        return;
+    }
+
+    if (++skip_cnt[idx] >= csa.dbg_raw_skip[idx])
+        skip_cnt[idx] = 0;
+    if (skip_cnt[idx] != 0)
+        return;
+
+    if (pkt_less) {
+        if (raw_pend.len == 0) {
+            pkt_less = false;
+        }
+    }
+
+    if (!pkt_less && !pkt_raw[idx]) {
+        if (dft_ns.free_pkts.len < 5) {
+            pkt_less = true;
+            return;
+
+        } else {
+            pkt_raw[idx] = cdn_pkt_get(&dft_ns.free_pkts);
+            pkt_raw[idx]->dst = csa.dbg_raw_dst;
+            pkt_raw[idx]->dat[0] = 0x40 | idx;
+            *(uint32_t *)(pkt_raw[idx]->dat + 1) = csa.loop_cnt;
+            pkt_raw[idx]->dat[5] = csa.dbg_raw_skip[idx];
+            pkt_raw[idx]->len = 6;
+        }
+    }
+    if (!pkt_raw[idx])
+        return;
+
+    for (int i = 0; i < 10; i++) {
+        regr_t *regr = &csa.dbg_raw[idx][i];
+        if (!regr->size)
+            break;
+        uint8_t *dst_dat = pkt_raw[idx]->dat + pkt_raw[idx]->len;
+        memcpy(dst_dat, ((void *) &csa) + regr->offset, regr->size);
+        pkt_raw[idx]->len += regr->size;
+    }
+
+    if (pkt_raw[idx]->len >= csa.dbg_raw_th) {
+        list_put(&raw_pend, &pkt_raw[idx]->node);
+        pkt_raw[idx] = NULL;
+    }
+}
+
 
 static inline void position_loop_compute(void)
 {
     if (csa.state < ST_POSITION) {
         csa.tc_run = false;
         pid_i_reset(&csa.pid_pos, csa.sen_pos, 0);
+        pid_i_set_target(&csa.pid_pos, csa.sen_pos);
         csa.cal_pos = csa.sen_pos;
         csa.tc_pos = csa.sen_pos;
+        if (csa.state == ST_STOP) {
+            csa.cal_speed = 0;
+        }
         return;
     }
 
@@ -68,9 +143,13 @@ static inline void speed_loop_compute(void)
         speed_avg = 0;
         speed_filt_cnt = 0;
 
+
         if (csa.state < ST_CONST_SPEED) {
-            pid_f_reset(&csa.pid_speed, csa.sen_speed, 0);
-            csa.cal_speed = csa.sen_speed;
+            pid_f_reset(&csa.pid_speed, 0, 0);
+            if (csa.state == ST_STOP) {
+                csa.cal_current = 0;
+                pid_f_set_target(&csa.pid_speed, 0);
+            }
         } else {
             pid_f_set_target(&csa.pid_speed, csa.cal_speed); // TODO: only set once after modified
             csa.cal_current = -lroundf(pid_f_compute_no_d(&csa.pid_speed, csa.sen_speed));
@@ -79,25 +158,20 @@ static inline void speed_loop_compute(void)
         if (++sub_cnt == 5) {
             sub_cnt = 0;
             position_loop_compute();
+            raw_dbg(2);
+            raw_dbg(3);
         }
+        raw_dbg(1);
     }
 }
 
 
 void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
 {
-    static int skip_cnt = 0;
     static float ia_idle, ib_idle;
     float sin_sen_angle_elec, cos_sen_angle_elec; // reduce the amount of calculations
     int16_t out_pwm_u = 0, out_pwm_v = 0, out_pwm_w = 0;
-    bool dbg_str = (csa.loop_cnt & csa.dbg_str_msk) == 0;
-    //dbg_str = 0;
-
-    if (csa.loop_cnt == 0xffff) {
-        csa.state = ST_CALI; //////////////////////////////
-        //csa.cal_current = 600;
-        //csa.cal_speed = 1000;
-    }
+    bool dbg_str = csa.dbg_str_msk && (csa.loop_cnt % csa.dbg_str_skip) == 0;
 
     csa.ori_encoder = encoder_read();
     csa.noc_encoder = csa.ori_encoder - csa.bias_encoder;
@@ -193,27 +267,29 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
         }
         if (dbg_str)
             d_debug_c(", in %5d.%.2d %5d.%.2d", P_2F(ia_idle), P_2F(ib_idle));
+
+        csa.sen_current = 0;
     }
 
     // current --> pwm
     if (csa.state != ST_STOP) {
-        float i_sq_out, i_alpha, i_beta;
+        float i_alpha, i_beta;
 
         // calculate angle
         if (csa.state != ST_CALI) {
             pid_f_set_target(&csa.pid_cur, csa.cal_current);
-            i_sq_out = pid_f_compute_no_d(&csa.pid_cur, csa.sen_current);
-            i_alpha = -i_sq_out * sin_sen_angle_elec;
-            i_beta =  i_sq_out * cos_sen_angle_elec;
+            csa.cal_i_sq = pid_f_compute_no_d(&csa.pid_cur, csa.sen_current);
+            i_alpha = -csa.cal_i_sq * sin_sen_angle_elec;
+            i_beta =  csa.cal_i_sq * cos_sen_angle_elec;
 
         } else {
             csa.cali_angle_elec += csa.cali_angle_step;
             if (csa.cali_angle_elec >= (float)M_PI*2)
                 csa.cali_angle_elec -= (float)M_PI*2;
 
-            i_sq_out = csa.cali_current;
-            i_alpha = -i_sq_out * sinf(csa.cali_angle_elec);
-            i_beta =  i_sq_out * cosf(csa.cali_angle_elec);
+            csa.cal_i_sq = csa.cali_current;
+            i_alpha = -csa.cal_i_sq * sinf(csa.cali_angle_elec);
+            i_beta =  csa.cal_i_sq * cosf(csa.cali_angle_elec);
         }
 
         out_pwm_u = lroundf(i_alpha);
@@ -226,10 +302,11 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
         append_dprintf(DBG_CURRENT, "w:%d", out_pwm_w);
         */
         if (dbg_str)
-            d_debug_c(", o %5d.%.2d %5d %5d %5d\n", P_2F(i_sq_out), out_pwm_u, out_pwm_v, out_pwm_w);
+            d_debug_c(", o %5d.%.2d %5d %5d %5d\n", P_2F(csa.cal_i_sq), out_pwm_u, out_pwm_v, out_pwm_w);
     } else {
-        pid_f_reset(&csa.pid_cur, csa.sen_current, 0.0);
-        csa.cal_current = 0;
+        csa.cal_i_sq = 0;
+        pid_f_set_target(&csa.pid_cur, 0);
+        pid_f_reset(&csa.pid_cur, 0, 0);
 
         //peak_cur_cnt = 0;
         if (dbg_str)
@@ -243,5 +320,6 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
     __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, DRV_PWM_HALF - out_pwm_w); // TIM1_CH1: C
 
     speed_loop_compute();
+    raw_dbg(0);
     csa.loop_cnt++;
 }

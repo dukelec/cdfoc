@@ -29,11 +29,9 @@ static gpio_t r_int_n = { .group = CDCTL_INT_N_GPIO_Port, .num = CDCTL_INT_N_Pin
 static gpio_t r_ns = { .group = CDCTL_NSS_GPIO_Port, .num = CDCTL_NSS_Pin };
 static spi_t r_spi = { .hspi = &hspi1, .ns_pin = &r_ns };
 
-#define FRAME_MAX 10
 static cd_frame_t frame_alloc[FRAME_MAX];
-static list_head_t frame_free_head = {0};
+list_head_t frame_free_head = {0};
 
-#define PACKET_MAX 50
 static cdn_pkt_t packet_alloc[PACKET_MAX];
 
 static cdctl_dev_t r_dev = {0};    // CDBUS
@@ -94,6 +92,34 @@ static void jump_to_app(void)
 #endif
 
 
+extern uint32_t end; // end of bss
+#define STACK_CHECK_SKIP 0x200
+#define STACK_CHECK_SIZE (64 + STACK_CHECK_SKIP)
+
+static void stack_check_init(void)
+{
+    int i;
+    printf("stack_check_init: skip: %p ~ %p, to %p\n",
+            &end, &end + STACK_CHECK_SKIP, &end + STACK_CHECK_SIZE);
+    for (i = STACK_CHECK_SKIP; i < STACK_CHECK_SIZE; i+=4)
+        *(uint32_t *)(&end + i) = 0xababcdcd;
+}
+
+static void stack_check(void)
+{
+    int i;
+    for (i = STACK_CHECK_SKIP; i < STACK_CHECK_SIZE; i+=4) {
+        if (*(uint32_t *)(&end + i) != 0xababcdcd) {
+            printf("stack overflow %p (skip: %p ~ %p): %08lx\n",
+                    &end + i, &end, &end + STACK_CHECK_SKIP, *(uint32_t *)(&end + i));
+            d_error("stack overflow %p (skip: %p ~ %p): %08lx\n",
+                    &end + i, &end, &end + STACK_CHECK_SKIP, *(uint32_t *)(&end + i));
+            while (true);
+        }
+    }
+}
+
+
 uint16_t encoder_read(void)
 {
     uint8_t buf[4];
@@ -133,6 +159,7 @@ void app_main(void)
     printf("\nstart app_main...\n");
 #endif
 
+    stack_check_init();
     debug_init(&dft_ns, &csa.dbg_dst, &csa.dbg_en);
     load_conf();
     device_init();
@@ -179,6 +206,8 @@ void app_main(void)
         //encoder_read();
         //d_debug("drv: %08x\n", drv_read_reg(0x01) << 16 | drv_read_reg(0x00));
 
+        stack_check();
+        app_motor_routine();
         cdn_routine(&dft_ns); // handle cdnet
         common_service_routine();
         debug_flush();
