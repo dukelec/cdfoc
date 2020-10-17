@@ -10,7 +10,6 @@
 #include "math.h"
 #include "app_main.h"
 
-static uint16_t last_encoder;
 static cdn_sock_t sock8 = { .port = 8, .ns = &dft_ns }; // raw debug
 static list_head_t raw_pend = { 0 };
 
@@ -21,7 +20,7 @@ void app_motor_init(void)
     pid_f_init(&csa.pid_speed, true);
     pid_i_init(&csa.pid_pos, true);
 
-    last_encoder = encoder_read();
+    csa.sen_encoder = encoder_read(); // init last value
     cdn_sock_bind(&sock8);
 }
 
@@ -166,6 +165,14 @@ static inline void speed_loop_compute(void)
 }
 
 
+#define ENC_MAX_DELTA   40 // > 21
+static int enc_err_cnt = 0;
+
+#define HIST_RM 3
+#define HIST_LEN 10
+static uint16_t hist[HIST_LEN] = { 0 };
+
+
 void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
 {
     static float ia_idle, ib_idle;
@@ -175,7 +182,74 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
 
     csa.ori_encoder = encoder_read();
     csa.noc_encoder = csa.ori_encoder - csa.bias_encoder;
-    int16_t delta_enc = csa.noc_encoder - last_encoder;
+    int16_t delta_enc = csa.noc_encoder - csa.sen_encoder; // sen_encoder is previous value
+
+    uint16_t hist_dm[HIST_LEN] = { 0 }; // delta_max
+    bool hist_rm[HIST_LEN] = { 0 };
+
+    for (int i = 0; i < HIST_LEN - 1; i++)
+        hist[i] = hist[i + 1];
+    hist[HIST_LEN - 1] = csa.noc_encoder;
+
+    hist_dm[0] = abs(hist[1] - hist[0]);
+    hist_dm[HIST_LEN - 1] = abs(hist[HIST_LEN - 1] - hist[HIST_LEN - 2]) * 2;
+    for (int i = 1; i < HIST_LEN - 2; i++)
+        hist_dm[i] = (abs(hist[i] - hist[i - 1]) + abs(hist[i + 1] - hist[i]));
+
+    for (int c = 0; c < HIST_RM; c++) {
+        int idx = -1;
+        int max_val = 0;
+        for (int i = 0; i < HIST_LEN; i++) {
+            if (!hist_rm[i] && (hist_dm[i] > max_val || idx == -1)) {
+                max_val = hist_dm[i];
+                idx = i;
+            }
+        }
+        hist_rm[idx] = true;
+    }
+
+    int first = -1;
+    int delta_sum = 0;
+    int delta_cnt = 0;
+    for (int i = 0; i < HIST_LEN - 1; i++) {
+        if (!(hist_rm[i] || hist_rm[i + 1])) {
+            if (first == -1)
+                first = i;
+            delta_sum += (int16_t)(hist[i + 1] - hist[i]);
+            delta_cnt ++;
+        }
+    }
+
+    csa.delta_encoder = DIV_ROUND_CLOSEST(delta_sum, delta_cnt);
+    csa.sen_encoder = hist[first] + (HIST_LEN - first - 1) * csa.delta_encoder;
+
+
+#if 0
+    int16_t delta = hist[i + 1] - hist[i];
+    if (abs(delta) <= ENC_MAX_DELTA) {
+
+    }
+
+
+
+    if (abs(delta_enc) > ENC_MAX_DELTA) {
+        if (++enc_err_cnt > 20) {
+            d_debug("enc: rst!\n");
+            enc_err_cnt = 0;
+            csa.sen_encoder = csa.noc_encoder;
+            csa.delta_encoder = delta_enc;
+        } else {
+            csa.sen_encoder += csa.delta_encoder;
+        }
+    } else {
+        enc_err_cnt = 0;
+        //csa.sen_encoder = DIV_ROUND_CLOSEST((int16_t)csa.sen_encoder + (int16_t)csa.noc_encoder, 2); 32768!!
+        csa.sen_encoder += delta_enc / 2;
+        //csa.delta_encoder = DIV_ROUND_CLOSEST(csa.delta_encoder + delta_enc, 2);
+        csa.delta_encoder = (csa.delta_encoder + delta_enc) / 2;
+    }
+
+#endif
 
 #if 0
     if (abs(delta_enc) < 1000 || skip_cnt != 0) { // a good value?
@@ -196,7 +270,7 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
         last_encoder += csa.delta_encoder;
         skip_cnt++;
     }
-#else
+//#else
     csa.sen_encoder = csa.noc_encoder;
     csa.delta_encoder = delta_enc;
     last_encoder = csa.noc_encoder;

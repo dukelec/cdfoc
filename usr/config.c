@@ -70,10 +70,10 @@ csa_t csa = {
         .dbg_raw_skip = { 0, 0, 0, 0 },
         .dbg_raw = {
                 { // cur : target, i_term, last_input, cal_i_sq,
-                        { .offset = offsetof(csa_t, pid_cur) + offsetof(pid_f_t, target), .size = 4 * 3 },
-                        { .offset = offsetof(csa_t, cal_i_sq), .size = 4 },
-                        { .offset = offsetof(csa_t, ori_encoder), .size = 2 },
-                        { .offset = offsetof(csa_t, delta_encoder), .size = 2 }
+                        //{ .offset = offsetof(csa_t, pid_cur) + offsetof(pid_f_t, target), .size = 4 * 3 },
+                        //{ .offset = offsetof(csa_t, cal_i_sq), .size = 4 },
+                        { .offset = offsetof(csa_t, noc_encoder), .size = 2 },
+                        { .offset = offsetof(csa_t, sen_encoder), .size = 2 }
                 }, { // speed
                         { .offset = offsetof(csa_t, pid_speed) + offsetof(pid_f_t, target), .size = 4 },
                         { .offset = offsetof(csa_t, pid_speed) + offsetof(pid_f_t, last_input), .size = 4 },
