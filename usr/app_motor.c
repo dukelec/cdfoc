@@ -98,7 +98,7 @@ static void raw_dbg(int idx)
 static inline void position_loop_compute(void)
 {
     if (csa.state < ST_POSITION) {
-        csa.tc_run = false;
+        csa.tc_state = 0;
         pid_i_reset(&csa.pid_pos, csa.sen_pos, 0);
         pid_i_set_target(&csa.pid_pos, csa.sen_pos);
         csa.cal_pos = csa.sen_pos;
@@ -109,30 +109,37 @@ static inline void position_loop_compute(void)
         return;
     }
 
-    if (!csa.tc_run) {
-        csa.cal_pos = csa.tc_pos;
-        pid_i_set_target(&csa.pid_pos, csa.cal_pos);
+    if (csa.tc_state) {
+        int32_t tc_ac = ((csa.tc_ve + csa.tc_vc) / 2) * (csa.tc_ve - csa.tc_vc) / (csa.tc_pos - csa.cal_pos) ;
 
-    } else if (csa.tc_cnt >= csa.tc_steps) {
-        csa.tc_run = false;
-        csa.cal_pos = csa.tc_pos;
-        pid_i_set_target(&csa.pid_pos, csa.cal_pos);
+        if (abs(tc_ac) < csa.tc_accel) {
+            if (csa.tc_state == 1) {
+                csa.tc_vc += sign(csa.tc_pos - csa.cal_pos) * csa.tc_accel;
+                csa.tc_vc = clip(csa.tc_vc, -(int)csa.tc_speed, (int)csa.tc_speed);
+            }
+        } else {
+            csa.tc_vc += tc_ac;
+            csa.tc_state = 2;
+        }
 
-    } else {
-        t_curve_step(csa.tc_s_seg, csa.tc_t_seg, csa.tc_a_seg,
-                csa.tc_v_s, 25.0 / CURRENT_LOOP_FREQ * csa.tc_cnt, // i * period
-                &csa.tc_v_cur, &csa.tc_s_cur);
-        csa.tc_cnt++;
-        pid_i_set_target(&csa.pid_pos, lroundf(csa.tc_s_s + csa.tc_s_cur));
+        if (abs(csa.tc_pos - csa.cal_pos) <= csa.tc_accel) {
+            csa.tc_state = 0;
+            csa.cal_pos = csa.tc_pos;
+            csa.tc_vc = csa.tc_ve;
+        } else {
+            csa.cal_pos += csa.tc_vc;
+        }
     }
 
+    pid_i_set_target(&csa.pid_pos, csa.cal_pos);
     csa.cal_speed = lroundf(pid_i_compute(&csa.pid_pos, csa.sen_pos));
 }
 
 static inline void speed_loop_compute(void)
 {
     static int sub_cnt = 0;
-    const float coeffs[5] = {0.1, 0.15, 0.2, 0.25, 0.3};
+    //const float coeffs[5] = {0.1, 0.15, 0.2, 0.25, 0.3};
+    const float coeffs[5] = {0.2, 0.2, 0.2, 0.2, 0.2};
     static float speed_avg = 0.0;
     static int speed_filt_cnt = 0;
 
@@ -140,11 +147,9 @@ static inline void speed_loop_compute(void)
     speed_avg += speed * coeffs[speed_filt_cnt++];
 
     if (speed_filt_cnt == 5) {
-
         csa.sen_speed = lroundf(speed_avg);
         speed_avg = 0;
         speed_filt_cnt = 0;
-
 
         if (csa.state < ST_CONST_SPEED) {
             pid_f_reset(&csa.pid_speed, 0, 0);
@@ -189,6 +194,7 @@ static void selection_sort(uint32_t arr[], int len, uint32_t order[])
 #define HIST_LEN 10
 
 static uint16_t hist[HIST_LEN] = { 0 };
+
 
 void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
 {
@@ -281,8 +287,8 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
     if (csa.state != ST_STOP) {
         int32_t ia = HAL_ADCEx_InjectedGetValue(&hadc1, 1) - ia_idle;
         int32_t ib = HAL_ADCEx_InjectedGetValue(&hadc2, 1) - ib_idle;
-        int32_t ic = -ia - ib;
         HAL_ADCEx_InjectedGetValue(&hadc3, 1); // remove this
+        int32_t ic = -ia - ib;
 
         float i_alpha = ia;
         float i_beta = (ia + ib * 2) / 1.732050808f; // √3

@@ -126,14 +126,9 @@ typedef struct {
     int32_t         peak_cur_cnt;
 
     // for t_curve
-    bool            tc_run;
-    float           tc_s_cur;
-    float           tc_v_cur;
-    int             tc_cnt;
-    int             tc_steps;
-    int32_t         tc_s_s;
-    float           tc_v_s;
-    float           tc_s_seg[3], tc_t_seg[3], tc_a_seg[3];
+    uint8_t         tc_state; // 0: stop, 1: run, 2: tailer
+    int32_t         tc_vc;    // cur speed
+    int32_t         tc_ve;    // end speed
 
 } csa_t; // config status area
 

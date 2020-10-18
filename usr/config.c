@@ -44,7 +44,7 @@ csa_t csa = {
                 .period = 5.0 / CURRENT_LOOP_FREQ
         },
         .pid_pos = {
-                .kp = 60, .ki = 20, .kd = 0,
+                .kp = 200, .ki = 200, .kd = 1.5,
                 .out_min = -5000000,
                 .out_max = 5000000, // limit output speed
                 .period = 25.0 / CURRENT_LOOP_FREQ
@@ -74,27 +74,23 @@ csa_t csa = {
                         { .offset = offsetof(csa_t, cal_i_sq), .size = 4 },
                         { .offset = offsetof(csa_t, sen_encoder), .size = 2 }
                 }, { // speed
-                        { .offset = offsetof(csa_t, pid_speed) + offsetof(pid_f_t, target), .size = 4 },
-                        { .offset = offsetof(csa_t, pid_speed) + offsetof(pid_f_t, last_input), .size = 4 },
-                        { .offset = offsetof(csa_t, pid_speed) + offsetof(pid_f_t, i_term), .size = 4 },
-                        { .offset = offsetof(csa_t, cal_current), .size = 4 }
+                        { .offset = offsetof(csa_t, pid_speed) + offsetof(pid_f_t, target), .size = 4 * 3 },
+                        { .offset = offsetof(csa_t, delta_encoder), .size = 2 }
                 }, { // pos
-                        { .offset = offsetof(csa_t, pid_pos) + offsetof(pid_i_t, target), .size = 4 },
-                        { .offset = offsetof(csa_t, pid_pos) + offsetof(pid_i_t, last_input), .size = 4 },
-                        { .offset = offsetof(csa_t, pid_pos) + offsetof(pid_i_t, i_term), .size = 4 },
-                        { .offset = offsetof(csa_t, cal_speed), .size = 4 }
+                        { .offset = offsetof(csa_t, pid_pos) + offsetof(pid_i_t, target), .size = 4 * 3 },
+                        { .offset = offsetof(csa_t, cal_speed), .size = 4 },
                 }, { // t_curve
-                        { .offset = offsetof(csa_t, tc_run), .size = 1 },
-                        { .offset = offsetof(csa_t, tc_s_cur), .size = 4 },
-                        { .offset = offsetof(csa_t, tc_v_cur), .size = 4 },
-                        { .offset = offsetof(csa_t, sen_pos), .size = 4 },
-                        { .offset = offsetof(csa_t, sen_speed), .size = 4 },
-                        { .offset = offsetof(csa_t, cal_pos), .size = 4 }
+                        { .offset = offsetof(csa_t, tc_state), .size = 1 },
+                        { .offset = offsetof(csa_t, tc_pos), .size = 4 },
+                        { .offset = offsetof(csa_t, cal_pos), .size = 4 },
+                        //{ .offset = offsetof(csa_t, sen_pos), .size = 4 },
+                        { .offset = offsetof(csa_t, tc_vc), .size = 4 }//,
+                        //{ .offset = offsetof(csa_t, sen_speed), .size = 4 }
                 }
         },
 
-        .tc_speed = 500000,
-        .tc_accel = 600000,
+        .tc_speed = 160, //500000 / CURRENT_LOOP_FREQ,
+        .tc_accel = 1, //600000 / CURRENT_LOOP_FREQ,
 
         .cali_angle_elec = (float)M_PI/2,
         .cali_current = 200,
@@ -248,10 +244,8 @@ void csa_list_show(void)
     CSA_SHOW(loop_cnt);
     d_info("\n");
 
-    CSA_SHOW(tc_run);
-    CSA_SHOW(tc_s_cur);
-    CSA_SHOW(tc_v_cur);
-    CSA_SHOW(tc_cnt);
-    CSA_SHOW(tc_steps);
+    CSA_SHOW(tc_state);
+    CSA_SHOW(tc_vc);
+    CSA_SHOW(tc_ve);
     d_info("\n");
 }

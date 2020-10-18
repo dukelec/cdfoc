@@ -11,6 +11,9 @@
 #include "cd_utils.h"
 #include "pid_i.h"
 
+#define HIST_LEN 10
+static int hist[HIST_LEN] = { 0 };
+
 float pid_i_compute(pid_i_t *pid, int input)
 {
     int error, delta_input;
@@ -24,7 +27,16 @@ float pid_i_compute(pid_i_t *pid, int input)
     delta_input = input - pid->last_input; // delta_input = -delta_error
     pid->last_input = input;
 
-    output = pid->kp * error + pid->i_term - pid->_kd * delta_input;
+    for (int i = 0; i < HIST_LEN - 1; i++)
+        hist[i] = hist[i + 1];
+    hist[HIST_LEN - 1] = delta_input;
+
+    int di_avg = 0;
+    for (int i = 0; i < HIST_LEN; i++)
+        di_avg += hist[i];
+    di_avg = DIV_ROUND_CLOSEST(di_avg, HIST_LEN);
+
+    output = pid->kp * error + pid->i_term - pid->_kd * di_avg;
     output = clip(output, pid->out_min, pid->out_max);
     return output;
 }
