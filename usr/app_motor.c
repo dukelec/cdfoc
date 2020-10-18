@@ -14,6 +14,8 @@ static cdn_sock_t sock8 = { .port = 8, .ns = &dft_ns }; // raw debug
 static list_head_t raw_pend = { 0 };
 
 
+static uint16_t tto_last;
+
 void app_motor_init(void)
 {
     pid_f_init(&csa.pid_cur, true);
@@ -21,6 +23,7 @@ void app_motor_init(void)
     pid_i_init(&csa.pid_pos, true);
 
     csa.sen_encoder = encoder_read(); // init last value
+    tto_last = csa.sen_encoder;
     cdn_sock_bind(&sock8);
 }
 
@@ -165,13 +168,27 @@ static inline void speed_loop_compute(void)
 }
 
 
-#define ENC_MAX_DELTA   40 // > 21
-static int enc_err_cnt = 0;
+static void selection_sort(uint32_t arr[], int len, uint32_t order[])
+{
+    for (int i = 0 ; i < len - 1 ; i++) {
+        int min = i;
+        for (int j = i + 1; j < len; j++) {
+            if (arr[j] < arr[min])
+                min = j;
+        }
+        if (min != i) {
+            swap(arr[min], arr[i]);
+            if (order)
+                swap(order[min], order[i]);
+        }
+    }
+}
+
 
 #define HIST_RM 3
 #define HIST_LEN 10
-static uint16_t hist[HIST_LEN] = { 0 };
 
+static uint16_t hist[HIST_LEN] = { 0 };
 
 void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
 {
@@ -184,97 +201,61 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
     csa.noc_encoder = csa.ori_encoder - csa.bias_encoder;
     int16_t delta_enc = csa.noc_encoder - csa.sen_encoder; // sen_encoder is previous value
 
-    uint16_t hist_dm[HIST_LEN] = { 0 }; // delta_max
-    bool hist_rm[HIST_LEN] = { 0 };
+    // v--- Encoder Filter: ---v
 
     for (int i = 0; i < HIST_LEN - 1; i++)
         hist[i] = hist[i + 1];
     hist[HIST_LEN - 1] = csa.noc_encoder;
 
-    hist_dm[0] = abs(hist[1] - hist[0]);
-    hist_dm[HIST_LEN - 1] = abs(hist[HIST_LEN - 1] - hist[HIST_LEN - 2]) * 2;
-    for (int i = 1; i < HIST_LEN - 2; i++)
-        hist_dm[i] = (abs(hist[i] - hist[i - 1]) + abs(hist[i + 1] - hist[i]));
-
-    for (int c = 0; c < HIST_RM; c++) {
-        int idx = -1;
-        int max_val = 0;
-        for (int i = 0; i < HIST_LEN; i++) {
-            if (!hist_rm[i] && (hist_dm[i] > max_val || idx == -1)) {
-                max_val = hist_dm[i];
-                idx = i;
-            }
-        }
-        hist_rm[idx] = true;
+    uint32_t order[HIST_LEN];
+    uint32_t hist32[HIST_LEN];
+    for (int i = 0; i < HIST_LEN; i++) {
+        hist32[i] = hist[i];
+        order[i] = i;
     }
+    selection_sort(hist32, HIST_LEN, order);
 
-    int first = -1;
-    int delta_sum = 0;
-    int delta_cnt = 0;
+    int longest_idx = 0;
+    uint32_t longest_dt = 0;
     for (int i = 0; i < HIST_LEN - 1; i++) {
-        if (!(hist_rm[i] || hist_rm[i + 1])) {
-            if (first == -1)
-                first = i;
-            delta_sum += (int16_t)(hist[i + 1] - hist[i]);
-            delta_cnt ++;
+        if (hist32[i + 1] - hist32[i] > longest_dt) {
+            longest_dt = hist32[i + 1] - hist32[i];
+            longest_idx = i;
         }
     }
-
-    csa.delta_encoder = DIV_ROUND_CLOSEST(delta_sum, delta_cnt);
-    csa.sen_encoder = hist[first] + (HIST_LEN - first - 1) * csa.delta_encoder;
-
-
-#if 0
-    int16_t delta = hist[i + 1] - hist[i];
-    if (abs(delta) <= ENC_MAX_DELTA) {
-
-    }
-
-
-
-    if (abs(delta_enc) > ENC_MAX_DELTA) {
-        if (++enc_err_cnt > 20) {
-            d_debug("enc: rst!\n");
-            enc_err_cnt = 0;
-            csa.sen_encoder = csa.noc_encoder;
-            csa.delta_encoder = delta_enc;
-        } else {
-            csa.sen_encoder += csa.delta_encoder;
+    uint32_t split_val = hist32[longest_idx];
+    if (hist32[0] + (0x10000 - hist32[HIST_LEN - 1]) < longest_dt) {
+        for (int i = 0; i < HIST_LEN; i++) {
+            if (hist32[i] <= split_val)
+                hist32[i] += 0x10000;
         }
-    } else {
-        enc_err_cnt = 0;
-        //csa.sen_encoder = DIV_ROUND_CLOSEST((int16_t)csa.sen_encoder + (int16_t)csa.noc_encoder, 2); 32768!!
-        csa.sen_encoder += delta_enc / 2;
-        //csa.delta_encoder = DIV_ROUND_CLOSEST(csa.delta_encoder + delta_enc, 2);
-        csa.delta_encoder = (csa.delta_encoder + delta_enc) / 2;
     }
+    selection_sort(hist32, HIST_LEN, order);
+    selection_sort(order+3, HIST_LEN-6, hist32+3);
 
-#endif
 
-#if 0
-    if (abs(delta_enc) < 1000 || skip_cnt != 0) { // a good value?
-        if (dbg_str && abs(delta_enc) >= 1000)
-            d_debug("rst! big delta_enc: %d (%x - %x) | %d\n",
-                    delta_enc, csa.noc_encoder, last_encoder, csa.delta_encoder);
-        csa.delta_encoder = delta_enc;
-        // (4Bytes 5.25M, 1/8 CURRENT_LOOP) was wrong
-        // encoder lock data at start of first byte
-        csa.sen_encoder = csa.noc_encoder + DIV_ROUND_CLOSEST(delta_enc * 1, 8);
-        last_encoder = csa.noc_encoder;
-        skip_cnt = 0;
-    } else { // skip wrong sensor value
-        //if (dbg_str)
-        //    d_debug("skip big delta_enc: %d (%x - %x) | %d\n",
-        //            delta_enc, csa.noc_encoder, last_encoder, csa.delta_encoder);
-        csa.sen_encoder += csa.delta_encoder;
-        last_encoder += csa.delta_encoder;
-        skip_cnt++;
+    int isum = 0;
+    for (int i = 3; i < HIST_LEN - 3; i++)
+        isum += order[i];
+    isum = DIV_ROUND_CLOSEST(isum, HIST_LEN - 6);
+
+    int dsum = 0;
+    for (int i = 3; i < HIST_LEN - 3 - 1; i++) {
+        dsum += DIV_ROUND_CLOSEST((int16_t)(hist[order[i+1]] - hist[order[i]]), (int16_t)(order[i+1] - order[i]));
     }
-//#else
-    csa.sen_encoder = csa.noc_encoder;
-    csa.delta_encoder = delta_enc;
-    last_encoder = csa.noc_encoder;
-#endif
+    dsum = DIV_ROUND_CLOSEST(dsum, HIST_LEN - 6 - 1);
+
+    uint32_t ttt = 0;
+    for (int i = 3; i < HIST_LEN - 3; i++)
+        ttt += hist32[i];
+    uint16_t tto = DIV_ROUND_CLOSEST(ttt, HIST_LEN - 6);
+
+    csa.sen_encoder = tto + dsum * (HIST_LEN - 1 - isum);
+    csa.delta_encoder = tto - tto_last;
+    tto_last = tto;
+    // csa.sen_encoder = tto + csa.delta_encoder * 4;
+
+    // ^--- END of Encoder Filter ---^
 
     if (abs((uint16_t)(csa.ori_pos & 0xffff) - csa.sen_encoder) > 0x10000/2) {
         if (csa.sen_encoder < 0x10000/2)

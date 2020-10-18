@@ -32,7 +32,7 @@ csa_t csa = {
         .bus_baud_high = 2000000,
 
         .pid_cur =  {
-                .kp = 0.1, .ki = 400,
+                .kp = 1, .ki = 400,
                 .out_min = DRV_PWM_HALF * -0.9,
                 .out_max = DRV_PWM_HALF * 0.9,
                 .period = 1.0 / CURRENT_LOOP_FREQ
@@ -70,9 +70,8 @@ csa_t csa = {
         .dbg_raw_skip = { 0, 0, 0, 0 },
         .dbg_raw = {
                 { // cur : target, i_term, last_input, cal_i_sq,
-                        //{ .offset = offsetof(csa_t, pid_cur) + offsetof(pid_f_t, target), .size = 4 * 3 },
-                        //{ .offset = offsetof(csa_t, cal_i_sq), .size = 4 },
-                        { .offset = offsetof(csa_t, noc_encoder), .size = 2 },
+                        { .offset = offsetof(csa_t, pid_cur) + offsetof(pid_f_t, target), .size = 4 * 3 },
+                        { .offset = offsetof(csa_t, cal_i_sq), .size = 4 },
                         { .offset = offsetof(csa_t, sen_encoder), .size = 2 }
                 }, { // speed
                         { .offset = offsetof(csa_t, pid_speed) + offsetof(pid_f_t, target), .size = 4 },
