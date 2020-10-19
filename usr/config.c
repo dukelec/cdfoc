@@ -44,7 +44,7 @@ csa_t csa = {
                 .period = 5.0 / CURRENT_LOOP_FREQ
         },
         .pid_pos = {
-                .kp = 200, .ki = 200, .kd = 1.5,
+                .kp = 200, .ki = 200, .kd = 1,
                 .out_min = -5000000,
                 .out_max = 5000000, // limit output speed
                 .period = 25.0 / CURRENT_LOOP_FREQ
@@ -84,15 +84,16 @@ csa_t csa = {
                         { .offset = offsetof(csa_t, tc_pos), .size = 4 },
                         { .offset = offsetof(csa_t, cal_pos), .size = 4 },
                         //{ .offset = offsetof(csa_t, sen_pos), .size = 4 },
-                        { .offset = offsetof(csa_t, tc_vc), .size = 4 }//,
+                        { .offset = offsetof(csa_t, tc_vc), .size = 4 },
+                        { .offset = offsetof(csa_t, tc_ve), .size = 4 }//,
                         //{ .offset = offsetof(csa_t, sen_speed), .size = 4 }
                 }
         },
 
-        .tc_speed = 160, //500000 / CURRENT_LOOP_FREQ,
-        .tc_accel = 2, //600000 / CURRENT_LOOP_FREQ,
-        .tc_speed_m = 60,
-        .tc_accel_m = 1,
+        .tc_speed = 200000,
+        .tc_accel = 10000,
+        .tc_speed_m = 50000,
+        .tc_accel_m = 5000,
         .tc_pos_d = 10000,
 
         .cali_angle_elec = (float)M_PI/2,

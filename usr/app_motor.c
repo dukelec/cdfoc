@@ -108,57 +108,59 @@ static inline void position_loop_compute(void)
         return;
     }
 
-    int32_t         pos;
-    uint32_t        speed;
-    uint32_t        accel;
+    int32_t pos;
+    float   speed;
+    float   accel;
 
     if ((csa.tc_pos >= csa.cal_pos && csa.cal_pos >= csa.tc_pos_m) ||
             (csa.tc_pos <= csa.cal_pos && csa.cal_pos <= csa.tc_pos_m)) {
         pos = csa.tc_pos;
-        speed = csa.tc_speed_m;
-        accel = csa.tc_accel_m;
+        speed = csa.tc_speed_m / (CURRENT_LOOP_FREQ / 25.0f);
+        accel = csa.tc_accel_m / (CURRENT_LOOP_FREQ / 25.0f);
         csa.tc_ve = 0;
     } else { // target is middle point
         pos = csa.tc_pos_m;
-        speed = csa.tc_speed;
-        accel = csa.tc_accel;
-        csa.tc_ve = sign(csa.tc_pos - csa.cal_pos) * csa.tc_speed_m;
+        speed = csa.tc_speed / (CURRENT_LOOP_FREQ / 25.0f);
+        accel = csa.tc_accel / (CURRENT_LOOP_FREQ / 25.0f);
+        csa.tc_ve = sign(csa.tc_pos - csa.cal_pos) * ((float)csa.tc_speed_m) / (CURRENT_LOOP_FREQ / 25.0f);
     }
 
     if (csa.tc_state) {
-        int32_t tc_ac = ((csa.tc_ve + csa.tc_vc) / 2) * (csa.tc_ve - csa.tc_vc) / (pos - csa.cal_pos) ;
+        float tc_ac = 0;
+        if (pos != csa.cal_pos)
+            tc_ac = ((csa.tc_ve + csa.tc_vc) / 2.0f) * (csa.tc_ve - csa.tc_vc) / (pos - csa.cal_pos);
+        //tc_ac = sign(tc_ac) * min(fabsf(tc_ac), accel * 2.0f);
 
-        if (abs(tc_ac) < accel) {
+        if (fabsf(tc_ac) < accel) {
             if (csa.tc_state == 1) {
                 csa.tc_vc += sign(pos - csa.cal_pos) * accel;
-                csa.tc_vc = clip(csa.tc_vc, -(int)speed, (int)speed);
+                csa.tc_vc = clip(csa.tc_vc, -speed, speed);
             }
         } else {
-            csa.tc_vc += tc_ac;
             csa.tc_state = 2;
+            csa.tc_vc += tc_ac;
         }
 
-        if (abs(pos - csa.cal_pos) <= accel) {
+        if (abs(pos - csa.cal_pos) <= max(lroundf(accel), 1)) {
             csa.cal_pos = pos;
             csa.tc_vc = csa.tc_ve;
 
         } else {
-            if (abs(csa.tc_vc) < accel)
+            if (fabsf(csa.tc_vc) < accel)
                 csa.tc_vc = sign(pos - csa.cal_pos) * accel;
 
             if (csa.cal_pos <= pos) {
-                csa.cal_pos = min(csa.cal_pos + csa.tc_vc, pos);
+                csa.cal_pos = min(lroundf(csa.cal_pos + csa.tc_vc), pos);
             } else {
-                csa.cal_pos = max(csa.cal_pos + csa.tc_vc, pos);
+                csa.cal_pos = max(lroundf(csa.cal_pos + csa.tc_vc), pos);
             }
         }
     }
 
     if (csa.cal_pos == csa.tc_pos)
         csa.tc_state = 0;
-    if (!csa.tc_state) {
+    if (!csa.tc_state)
         csa.tc_vc = 0;
-    }
 
     pid_i_set_target(&csa.pid_pos, csa.cal_pos);
     csa.cal_speed = lroundf(pid_i_compute(&csa.pid_pos, csa.sen_pos));

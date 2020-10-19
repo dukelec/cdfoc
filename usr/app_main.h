@@ -131,8 +131,8 @@ typedef struct {
 
     // for t_curve
     uint8_t         tc_state; // 0: stop, 1: run, 2: tailer
-    int32_t         tc_vc;    // cur speed
-    int32_t         tc_ve;    // end speed
+    float           tc_vc;    // cur speed
+    float           tc_ve;    // end speed
 
 
 } csa_t; // config status area
