@@ -13,7 +13,6 @@
 static cdn_sock_t sock8 = { .port = 8, .ns = &dft_ns }; // raw debug
 static list_head_t raw_pend = { 0 };
 
-
 static uint16_t tto_last;
 
 void app_motor_init(void)
@@ -109,26 +108,56 @@ static inline void position_loop_compute(void)
         return;
     }
 
-    if (csa.tc_state) {
-        int32_t tc_ac = ((csa.tc_ve + csa.tc_vc) / 2) * (csa.tc_ve - csa.tc_vc) / (csa.tc_pos - csa.cal_pos) ;
+    int32_t         pos;
+    uint32_t        speed;
+    uint32_t        accel;
 
-        if (abs(tc_ac) < csa.tc_accel) {
+    if ((csa.tc_pos >= csa.cal_pos && csa.cal_pos >= csa.tc_pos_m) ||
+            (csa.tc_pos <= csa.cal_pos && csa.cal_pos <= csa.tc_pos_m)) {
+        pos = csa.tc_pos;
+        speed = csa.tc_speed_m;
+        accel = csa.tc_accel_m;
+        csa.tc_ve = 0;
+    } else { // target is middle point
+        pos = csa.tc_pos_m;
+        speed = csa.tc_speed;
+        accel = csa.tc_accel;
+        csa.tc_ve = sign(csa.tc_pos - csa.cal_pos) * csa.tc_speed_m;
+    }
+
+    if (csa.tc_state) {
+        int32_t tc_ac = ((csa.tc_ve + csa.tc_vc) / 2) * (csa.tc_ve - csa.tc_vc) / (pos - csa.cal_pos) ;
+
+        if (abs(tc_ac) < accel) {
             if (csa.tc_state == 1) {
-                csa.tc_vc += sign(csa.tc_pos - csa.cal_pos) * csa.tc_accel;
-                csa.tc_vc = clip(csa.tc_vc, -(int)csa.tc_speed, (int)csa.tc_speed);
+                csa.tc_vc += sign(pos - csa.cal_pos) * accel;
+                csa.tc_vc = clip(csa.tc_vc, -(int)speed, (int)speed);
             }
         } else {
             csa.tc_vc += tc_ac;
             csa.tc_state = 2;
         }
 
-        if (abs(csa.tc_pos - csa.cal_pos) <= csa.tc_accel) {
-            csa.tc_state = 0;
-            csa.cal_pos = csa.tc_pos;
+        if (abs(pos - csa.cal_pos) <= accel) {
+            csa.cal_pos = pos;
             csa.tc_vc = csa.tc_ve;
+
         } else {
-            csa.cal_pos += csa.tc_vc;
+            if (abs(csa.tc_vc) < accel)
+                csa.tc_vc = sign(pos - csa.cal_pos) * accel;
+
+            if (csa.cal_pos <= pos) {
+                csa.cal_pos = min(csa.cal_pos + csa.tc_vc, pos);
+            } else {
+                csa.cal_pos = max(csa.cal_pos + csa.tc_vc, pos);
+            }
         }
+    }
+
+    if (csa.cal_pos == csa.tc_pos)
+        csa.tc_state = 0;
+    if (!csa.tc_state) {
+        csa.tc_vc = 0;
     }
 
     pid_i_set_target(&csa.pid_pos, csa.cal_pos);

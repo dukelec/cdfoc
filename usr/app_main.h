@@ -48,7 +48,6 @@ typedef enum {
     LED_ERROR
 } led_state_t;
 
-
 typedef struct {
     uint16_t        offset;
     uint16_t        size;
@@ -96,6 +95,11 @@ typedef struct {
     uint32_t        tc_speed;
     uint32_t        tc_accel;
 
+    uint32_t        tc_pos_d;        // delta for middle
+    int32_t         tc_pos_m;
+    uint32_t        tc_speed_m;
+    uint32_t        tc_accel_m;
+
     float           cali_angle_elec;
     float           cali_current;
     float           cali_angle_step; // increase cali_angle_elec
@@ -129,6 +133,7 @@ typedef struct {
     uint8_t         tc_state; // 0: stop, 1: run, 2: tailer
     int32_t         tc_vc;    // cur speed
     int32_t         tc_ve;    // end speed
+
 
 } csa_t; // config status area
 

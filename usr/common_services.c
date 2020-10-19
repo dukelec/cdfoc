@@ -279,8 +279,10 @@ static void p13_service_routine(void)
 
         if (csa.state == ST_POS_TC) {
             local_irq_save(flags);
-            if (csa.cal_pos != csa.tc_pos)
+            if (csa.cal_pos != csa.tc_pos) {
                 csa.tc_state = 1; // restart t_curve
+                csa.tc_pos_m = csa.tc_pos - sign(csa.tc_pos - csa.cal_pos) * csa.tc_pos_d;
+            }
             local_irq_restore(flags);
         }
 

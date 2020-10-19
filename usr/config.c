@@ -50,7 +50,7 @@ csa_t csa = {
                 .period = 25.0 / CURRENT_LOOP_FREQ
         },
 
-        .bias_encoder = 0x4590,
+        .bias_encoder = 0x1425,
 
         .qxchg_set = {
                 { .offset = offsetof(csa_t, tc_pos), .size = 4 }
@@ -90,7 +90,10 @@ csa_t csa = {
         },
 
         .tc_speed = 160, //500000 / CURRENT_LOOP_FREQ,
-        .tc_accel = 1, //600000 / CURRENT_LOOP_FREQ,
+        .tc_accel = 2, //600000 / CURRENT_LOOP_FREQ,
+        .tc_speed_m = 60,
+        .tc_accel_m = 1,
+        .tc_pos_d = 10000,
 
         .cali_angle_elec = (float)M_PI/2,
         .cali_current = 200,
