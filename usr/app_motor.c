@@ -10,7 +10,7 @@
 #include "math.h"
 #include "app_main.h"
 
-static cdn_sock_t sock8 = { .port = 8, .ns = &dft_ns }; // raw debug
+static cdn_sock_t sock_raw_dbg = { .port = 0xa, .ns = &dft_ns }; // raw debug
 static list_head_t raw_pend = { 0 };
 
 static uint16_t tto_last;
@@ -23,7 +23,7 @@ void app_motor_init(void)
 
     csa.sen_encoder = encoder_read(); // init last value
     tto_last = csa.sen_encoder;
-    cdn_sock_bind(&sock8);
+    cdn_sock_bind(&sock_raw_dbg);
 }
 
 void app_motor_routine(void)
@@ -31,7 +31,7 @@ void app_motor_routine(void)
     if (frame_free_head.len > 1) {
         cdn_pkt_t *pkt = cdn_pkt_get(&raw_pend);
         if (pkt)
-            cdn_sock_sendto(&sock8, pkt);
+            cdn_sock_sendto(&sock_raw_dbg, pkt);
     }
 }
 
@@ -153,8 +153,6 @@ static inline void t_curve_compute(void)
 
 static inline void position_loop_compute(void)
 {
-    static int sub_cnt = 0;
-
     if (csa.state < ST_POSITION) {
         csa.tc_state = 0;
         csa.tc_vc = 0;

@@ -57,6 +57,10 @@ typedef struct {
 typedef struct {
     uint16_t        magic_code; // 0xcdcd
     uint16_t        conf_ver;
+    bool            conf_from;  // 0: default, 1: load from flash
+    bool            do_reboot;
+    bool            _reserved;
+    bool            save_conf;
 
     //uint8_t       bus_mode; // a, bs, trad
     uint8_t         bus_net;
@@ -65,6 +69,8 @@ typedef struct {
     uint32_t        bus_baud_high;
     //uint16_t      bus_tx_premit_len;
     //uint16_t      bus_max_idle_len;
+    bool            dbg_en;
+    cdn_sockaddr_t  dbg_dst;
 
     pid_i_t         pid_pos;
     pid_f_t         pid_speed;
@@ -80,8 +86,6 @@ typedef struct {
     regr_t          qxchg_ret[10];
     regr_t          qxchg_ro[10];
 
-    bool            dbg_en;
-    cdn_sockaddr_t  dbg_dst;
     uint8_t         dbg_str_msk;
     uint16_t        dbg_str_skip;     // for period string debug
 
@@ -125,7 +129,6 @@ typedef struct {
     float           sen_current;
     float           sen_angle_elec;
 
-    bool            conf_from;   // 0: default, 1: load from flash
     uint32_t        loop_cnt;
     int32_t         peak_cur_cnt;
 
@@ -133,7 +136,6 @@ typedef struct {
     uint8_t         tc_state; // 0: stop, 1: run, 2: tailer
     float           tc_vc;    // cur speed
     float           tc_ve;    // end speed
-
 
 } csa_t; // config status area
 
@@ -156,11 +158,6 @@ void app_motor_routine(void);
 void limit_det_isr(void);
 
 uint16_t encoder_read(void);
-
-int t_curve_plan(float v_s, float v_e, float s, float v_unsign, float a_unsign,
-                float *s_seg, float *t_seg, float *a_seg);
-int t_curve_step(const float *s_seg, const float *t_seg, const float *a_seg,
-        float v_s, float t_cur, float *v_cur, float *s_cur);
 
 extern ADC_HandleTypeDef hadc1;
 extern ADC_HandleTypeDef hadc2;

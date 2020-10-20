@@ -14,10 +14,9 @@ static char cpu_id[25];
 static char info_str[100];
 
 static cdn_sock_t sock1 = { .port = 1, .ns = &dft_ns };
-static cdn_sock_t sock10 = { .port = 10, .ns = &dft_ns };
-static cdn_sock_t sock11 = { .port = 11, .ns = &dft_ns };
-static cdn_sock_t sock12 = { .port = 12, .ns = &dft_ns };
-static cdn_sock_t sock13 = { .port = 13, .ns = &dft_ns };
+static cdn_sock_t sock5 = { .port = 5, .ns = &dft_ns };
+static cdn_sock_t sock6 = { .port = 6, .ns = &dft_ns };
+static cdn_sock_t sock8 = { .port = 8, .ns = &dft_ns };
 
 
 static void get_uid(char *buf)
@@ -49,11 +48,7 @@ static void init_info_str(void)
 {
     // M: model; S: serial string; HW: hardware version; SW: software version
     get_uid(cpu_id);
-#ifdef BOOTLOADER
-    sprintf(info_str, "M: mdrv (bl); S: %s; SW: %s", cpu_id, SW_VER);
-#else
     sprintf(info_str, "M: mdrv; S: %s; SW: %s", cpu_id, SW_VER);
-#endif
     d_info("info: %s\n", info_str);
 }
 
@@ -78,47 +73,14 @@ static void p1_service_routine(void)
 }
 
 
-// device control
-static void p10_service_routine(void)
-{
-    cdn_pkt_t *pkt = cdn_sock_recvfrom(&sock10);
-    if (!pkt)
-        return;
-
-    pkt->len = 1;
-    pkt->dat[0] = 0x80;
-    pkt->dst = pkt->src;
-
-    if (pkt->len && pkt->dat[0] == 0x20) {
-        cdn_sock_sendto(&sock10, pkt);
-        delay_systick(50000 / SYSTICK_US_DIV);
-        // TODO: return before reset for cdnet seq
-        NVIC_SystemReset();
-
-    } else if (pkt->len && pkt->dat[0] == 0x21) {
-        d_debug("p10 ser: save config to flash\n");
-        pkt->dat[0] |= save_conf();
-        cdn_sock_sendto(&sock10, pkt);
-
-    } else if (pkt->len && pkt->dat[0] == 0x22) {
-        d_debug("p10 ser: stay in bootloader\n");
-        //csa.bl_wait = 0xff;
-        cdn_sock_sendto(&sock10, pkt);
-
-    } else {
-        d_debug("p10 ser: ignore\n");
-        list_put(&dft_ns.free_pkts, &pkt->node);
-    }
-}
-
 // flash memory manipulation
-static void p11_service_routine(void)
+static void p8_service_routine(void)
 {
     // erase: 0x2f, addr_32, len_32  | return [0x80] on success
     // read:  0x00, addr_32, len_8   | return [0x80, data]
     // write: 0x20, addr_32 + [data] | return [0x80] on success
 
-    cdn_pkt_t *pkt = cdn_sock_recvfrom(&sock11);
+    cdn_pkt_t *pkt = cdn_sock_recvfrom(&sock8);
     if (!pkt)
         return;
 
@@ -178,18 +140,18 @@ static void p11_service_routine(void)
     }
 
     pkt->dst = pkt->src;
-    cdn_sock_sendto(&sock11, pkt);
+    cdn_sock_sendto(&sock8, pkt);
     return;
 }
 
 
 // csa manipulation
-static void p12_service_routine(void)
+static void p5_service_routine(void)
 {
     // read:  0x00, offset_16, len_8   | return [0x80, data]
     // write: 0x20, offset_16 + [data] | return [0x80] on success
 
-    cdn_pkt_t *pkt = cdn_sock_recvfrom(&sock12);
+    cdn_pkt_t *pkt = cdn_sock_recvfrom(&sock5);
     if (!pkt)
         return;
 
@@ -209,28 +171,34 @@ static void p12_service_routine(void)
 
         for (int i = 0; i < regr_wa_num; i++) {
             regr_t *regr = regr_wa + i;
-            uint16_t start = clip(offset, regr->offset, regr->offset + regr->size - 1);
-            uint16_t end = clip(offset + len - 1, regr->offset, regr->offset + regr->size - 1);
-            if (start == end && start != offset) {
-                //d_debug("csa i%d: [%x, %x], [%x, %x] -> [%x, %x]\n",
-                //        i, regr->offset, regr->offset + regr->size - 1,
-                //        offset, offset + len - 1,
+            uint16_t start = clip(offset, regr->offset, regr->offset + regr->size);
+            uint16_t end = clip(offset + len, regr->offset, regr->offset + regr->size);
+            if (start == end) {
+                //d_debug("csa i%d: [%x, %x), [%x, %x) -> [%x, %x)\n",
+                //        i, regr->offset, regr->offset + regr->size,
+                //        offset, offset + len,
                 //        start, end);
                 continue;
             }
 
             //d_debug("csa @ %p, %p <- %p, len %d, dat[0]: %x\n",
-            //        &csa, ((void *) &csa) + start, src_dat + (start - offset), end - start + 1,
+            //        &csa, ((void *) &csa) + start, src_dat + (start - offset), end - start,
             //        *(src_dat + (start - offset)));
 
             local_irq_save(flags);
-            memcpy(((void *) &csa) + start, src_dat + (start - offset), end - start + 1);
+            memcpy(((void *) &csa) + start, src_dat + (start - offset), end - start);
             local_irq_restore(flags);
         }
 
         d_debug("csa write: %04x %d\n", offset, len);
         pkt->len = 1;
         pkt->dat[0] = 0x80;
+
+        if (csa.save_conf) {
+            csa.save_conf = false;
+            pkt->dat[0] |= save_conf();
+            d_debug("csa: save config to flash, ret: %x\n", pkt->dat[0]);
+        }
 
     } else {
         list_put(&dft_ns.free_pkts, &pkt->node);
@@ -239,15 +207,15 @@ static void p12_service_routine(void)
     }
 
     pkt->dst = pkt->src;
-    cdn_sock_sendto(&sock12, pkt);
+    cdn_sock_sendto(&sock5, pkt);
     return;
 }
 
 
 // qxchg
-static void p13_service_routine(void)
+static void p6_service_routine(void)
 {
-    cdn_pkt_t *pkt = cdn_sock_recvfrom(&sock13);
+    cdn_pkt_t *pkt = cdn_sock_recvfrom(&sock6);
     if (!pkt)
         return;
 
@@ -307,7 +275,7 @@ static void p13_service_routine(void)
     }
 
     pkt->dst = pkt->src;
-    cdn_sock_sendto(&sock13, pkt);
+    cdn_sock_sendto(&sock6, pkt);
     return;
 }
 
@@ -315,18 +283,18 @@ static void p13_service_routine(void)
 void common_service_init(void)
 {
     cdn_sock_bind(&sock1);
-    cdn_sock_bind(&sock10);
-    cdn_sock_bind(&sock11);
-    cdn_sock_bind(&sock12);
-    cdn_sock_bind(&sock13);
+    cdn_sock_bind(&sock5);
+    cdn_sock_bind(&sock6);
+    cdn_sock_bind(&sock8);
     init_info_str();
 }
 
 void common_service_routine(void)
 {
+    if (csa.do_reboot)
+        NVIC_SystemReset();
     p1_service_routine();
-    p10_service_routine();
-    p11_service_routine();
-    p12_service_routine();
-    p13_service_routine();
+    p5_service_routine();
+    p6_service_routine();
+    p8_service_routine();
 }

@@ -11,7 +11,7 @@
 #include "math.h"
 
 regr_t regr_wa[] = {
-        { .offset = offsetof(csa_t, bus_net), .size = offsetof(csa_t, pid_pos) - offsetof(csa_t, bus_net) },
+        { .offset = offsetof(csa_t, do_reboot), .size = offsetof(csa_t, pid_pos) - offsetof(csa_t, do_reboot) },
         { .offset = offsetof(csa_t, pid_pos), .size = offsetof(pid_i_t, target) },
         { .offset = offsetof(csa_t, pid_speed), .size = offsetof(pid_f_t, target) },
         { .offset = offsetof(csa_t, pid_speed), .size = offsetof(pid_f_t, target) },
@@ -30,6 +30,8 @@ csa_t csa = {
         .bus_mac = 254,
         .bus_baud_low = 1000000,
         .bus_baud_high = 2000000,
+        .dbg_en = true,
+        .dbg_dst = { .addr = {0x80, 0x00, 0x00}, .port = 9 },
 
         .pid_cur =  {
                 .kp = 1, .ki = 400,
@@ -59,8 +61,6 @@ csa_t csa = {
                 { .offset = offsetof(csa_t, cal_pos), .size = 8 }
         },
 
-        .dbg_en = true,
-        .dbg_dst = { .addr = {0x80, 0x00, 0x00}, .port = 9 },
         .dbg_str_msk = 0xff,
         .dbg_str_skip = 0x1fff, // 0x01ff,
 
@@ -92,9 +92,9 @@ csa_t csa = {
 
         .tc_speed = 200000,
         .tc_accel = 10000,
+        .tc_pos_d = 10000,
         .tc_speed_m = 50000,
         .tc_accel_m = 5000,
-        .tc_pos_d = 10000,
 
         .cali_angle_elec = (float)M_PI/2,
         .cali_current = 200,
@@ -106,9 +106,9 @@ csa_t csa = {
 void load_conf(void)
 {
     csa_t app_tmp;
-    memcpy(&app_tmp, (void *)APP_CONF_ADDR, sizeof(csa_t));
+    memcpy(&app_tmp, (void *)APP_CONF_ADDR, offsetof(csa_t, state));
     if (app_tmp.magic_code == 0xcdcd && app_tmp.conf_ver == APP_CONF_VER) {
-        memcpy(&csa, &app_tmp, offsetof(csa_t, conf_from));
+        memcpy(&csa, &app_tmp, offsetof(csa_t, state));
         csa.conf_from = 1;
     }
 }
@@ -159,12 +159,17 @@ void csa_list_show(void)
     d_info("csa_list_show:\n\n");
 
     CSA_SHOW(conf_ver);
+    CSA_SHOW(conf_from);
+    CSA_SHOW(do_reboot);
     d_info("\n");
 
     CSA_SHOW(bus_net);
     CSA_SHOW(bus_mac);
     CSA_SHOW(bus_baud_low);
     CSA_SHOW(bus_baud_high);
+    CSA_SHOW(dbg_en);
+    CSA_SHOW_SUB(dbg_dst, cdn_sockaddr_t, addr);
+    CSA_SHOW_SUB(dbg_dst, cdn_sockaddr_t, port);
     d_info("\n");
 
     CSA_SHOW_SUB(pid_pos, pid_i_t, kp);
@@ -195,11 +200,9 @@ void csa_list_show(void)
     CSA_SHOW(bias_pos);
     CSA_SHOW(qxchg_set);
     CSA_SHOW(qxchg_ret);
+    CSA_SHOW(qxchg_ro);
     d_info("\n");
 
-    CSA_SHOW(dbg_en);
-    CSA_SHOW_SUB(dbg_dst, cdn_sockaddr_t, addr);
-    CSA_SHOW_SUB(dbg_dst, cdn_sockaddr_t, port);
     CSA_SHOW(dbg_str_msk);
     CSA_SHOW(dbg_str_skip);
     d_info("\n");
@@ -217,14 +220,25 @@ void csa_list_show(void)
     CSA_SHOW(tc_accel);
     d_info("\n");
 
+    CSA_SHOW(tc_pos_d);
+    CSA_SHOW(tc_pos_m);
+    CSA_SHOW(tc_speed_m);
+    CSA_SHOW(tc_accel_m);
+    d_info("\n");
+
     CSA_SHOW(cali_angle_elec);
     CSA_SHOW(cali_current);
     CSA_SHOW(cali_angle_step);
     d_info("\n");
 
-    CSA_SHOW(conf_from);
     CSA_SHOW(state);
     CSA_SHOW(err_flag);
+    d_info("\n");
+
+    CSA_SHOW(cal_pos);
+    CSA_SHOW(cal_speed);
+    CSA_SHOW(cal_current);
+    CSA_SHOW(cal_i_sq);
     d_info("\n");
 
     CSA_SHOW(ori_encoder);
@@ -238,11 +252,6 @@ void csa_list_show(void)
     CSA_SHOW(sen_speed);
     CSA_SHOW(sen_current);
     CSA_SHOW(sen_angle_elec);
-    d_info("\n");
-
-    CSA_SHOW(cal_pos);
-    CSA_SHOW(cal_speed);
-    CSA_SHOW(cal_current);
     d_info("\n");
 
     CSA_SHOW(loop_cnt);
