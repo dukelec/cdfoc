@@ -107,7 +107,7 @@ void load_conf(void)
 {
     csa_t app_tmp;
     memcpy(&app_tmp, (void *)APP_CONF_ADDR, offsetof(csa_t, state));
-    memset(&app_tmp.conf_from, 0, offsetof(csa_t, bus_net));
+    memset(&app_tmp.conf_from, 0, 4);
 
     if (app_tmp.magic_code == 0xcdcd && app_tmp.conf_ver == APP_CONF_VER) {
         memcpy(&csa, &app_tmp, offsetof(csa_t, state));
@@ -134,7 +134,7 @@ int save_conf(void)
 
     uint32_t *dst_dat = (uint32_t *)APP_CONF_ADDR;
     uint32_t *src_dat = (uint32_t *)&csa;
-    int cnt = (offsetof(csa_t, conf_from) + 3) / 4;
+    int cnt = (offsetof(csa_t, state) + 3) / 4;
 
     for (int i = 0; ret == HAL_OK && i < cnt; i++)
         ret = HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, (uint32_t)(dst_dat + i), *(src_dat + i));
@@ -163,6 +163,7 @@ void csa_list_show(void)
     CSA_SHOW(conf_ver);
     CSA_SHOW(conf_from);
     CSA_SHOW(do_reboot);
+    CSA_SHOW(save_conf);
     d_info("\n");
 
     CSA_SHOW(bus_net);
