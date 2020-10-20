@@ -44,7 +44,7 @@ csa_t csa = {
                 .period = 5.0 / CURRENT_LOOP_FREQ
         },
         .pid_pos = {
-                .kp = 200, .ki = 200, .kd = 1,
+                .kp = 45, .ki = 50, .kd = 0.05,
                 .out_min = -5000000,
                 .out_max = 5000000, // limit output speed
                 .period = 25.0 / CURRENT_LOOP_FREQ

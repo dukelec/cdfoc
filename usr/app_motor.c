@@ -94,20 +94,8 @@ static void raw_dbg(int idx)
 }
 
 
-static inline void position_loop_compute(void)
+static inline void t_curve_compute(void)
 {
-    if (csa.state < ST_POSITION) {
-        csa.tc_state = 0;
-        pid_i_reset(&csa.pid_pos, csa.sen_pos, 0);
-        pid_i_set_target(&csa.pid_pos, csa.sen_pos);
-        csa.cal_pos = csa.sen_pos;
-        csa.tc_pos = csa.sen_pos;
-        if (csa.state == ST_STOP) {
-            csa.cal_speed = 0;
-        }
-        return;
-    }
-
     int32_t pos;
     float   speed;
     float   accel;
@@ -161,9 +149,30 @@ static inline void position_loop_compute(void)
         csa.tc_state = 0;
     if (!csa.tc_state)
         csa.tc_vc = 0;
+}
 
+static inline void position_loop_compute(void)
+{
+    static int sub_cnt = 0;
+
+    if (csa.state < ST_POSITION) {
+        csa.tc_state = 0;
+        csa.tc_vc = 0;
+        pid_i_reset(&csa.pid_pos, csa.sen_pos, 0);
+        pid_i_set_target(&csa.pid_pos, csa.sen_pos);
+        csa.cal_pos = csa.sen_pos;
+        csa.tc_pos = csa.sen_pos;
+        if (csa.state == ST_STOP) {
+            csa.cal_speed = 0;
+        }
+        return;
+    }
+
+    t_curve_compute();
     pid_i_set_target(&csa.pid_pos, csa.cal_pos);
     csa.cal_speed = lroundf(pid_i_compute(&csa.pid_pos, csa.sen_pos));
+
+    raw_dbg(3);
 }
 
 static inline void speed_loop_compute(void)
@@ -197,7 +206,6 @@ static inline void speed_loop_compute(void)
             sub_cnt = 0;
             position_loop_compute();
             raw_dbg(2);
-            raw_dbg(3);
         }
         raw_dbg(1);
     }
