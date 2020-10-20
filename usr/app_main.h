@@ -156,6 +156,7 @@ void set_led_state(led_state_t state);
 void app_motor_init(void);
 void app_motor_routine(void);
 void limit_det_isr(void);
+void selection_sort(int32_t arr[], int len, int32_t order[]);
 
 uint16_t encoder_read(void);
 

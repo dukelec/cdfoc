@@ -10,8 +10,9 @@
 
 #include "cd_utils.h"
 #include "pid_i.h"
+#include "app_main.h"
 
-#define HIST_LEN 10
+#define HIST_LEN 3
 static int hist[HIST_LEN] = { 0 };
 
 float pid_i_compute(pid_i_t *pid, int input)
@@ -22,21 +23,30 @@ float pid_i_compute(pid_i_t *pid, int input)
     error = pid->target - input;
 
     pid->i_term += pid->_ki * error;
-    pid->i_term = clip(pid->i_term, pid->out_min, pid->out_max);
+    //pid->i_term = clip(pid->i_term, pid->out_min, pid->out_max);
+    //                                                     %         max_out         %
+    int i_lim = (min(abs(csa.tc_pos - csa.cal_pos) + 60, 20000) * pid->out_max / 20000);
+    pid->i_term = clip(pid->i_term, -i_lim, i_lim);
+
+    float kp_term = pid->kp * error;
+    //                                                           %      max_out     %
+    //float kp_term = (min(abs(csa.tc_pos - csa.cal_pos) + 5000, 20000) * pid->kp / 20000) * error;
+
 
     delta_input = input - pid->last_input; // delta_input = -delta_error
     pid->last_input = input;
 
     for (int i = 0; i < HIST_LEN - 1; i++)
         hist[i] = hist[i + 1];
-    hist[HIST_LEN - 1] = delta_input;
+    //hist[HIST_LEN - 1] = delta_input;
 
-    int di_avg = 0;
-    for (int i = 0; i < HIST_LEN; i++)
-        di_avg += hist[i];
-    di_avg = DIV_ROUND_CLOSEST(di_avg, HIST_LEN);
+    selection_sort(hist, HIST_LEN, NULL);
+    int di_avg = hist[1];
+    //for (int i = 0; i < HIST_LEN; i++)
+    //    di_avg += hist[i];
+    //di_avg = DIV_ROUND_CLOSEST(di_avg, HIST_LEN);
 
-    output = pid->kp * error + pid->i_term - pid->_kd * di_avg;
+    output = kp_term + pid->i_term - pid->_kd * di_avg;
     output = clip(output, pid->out_min, pid->out_max);
     return output;
 }

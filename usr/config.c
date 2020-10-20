@@ -34,21 +34,21 @@ csa_t csa = {
         .dbg_dst = { .addr = {0x80, 0x00, 0x00}, .port = 9 },
 
         .pid_cur =  {
-                .kp = 1, .ki = 400,
+                .kp = 1, .ki = 500,
                 .out_min = DRV_PWM_HALF * -0.9,
                 .out_max = DRV_PWM_HALF * 0.9,
                 .period = 1.0 / CURRENT_LOOP_FREQ
         },
         .pid_speed = {
-                .kp = 0.02, .ki = 5,
+                .kp = 0.01, .ki = 4,
                 .out_min = -3000,
                 .out_max = 3000, // limit output current
                 .period = 5.0 / CURRENT_LOOP_FREQ
         },
         .pid_pos = {
-                .kp = 45, .ki = 50, .kd = 0.05,
-                .out_min = -5000000,
-                .out_max = 5000000, // limit output speed
+                .kp = 14, .ki = 10, .kd = 0.01,
+                .out_min = -200000,
+                .out_max = 200000, // limit output speed
                 .period = 25.0 / CURRENT_LOOP_FREQ
         },
 
@@ -64,7 +64,7 @@ csa_t csa = {
         .dbg_str_msk = 0xff,
         .dbg_str_skip = 0x1fff, // 0x01ff,
 
-        .dbg_raw_dst = { .addr = {0x80, 0x00, 0x00}, .port = 8 },
+        .dbg_raw_dst = { .addr = {0x80, 0x00, 0x00}, .port = 0xa },
         .dbg_raw_msk = 0,
         .dbg_raw_th = 200,
         .dbg_raw_skip = { 0, 0, 0, 0 },
@@ -72,9 +72,12 @@ csa_t csa = {
                 { // cur : target, i_term, last_input, cal_i_sq,
                         { .offset = offsetof(csa_t, pid_cur) + offsetof(pid_f_t, target), .size = 4 * 3 },
                         { .offset = offsetof(csa_t, cal_i_sq), .size = 4 },
-                        { .offset = offsetof(csa_t, sen_encoder), .size = 2 }
+                        { .offset = offsetof(csa_t, sen_encoder), .size = 2 }//,
+                        //{ .offset = offsetof(csa_t, noc_encoder), .size = 2 }
                 }, { // speed
                         { .offset = offsetof(csa_t, pid_speed) + offsetof(pid_f_t, target), .size = 4 * 3 },
+                        { .offset = offsetof(csa_t, cal_current), .size = 4 },
+                        { .offset = offsetof(csa_t, sen_encoder), .size = 2 },
                         { .offset = offsetof(csa_t, delta_encoder), .size = 2 }
                 }, { // pos
                         { .offset = offsetof(csa_t, pid_pos) + offsetof(pid_i_t, target), .size = 4 * 3 },

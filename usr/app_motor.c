@@ -15,6 +15,40 @@ static list_head_t raw_pend = { 0 };
 
 static uint16_t tto_last;
 
+
+void selection_sort(int32_t arr[], int len, int32_t order[])
+{
+    for (int i = 0 ; i < len - 1 ; i++) {
+        int min = i;
+        for (int j = i + 1; j < len; j++) {
+            if (arr[j] < arr[min])
+                min = j;
+        }
+        if (min != i) {
+            swap(arr[min], arr[i]);
+            if (order)
+                swap(order[min], order[i]);
+        }
+    }
+}
+
+void selection_sort_u(uint32_t arr[], int len, uint32_t order[])
+{
+    for (int i = 0 ; i < len - 1 ; i++) {
+        int min = i;
+        for (int j = i + 1; j < len; j++) {
+            if (arr[j] < arr[min])
+                min = j;
+        }
+        if (min != i) {
+            swap(arr[min], arr[i]);
+            if (order)
+                swap(order[min], order[i]);
+        }
+    }
+}
+
+
 void app_motor_init(void)
 {
     pid_f_init(&csa.pid_cur, true);
@@ -173,21 +207,21 @@ static inline void position_loop_compute(void)
     raw_dbg(3);
 }
 
+
+#define S_HIST_LEN 5
+
 static inline void speed_loop_compute(void)
 {
     static int sub_cnt = 0;
-    //const float coeffs[5] = {0.1, 0.15, 0.2, 0.25, 0.3};
-    const float coeffs[5] = {0.2, 0.2, 0.2, 0.2, 0.2};
-    static float speed_avg = 0.0;
-    static int speed_filt_cnt = 0;
+    static int32_t s_filt[S_HIST_LEN] = { 0 };
+    static int s_filt_cnt = 0;
 
-    float speed = csa.delta_encoder * CURRENT_LOOP_FREQ; // encoder steps per sec
-    speed_avg += speed * coeffs[speed_filt_cnt++];
+    s_filt[s_filt_cnt++] = csa.delta_encoder * CURRENT_LOOP_FREQ; // encoder steps per sec
 
-    if (speed_filt_cnt == 5) {
-        csa.sen_speed = lroundf(speed_avg);
-        speed_avg = 0;
-        speed_filt_cnt = 0;
+    if (s_filt_cnt == 5) {
+        selection_sort(s_filt, S_HIST_LEN, NULL);
+        csa.sen_speed = s_filt[2];
+        s_filt_cnt = 0;
 
         if (csa.state < ST_CONST_SPEED) {
             pid_f_reset(&csa.pid_speed, 0, 0);
@@ -206,23 +240,6 @@ static inline void speed_loop_compute(void)
             raw_dbg(2);
         }
         raw_dbg(1);
-    }
-}
-
-
-static void selection_sort(uint32_t arr[], int len, uint32_t order[])
-{
-    for (int i = 0 ; i < len - 1 ; i++) {
-        int min = i;
-        for (int j = i + 1; j < len; j++) {
-            if (arr[j] < arr[min])
-                min = j;
-        }
-        if (min != i) {
-            swap(arr[min], arr[i]);
-            if (order)
-                swap(order[min], order[i]);
-        }
     }
 }
 
@@ -256,7 +273,7 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
         hist32[i] = hist[i];
         order[i] = i;
     }
-    selection_sort(hist32, HIST_LEN, order);
+    selection_sort_u(hist32, HIST_LEN, order);
 
     int longest_idx = 0;
     uint32_t longest_dt = 0;
@@ -273,8 +290,8 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
                 hist32[i] += 0x10000;
         }
     }
-    selection_sort(hist32, HIST_LEN, order);
-    selection_sort(order+3, HIST_LEN-6, hist32+3);
+    selection_sort_u(hist32, HIST_LEN, order);
+    selection_sort_u(order+3, HIST_LEN-6, hist32+3);
 
 
     int isum = 0;
