@@ -40,13 +40,13 @@ csa_t csa = {
                 .period = 1.0 / CURRENT_LOOP_FREQ
         },
         .pid_speed = {
-                .kp = 0.02, .ki = 8,
+                .kp = 0.03, .ki = 8,
                 .out_min = -3000,
                 .out_max = 3000, // limit output current
                 .period = 5.0 / CURRENT_LOOP_FREQ
         },
         .pid_pos = {
-                .kp = 14, .ki = 10, .kd = 0.02,
+                .kp = 15, .ki = 12, .kd = 0.02,
                 .out_min = -400000,
                 .out_max = 400000, // limit output speed
                 .period = 25.0 / CURRENT_LOOP_FREQ
@@ -61,7 +61,7 @@ csa_t csa = {
                 { .offset = offsetof(csa_t, cal_pos), .size = 8 }
         },
 
-        .dbg_str_msk = 0, //0xff,
+        .dbg_str_msk = 0xff,
         .dbg_str_skip = 0x1fff, // 0x01ff,
 
         .dbg_raw_dst = { .addr = {0x80, 0x00, 0x00}, .port = 0xa },
@@ -78,7 +78,7 @@ csa_t csa = {
                         { .offset = offsetof(csa_t, pid_speed) + offsetof(pid_f_t, target), .size = 4 * 3 },
                         { .offset = offsetof(csa_t, cal_current), .size = 4 },
                         { .offset = offsetof(csa_t, sen_encoder), .size = 2 },
-                        { .offset = offsetof(csa_t, delta_encoder), .size = 2 }
+                        { .offset = offsetof(csa_t, delta_encoder), .size = 4 }
                 }, { // pos
                         { .offset = offsetof(csa_t, pid_pos) + offsetof(pid_i_t, target), .size = 4 * 3 },
                         { .offset = offsetof(csa_t, cal_speed), .size = 4 },
@@ -94,8 +94,8 @@ csa_t csa = {
         },
 
         .tc_speed = 100000,
-        .tc_accel = 2000,
-        .tc_pos_d = 10000,
+        .tc_accel = 6000,
+        .tc_pos_d = 2000,
         .tc_speed_m = 5000,
         .tc_accel_m = 100,
 

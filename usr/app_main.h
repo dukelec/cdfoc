@@ -114,18 +114,18 @@ typedef struct {
     uint16_t        err_flag;
 
     int32_t         cal_pos;
-    int32_t         cal_speed;
+    float           cal_speed;
     int32_t         cal_current;
     float           cal_i_sq;
 
     uint16_t        ori_encoder;
     int32_t         ori_pos;
 
-    int16_t         delta_encoder;
+    float           delta_encoder;
     uint16_t        noc_encoder; // no compensation
     uint16_t        sen_encoder;
     int32_t         sen_pos;
-    int32_t         sen_speed;
+    float           sen_speed;
     float           sen_current;
     float           sen_angle_elec;
 

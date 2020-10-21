@@ -13,7 +13,7 @@
 static cdn_sock_t sock_raw_dbg = { .port = 0xa, .ns = &dft_ns }; // raw debug
 static list_head_t raw_pend = { 0 };
 
-static uint16_t tto_last;
+static float tto_last; // encoder last value
 
 
 void selection_sort(int32_t arr[], int len, int32_t order[])
@@ -134,6 +134,13 @@ static inline void t_curve_compute(void)
     float   speed;
     float   accel;
 
+    if (csa.state != ST_POS_TC) {
+        csa.tc_state = 0;
+        csa.tc_vc = 0;
+        csa.tc_pos = csa.sen_pos;
+        return;
+    }
+
     if ((csa.tc_pos >= csa.cal_pos && csa.cal_pos >= csa.tc_pos_m) ||
             (csa.tc_pos <= csa.cal_pos && csa.cal_pos <= csa.tc_pos_m)) {
         pos = csa.tc_pos;
@@ -188,21 +195,17 @@ static inline void t_curve_compute(void)
 static inline void position_loop_compute(void)
 {
     if (csa.state < ST_POSITION) {
-        csa.tc_state = 0;
-        csa.tc_vc = 0;
         pid_i_reset(&csa.pid_pos, csa.sen_pos, 0);
         pid_i_set_target(&csa.pid_pos, csa.sen_pos);
         csa.cal_pos = csa.sen_pos;
-        csa.tc_pos = csa.sen_pos;
-        if (csa.state == ST_STOP) {
+        if (csa.state == ST_STOP)
             csa.cal_speed = 0;
-        }
         return;
     }
 
     t_curve_compute();
     pid_i_set_target(&csa.pid_pos, csa.cal_pos);
-    csa.cal_speed = lroundf(pid_i_compute(&csa.pid_pos, csa.sen_pos));
+    csa.cal_speed = pid_i_compute(&csa.pid_pos, csa.sen_pos);
 
     raw_dbg(3);
 }
@@ -213,14 +216,14 @@ static inline void position_loop_compute(void)
 static inline void speed_loop_compute(void)
 {
     static int sub_cnt = 0;
-    static int32_t s_filt[S_HIST_LEN] = { 0 };
+    static float s_avg = 0;
     static int s_filt_cnt = 0;
 
-    s_filt[s_filt_cnt++] = csa.delta_encoder * CURRENT_LOOP_FREQ; // encoder steps per sec
+    s_avg += csa.delta_encoder * (float)CURRENT_LOOP_FREQ; // encoder steps per sec
 
-    if (s_filt_cnt == 5) {
-        selection_sort(s_filt, S_HIST_LEN, NULL);
-        csa.sen_speed = s_filt[2];
+    if (++s_filt_cnt == 5) {
+        csa.sen_speed = s_avg / 5.0f;
+        s_avg = 0;
         s_filt_cnt = 0;
 
         if (++sub_cnt == 5) {
@@ -231,10 +234,9 @@ static inline void speed_loop_compute(void)
 
         if (csa.state < ST_CONST_SPEED) {
             pid_f_reset(&csa.pid_speed, 0, 0);
-            if (csa.state == ST_STOP) {
+            pid_f_set_target(&csa.pid_speed, 0);
+            if (csa.state == ST_STOP)
                 csa.cal_current = 0;
-                pid_f_set_target(&csa.pid_speed, 0);
-            }
         } else {
             pid_f_set_target(&csa.pid_speed, csa.cal_speed); // TODO: only set once after modified
             csa.cal_current = -lroundf(pid_f_compute_no_d(&csa.pid_speed, csa.sen_speed));
@@ -245,11 +247,8 @@ static inline void speed_loop_compute(void)
 }
 
 
-#define HIST_RM 3
 #define HIST_LEN 10
-
 static uint16_t hist[HIST_LEN] = { 0 };
-
 
 void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
 {
@@ -273,47 +272,57 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
     for (int i = 0; i < HIST_LEN; i++) {
         hist32[i] = hist[i];
         order[i] = i;
-    }
-    selection_sort_u(hist32, HIST_LEN, order);
+    }                                          // hist: 1, 2, 9, 8 -> hist32: 1, 2, 8, 9
+    selection_sort_u(hist32, HIST_LEN, order); // order 0, 1, 2, 3    order:  0, 1, 3, 2
 
     int longest_idx = 0;
-    uint32_t longest_dt = 0;
+    uint32_t longest_dt = hist32[0] + 0x10000 - hist32[HIST_LEN - 1]; // 1+10-9=2
     for (int i = 0; i < HIST_LEN - 1; i++) {
         if (hist32[i + 1] - hist32[i] > longest_dt) {
             longest_dt = hist32[i + 1] - hist32[i];
-            longest_idx = i;
+            longest_idx = i + 1; // idx: 2, val: 8
         }
     }
-    uint32_t split_val = hist32[longest_idx];
-    if (hist32[0] + (0x10000 - hist32[HIST_LEN - 1]) < longest_dt) {
-        for (int i = 0; i < HIST_LEN; i++) {
-            if (hist32[i] <= split_val)
-                hist32[i] += 0x10000;
-        }
-    }
-    selection_sort_u(hist32, HIST_LEN, order);
-    selection_sort_u(order+3, HIST_LEN-6, hist32+3);
+    for (int i = 0; i < longest_idx; i++)      // hist32: 1, 2, 8, 9 -> hist32: 11, 12, 8, 9 (range: [0,9])
+            hist32[i] += 0x10000;              // order:  0, 1, 3, 2    order:   0,  1, 3, 2
 
+                                               // hist32: 11, 12, 8, 9 -> hist32: 8, 9, 11, 12
+    selection_sort_u(hist32, HIST_LEN, order); // order:   0,  1, 3, 2    order:  3, 2,  0,  1
 
-    int isum = 0;
+    selection_sort_u(order+3, HIST_LEN-6, hist32+3); // hist32: 8, 9, 11, 12 -> hist32: 8, 11, 9, 12
+                                                     // order:  3, 2,  0,  1    order:  3,  0, 2,  1
+
+    float iavg = 0;
     for (int i = 3; i < HIST_LEN - 3; i++)
-        isum += order[i];
-    isum = DIV_ROUND_CLOSEST(isum, HIST_LEN - 6);
+        iavg += order[i];
+    iavg = iavg / (HIST_LEN - 6); // (0 + 2) / 2 = 1
 
-    int dsum = 0;
-    for (int i = 3; i < HIST_LEN - 3 - 1; i++) {
-        dsum += DIV_ROUND_CLOSEST((int16_t)(hist[order[i+1]] - hist[order[i]]), (int16_t)(order[i+1] - order[i]));
+    float davg = 0;
+    for (int i = 3; i < HIST_LEN - 3 - 1; i++) { // (hist[2] - hist[0]) / (2 - 0) => (9 - 1) / 2
+        //davg += (float)((int16_t)(hist[order[i+1]] - hist[order[i]])) / (float)(order[i+1] - order[i]);
+        int v_delta = (int)hist32[order[i+1]] - (int)hist32[order[i]]; // (9 - 11) = -2
+        int v_distant = order[i+1] - order[i];
+        davg += (float)v_delta / (float)v_distant; // -2 / 2 = -1
     }
-    dsum = DIV_ROUND_CLOSEST(dsum, HIST_LEN - 6 - 1);
+    davg = davg / (HIST_LEN - 6 - 1);
 
     uint32_t ttt = 0;
     for (int i = 3; i < HIST_LEN - 3; i++)
         ttt += hist32[i];
-    uint16_t tto = DIV_ROUND_CLOSEST(ttt, HIST_LEN - 6);
+    float tto = (float)ttt / (float)(HIST_LEN - 6); // (11 + 9) / 2 = 10
 
-    csa.sen_encoder = tto + dsum * (HIST_LEN /*- 1*/ - isum);
+    if (tto >= 0x10000)
+        tto = tto - (float)0x10000; // 10 - 10 = 0
+
+    csa.sen_encoder = lroundf(tto + davg * (HIST_LEN /*- 1*/ - iavg));
     csa.delta_encoder = tto - tto_last;
     tto_last = tto;
+
+    if (csa.delta_encoder > 0x8000)
+        csa.delta_encoder -= 0x10000;
+    else if  (csa.delta_encoder < -0x8000)
+        csa.delta_encoder += 0x10000;
+
     // csa.sen_encoder = tto + csa.delta_encoder * 4;
 
     // ^--- END of Encoder Filter ---^
