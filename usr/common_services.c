@@ -229,8 +229,11 @@ static void p6_service_routine(void)
             regr_t *regr = csa.qxchg_set + i;
             if (!regr->size)
                 break;
-            memcpy(((void *) &csa) + regr->offset, src_dat, regr->size);
-            src_dat += regr->size;
+            uint16_t lim_size = min(pkt->len - (src_dat - pkt->dat), regr->size);
+            if (!lim_size)
+                break;
+            memcpy(((void *) &csa) + regr->offset, src_dat, lim_size);
+            src_dat += lim_size;
         }
         for (int i = 0; i < 10; i++) {
             regr_t *regr = csa.qxchg_ret + i;

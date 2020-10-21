@@ -165,7 +165,7 @@ void app_main(void)
     device_init();
     common_service_init();
     d_info("conf: %s\n", csa.conf_from ? "load from flash" : "use default");
-    csa_list_show();
+    //csa_list_show();
 
     gpio_set_value(&drv_en, 1);
     delay_systick(50);

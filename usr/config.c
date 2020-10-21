@@ -29,7 +29,7 @@ csa_t csa = {
         .bus_net = 0,
         .bus_mac = 254,
         .bus_baud_low = 1000000,
-        .bus_baud_high = 2000000,
+        .bus_baud_high = 1000000,
         .dbg_en = true,
         .dbg_dst = { .addr = {0x80, 0x00, 0x00}, .port = 9 },
 
@@ -40,13 +40,13 @@ csa_t csa = {
                 .period = 1.0 / CURRENT_LOOP_FREQ
         },
         .pid_speed = {
-                .kp = 0.03, .ki = 8,
+                .kp = 0.02, .ki = 8,
                 .out_min = -3000,
                 .out_max = 3000, // limit output current
                 .period = 5.0 / CURRENT_LOOP_FREQ
         },
         .pid_pos = {
-                .kp = 15, .ki = 12, .kd = 0.02,
+                .kp = 15, .ki = 250, .kd = 0.02,
                 .out_min = -400000,
                 .out_max = 400000, // limit output speed
                 .period = 25.0 / CURRENT_LOOP_FREQ
@@ -55,13 +55,13 @@ csa_t csa = {
         .bias_encoder = 0x03c2,
 
         .qxchg_set = {
-                { .offset = offsetof(csa_t, tc_pos), .size = 4 }
+                { .offset = offsetof(csa_t, tc_pos), .size = 4 * 3 }
         },
         .qxchg_ret = {
                 { .offset = offsetof(csa_t, cal_pos), .size = 8 }
         },
 
-        .dbg_str_msk = 0xff,
+        .dbg_str_msk = 0, //0xff,
         .dbg_str_skip = 0x1fff, // 0x01ff,
 
         .dbg_raw_dst = { .addr = {0x80, 0x00, 0x00}, .port = 0xa },
@@ -93,9 +93,9 @@ csa_t csa = {
                 }
         },
 
-        .tc_speed = 100000,
+        .tc_speed = 180000,
         .tc_accel = 6000,
-        .tc_pos_d = 2000,
+        .tc_pos_d = 0, //2000,
         .tc_speed_m = 5000,
         .tc_accel_m = 100,
 
