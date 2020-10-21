@@ -223,6 +223,12 @@ static inline void speed_loop_compute(void)
         csa.sen_speed = s_filt[2];
         s_filt_cnt = 0;
 
+        if (++sub_cnt == 5) {
+            sub_cnt = 0;
+            position_loop_compute();
+            raw_dbg(2);
+        }
+
         if (csa.state < ST_CONST_SPEED) {
             pid_f_reset(&csa.pid_speed, 0, 0);
             if (csa.state == ST_STOP) {
@@ -234,11 +240,6 @@ static inline void speed_loop_compute(void)
             csa.cal_current = -lroundf(pid_f_compute_no_d(&csa.pid_speed, csa.sen_speed));
         }
 
-        if (++sub_cnt == 5) {
-            sub_cnt = 0;
-            position_loop_compute();
-            raw_dbg(2);
-        }
         raw_dbg(1);
     }
 }
@@ -310,7 +311,7 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
         ttt += hist32[i];
     uint16_t tto = DIV_ROUND_CLOSEST(ttt, HIST_LEN - 6);
 
-    csa.sen_encoder = tto + dsum * (HIST_LEN - 1 - isum);
+    csa.sen_encoder = tto + dsum * (HIST_LEN /*- 1*/ - isum);
     csa.delta_encoder = tto - tto_last;
     tto_last = tto;
     // csa.sen_encoder = tto + csa.delta_encoder * 4;

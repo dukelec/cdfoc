@@ -34,25 +34,25 @@ csa_t csa = {
         .dbg_dst = { .addr = {0x80, 0x00, 0x00}, .port = 9 },
 
         .pid_cur =  {
-                .kp = 1, .ki = 500,
+                .kp = 1, .ki = 1200,
                 .out_min = DRV_PWM_HALF * -0.9,
                 .out_max = DRV_PWM_HALF * 0.9,
                 .period = 1.0 / CURRENT_LOOP_FREQ
         },
         .pid_speed = {
-                .kp = 0.01, .ki = 4,
+                .kp = 0.02, .ki = 8,
                 .out_min = -3000,
                 .out_max = 3000, // limit output current
                 .period = 5.0 / CURRENT_LOOP_FREQ
         },
         .pid_pos = {
-                .kp = 14, .ki = 10, .kd = 0.01,
-                .out_min = -200000,
-                .out_max = 200000, // limit output speed
+                .kp = 14, .ki = 10, .kd = 0.02,
+                .out_min = -400000,
+                .out_max = 400000, // limit output speed
                 .period = 25.0 / CURRENT_LOOP_FREQ
         },
 
-        .bias_encoder = 0x1425,
+        .bias_encoder = 0x03c2,
 
         .qxchg_set = {
                 { .offset = offsetof(csa_t, tc_pos), .size = 4 }
@@ -61,7 +61,7 @@ csa_t csa = {
                 { .offset = offsetof(csa_t, cal_pos), .size = 8 }
         },
 
-        .dbg_str_msk = 0xff,
+        .dbg_str_msk = 0, //0xff,
         .dbg_str_skip = 0x1fff, // 0x01ff,
 
         .dbg_raw_dst = { .addr = {0x80, 0x00, 0x00}, .port = 0xa },
@@ -93,11 +93,11 @@ csa_t csa = {
                 }
         },
 
-        .tc_speed = 200000,
-        .tc_accel = 10000,
+        .tc_speed = 100000,
+        .tc_accel = 2000,
         .tc_pos_d = 10000,
-        .tc_speed_m = 50000,
-        .tc_accel_m = 5000,
+        .tc_speed_m = 5000,
+        .tc_accel_m = 100,
 
         .cali_angle_elec = (float)M_PI/2,
         .cali_current = 200,

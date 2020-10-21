@@ -13,7 +13,7 @@
 #include "app_main.h"
 
 #define HIST_LEN 3
-static int hist[HIST_LEN] = { 0 };
+static int32_t hist[HIST_LEN] = { 0 };
 
 float pid_i_compute(pid_i_t *pid, int input)
 {
@@ -28,6 +28,8 @@ float pid_i_compute(pid_i_t *pid, int input)
     int i_lim = (min(abs(csa.tc_pos - csa.cal_pos) + 60, 20000) * pid->out_max / 20000);
     pid->i_term = clip(pid->i_term, -i_lim, i_lim);
 
+    //float kp_term = (csa.tc_state == 0 ? (pid->kp / 2.0f) : pid->kp) * error;
+    //float kp_term = (csa.tc_state == 0 ? (pid->kp * 0.6f) : pid->kp) * error;
     float kp_term = pid->kp * error;
     //                                                           %      max_out     %
     //float kp_term = (min(abs(csa.tc_pos - csa.cal_pos) + 5000, 20000) * pid->kp / 20000) * error;
@@ -38,7 +40,7 @@ float pid_i_compute(pid_i_t *pid, int input)
 
     for (int i = 0; i < HIST_LEN - 1; i++)
         hist[i] = hist[i + 1];
-    //hist[HIST_LEN - 1] = delta_input;
+    hist[HIST_LEN - 1] = delta_input;
 
     selection_sort(hist, HIST_LEN, NULL);
     int di_avg = hist[1];
