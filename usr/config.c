@@ -11,7 +11,7 @@
 #include "math.h"
 
 regr_t regr_wa[] = {
-        { .offset = offsetof(csa_t, do_reboot), .size = offsetof(csa_t, pid_pos) - offsetof(csa_t, do_reboot) },
+        { .offset = offsetof(csa_t, magic_code), .size = offsetof(csa_t, pid_pos) - offsetof(csa_t, magic_code) },
         { .offset = offsetof(csa_t, pid_pos), .size = offsetof(pid_i_t, target) },
         { .offset = offsetof(csa_t, pid_speed), .size = offsetof(pid_f_t, target) },
         { .offset = offsetof(csa_t, pid_speed), .size = offsetof(pid_f_t, target) },
@@ -28,8 +28,8 @@ csa_t csa = {
 
         .bus_net = 0,
         .bus_mac = 254,
-        .bus_baud_low = 1000000,
-        .bus_baud_high = 1000000,
+        .bus_baud_low = 115200,
+        .bus_baud_high = 115200,
         .dbg_en = true,
         .dbg_dst = { .addr = {0x80, 0x00, 0x00}, .port = 9 },
 

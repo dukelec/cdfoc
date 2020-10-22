@@ -78,19 +78,6 @@ void set_led_state(led_state_t state)
     }
 }
 
-#ifdef BOOTLOADER
-#define APP_ADDR 0x08010000 // sector 4
-
-static void jump_to_app(void)
-{
-    uint32_t stack = *(uint32_t*)APP_ADDR;
-    uint32_t func = *(uint32_t*)(APP_ADDR + 4);
-    printf("jump to app...\n");
-    __set_MSP(stack); // init stack pointer
-    ((void(*)()) func)();
-}
-#endif
-
 
 extern uint32_t end; // end of bss
 #define STACK_CHECK_SKIP 0x200
@@ -153,11 +140,7 @@ static void drv_write_reg(uint8_t reg, uint16_t val)
 
 void app_main(void)
 {
-#ifdef BOOTLOADER
-    printf("\nstart app_main (bl_wait: %d)...\n", csa.bl_wait);
-#else
     printf("\nstart app_main...\n");
-#endif
 
     stack_check_init();
     debug_init(&dft_ns, &csa.dbg_dst, &csa.dbg_en);
@@ -192,17 +175,7 @@ void app_main(void)
     d_info("pwm on.\n");
     set_led_state(LED_POWERON);
 
-#ifdef BOOTLOADER
-    uint32_t boot_time = get_systick();
-#endif
-
     while (true) {
-#ifdef BOOTLOADER
-        if (csa.bl_wait != 0xff &&
-                get_systick() - boot_time > csa.bl_wait * 100000 / SYSTICK_US_DIV)
-            jump_to_app();
-#endif
-
         //encoder_read();
         //d_debug("drv: %08x\n", drv_read_reg(0x01) << 16 | drv_read_reg(0x00));
 
