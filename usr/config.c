@@ -28,8 +28,8 @@ csa_t csa = {
 
         .bus_net = 0,
         .bus_mac = 254,
-        .bus_baud_low = 115200,
-        .bus_baud_high = 115200,
+        .bus_baud_low = 1000000,
+        .bus_baud_high = 1000000,
         .dbg_en = true,
         .dbg_dst = { .addr = {0x80, 0x00, 0x00}, .port = 9 },
 
@@ -52,7 +52,7 @@ csa_t csa = {
                 .period = 25.0 / CURRENT_LOOP_FREQ
         },
 
-        .bias_encoder = 0x03c2,
+        .bias_encoder = 0x44d3,
 
         .qxchg_set = {
                 { .offset = offsetof(csa_t, tc_pos), .size = 4 * 3 }

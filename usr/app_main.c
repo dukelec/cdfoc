@@ -140,14 +140,14 @@ static void drv_write_reg(uint8_t reg, uint16_t val)
 
 void app_main(void)
 {
-    printf("\nstart app_main...\n");
+    printf("\nstart app_main (mdrv)...\n");
 
     stack_check_init();
-    debug_init(&dft_ns, &csa.dbg_dst, &csa.dbg_en);
     load_conf();
+    debug_init(&dft_ns, &csa.dbg_dst, &csa.dbg_en);
     device_init();
     common_service_init();
-    d_info("conf: %s\n", csa.conf_from ? "load from flash" : "use default");
+    d_info("conf (mdrv): %s\n", csa.conf_from ? "load from flash" : "use default");
     //csa_list_show();
 
     gpio_set_value(&drv_en, 1);
