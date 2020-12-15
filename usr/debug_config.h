@@ -19,7 +19,7 @@ void dbg_transmit(uart_t *uart, const uint8_t *buf, uint16_t len)
     uint16_t i;
     for (i = 0; i < len; i++) {
         while (!__HAL_UART_GET_FLAG(uart->huart, UART_FLAG_TXE));
-        uart->huart->Instance->DR = *(buf + i);
+        uart->huart->Instance->TDR = *(buf + i);
     }
 #else
     HAL_UART_Transmit(uart->huart, (uint8_t *)buf, len, HAL_MAX_DELAY);

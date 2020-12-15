@@ -351,7 +351,6 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
     if (csa.state != ST_STOP) {
         int32_t ia = HAL_ADCEx_InjectedGetValue(&hadc1, 1) - ia_idle;
         int32_t ib = HAL_ADCEx_InjectedGetValue(&hadc2, 1) - ib_idle;
-        HAL_ADCEx_InjectedGetValue(&hadc3, 1); // remove this
         int32_t ic = -ia - ib;
 
         float i_alpha = ia;
@@ -382,7 +381,6 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
         static int32_t ib_sum = 0;
         ia_sum += HAL_ADCEx_InjectedGetValue(&hadc1, 1);
         ib_sum += HAL_ADCEx_InjectedGetValue(&hadc2, 1);
-        HAL_ADCEx_InjectedGetValue(&hadc3, 1);
 
         if (++i_cnt == 5) {
             ia_idle = DIV_ROUND_CLOSEST(ia_sum, 5);

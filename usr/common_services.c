@@ -32,18 +32,6 @@ static void get_uid(char *buf)
     buf[24] = '\0';
 }
 
-static int get_sector(uint32_t addr)
-{
-    if (addr < 0x08000000 || addr > 0x080fffff)
-        return -1;
-    addr &= 0xfffff;
-    if (addr <= 0xffff)
-        return addr / (16 * 1024);
-    if (addr <= 0x1ffff)
-        return 4;
-    return addr / (128 * 1024) + 4;
-}
-
 static void init_info_str(void)
 {
     // M: model; S: serial string; HW: hardware version; SW: software version
@@ -91,20 +79,16 @@ static void p8_service_routine(void)
         uint32_t addr = *(uint32_t *)(pkt->dat + 1);
         uint32_t len = *(uint32_t *)(pkt->dat + 5);
 
-        f.TypeErase = FLASH_TYPEERASE_SECTORS;
-        f.Sector = get_sector(addr);
-        f.NbSectors = get_sector(addr + len) - get_sector(addr) + 1;
-        f.VoltageRange = FLASH_VOLTAGE_RANGE_3;
+        f.TypeErase = FLASH_TYPEERASE_PAGES;
+        f.Banks = FLASH_BANK_1;
+        f.Page = addr / 2048;
+        f.NbPages = (addr + len) / 2048 - f.Page + 1;
 
-        if (get_sector(addr) >= 0 && get_sector(addr + len) >= 0) {
-            ret = HAL_FLASH_Unlock();
-            if (ret == HAL_OK)
-                ret = HAL_FLASHEx_Erase(&f, &err_sector);
-            ret |= HAL_FLASH_Lock();
-            d_debug("nvm erase: %08x +%08x, %08x, ret: %d\n", addr, len, err_sector, ret);
-        } else {
-            d_debug("nvm erase: error sector\n");
-        }
+        ret = HAL_FLASH_Unlock();
+        if (ret == HAL_OK)
+            ret = HAL_FLASHEx_Erase(&f, &err_sector);
+        ret |= HAL_FLASH_Lock();
+        d_debug("nvm erase: %08x +%08x, %08x, ret: %d\n", addr, len, err_sector, ret);
 
         pkt->len = 1;
         pkt->dat[0] = ret == HAL_OK ? 0x80 : 0x81;
@@ -119,14 +103,14 @@ static void p8_service_routine(void)
 
     } else if (pkt->dat[0] == 0x20 && pkt->len > 5) {
         int ret;
-        uint32_t *dst_dat = (uint32_t *) *(uint32_t *)(pkt->dat + 1);
+        uint64_t *dst_dat = (uint64_t *) *(uint32_t *)(pkt->dat + 1);
         uint8_t len = pkt->len - 5;
-        uint8_t cnt = (len + 3) / 4;
-        uint32_t *src_dat = (uint32_t *)(pkt->dat + 5);
+        uint8_t cnt = (len + 7) / 8;
+        uint64_t *src_dat = (uint64_t *)(pkt->dat + 5);
 
         ret = HAL_FLASH_Unlock();
         for (int i = 0; ret == HAL_OK && i < cnt; i++)
-            ret = HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, (uint32_t)(dst_dat + i), *(src_dat + i));
+            ret = HAL_FLASH_Program(FLASH_TYPEPROGRAM_DOUBLEWORD, (uint32_t)(dst_dat + i), *(src_dat + i));
         ret |= HAL_FLASH_Lock();
 
         d_debug("nvm write: %08x %d(%d), ret: %d\n", dst_dat, len, cnt, ret);

@@ -123,10 +123,10 @@ int save_conf(void)
     uint8_t ret;
     uint32_t err_page = 0;
     FLASH_EraseInitTypeDef f;
-    f.TypeErase = FLASH_TYPEERASE_SECTORS;
-    f.Sector = 3; // sector 3
-    f.NbSectors = 1;
-    f.VoltageRange = FLASH_VOLTAGE_RANGE_3;
+    f.TypeErase = FLASH_TYPEERASE_PAGES;
+    f.Banks = FLASH_BANK_1;
+    f.Page = 63; // last page
+    f.NbPages = 1;
 
     ret = HAL_FLASH_Unlock();
     if (ret == HAL_OK)
@@ -135,12 +135,12 @@ int save_conf(void)
     if (ret != HAL_OK)
         d_info("conf: failed to erase flash\n");
 
-    uint32_t *dst_dat = (uint32_t *)APP_CONF_ADDR;
-    uint32_t *src_dat = (uint32_t *)&csa;
-    int cnt = (offsetof(csa_t, state) + 3) / 4;
+    uint64_t *dst_dat = (uint64_t *)APP_CONF_ADDR;
+    uint64_t *src_dat = (uint64_t *)&csa;
+    int cnt = (offsetof(csa_t, state) + 7) / 8;
 
     for (int i = 0; ret == HAL_OK && i < cnt; i++)
-        ret = HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, (uint32_t)(dst_dat + i), *(src_dat + i));
+        ret = HAL_FLASH_Program(FLASH_TYPEPROGRAM_DOUBLEWORD, (uint32_t)(dst_dat + i), *(src_dat + i));
     ret |= HAL_FLASH_Lock();
 
     if (ret == HAL_OK) {

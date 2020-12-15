@@ -115,6 +115,8 @@ int main(void)
   MX_ADC1_Init();
   MX_ADC2_Init();
   /* USER CODE BEGIN 2 */
+  void app_main(void);
+  app_main();
 
   /* USER CODE END 2 */
 

@@ -30,7 +30,7 @@
 #define DRV_PWM_HALF        2048
 
 #define FRAME_MAX           10
-#define PACKET_MAX          300
+#define PACKET_MAX          60
 
 
 typedef enum {
@@ -162,7 +162,6 @@ uint16_t encoder_read(void);
 
 extern ADC_HandleTypeDef hadc1;
 extern ADC_HandleTypeDef hadc2;
-extern ADC_HandleTypeDef hadc3;
 extern TIM_HandleTypeDef htim1;
 
 extern gpio_t led_r;
