@@ -1,4 +1,0 @@
-# flash command
-
-st-flash --reset write build/bldc_100w_fw.bin 0x08010000
-
