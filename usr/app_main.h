@@ -26,7 +26,7 @@
 #define APP_CONF_ADDR       0x0800c000 // sector 3
 #define APP_CONF_VER        0x0001
 
-#define CURRENT_LOOP_FREQ   (168000000 / 4096 / 2)
+#define CURRENT_LOOP_FREQ   (170000000 / 4096 / 2)
 #define DRV_PWM_HALF        2048
 
 #define FRAME_MAX           10
@@ -79,6 +79,7 @@ typedef struct {
     float           peak_cur_threshold;
     int32_t         peak_cur_duration;
 
+    uint8_t         motor_poles;
     uint16_t        bias_encoder;
     int32_t         bias_pos;
 
@@ -144,6 +145,7 @@ extern regr_t regr_wa[]; // writable list
 extern int regr_wa_num;
 
 void app_main(void);
+void tim_cb(void);
 void load_conf(void);
 int save_conf(void);
 void csa_list_show(void);
@@ -155,7 +157,6 @@ void set_led_state(led_state_t state);
 
 void app_motor_init(void);
 void app_motor_routine(void);
-void limit_det_isr(void);
 void selection_sort(int32_t arr[], int len, int32_t order[]);
 
 uint16_t encoder_read(void);
@@ -166,6 +167,7 @@ extern TIM_HandleTypeDef htim1;
 
 extern gpio_t led_r;
 extern gpio_t led_g;
+extern gpio_t dbg_out;
 extern cdn_ns_t dft_ns;
 extern list_head_t frame_free_head;
 

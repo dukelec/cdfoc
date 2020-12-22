@@ -16,6 +16,7 @@ extern UART_HandleTypeDef huart3;
 
 gpio_t led_r = { .group = LED_R_GPIO_Port, .num = LED_R_Pin };
 gpio_t led_g = { .group = LED_G_GPIO_Port, .num = LED_G_Pin };
+gpio_t dbg_out = { .group = DBG_OUT_GPIO_Port, .num = DBG_OUT_Pin };
 
 static gpio_t drv_cs = { .group = DRV_CS_GPIO_Port, .num = DRV_CS_Pin };
 static gpio_t s_cs = { .group = SEN_CS_GPIO_Port, .num = SEN_CS_Pin };
@@ -105,7 +106,27 @@ static void stack_check(void)
     }
 }
 
+#if 1
+// TLE5012B: SPI_POLARITY_LOW, SPI_PHASE_2EDGE, 16BIT
+uint16_t encoder_read(void)
+{
+    uint16_t buf[2];
+    buf[0] = 0x8021;
 
+    gpio_set_value(&s_cs, 0);
+    HAL_SPI_Transmit(&hspi3, (uint8_t *)buf, 1, HAL_MAX_DELAY);
+
+    GPIOB->MODER &= ~(1 << (5 * 2 + 1)); // PB5
+    HAL_SPI_Receive(&hspi3, (uint8_t *)buf, 2, HAL_MAX_DELAY);
+    gpio_set_value(&s_cs, 1);
+    GPIOB->MODER |= 1 << (5 * 2 + 1);
+
+    //d_debug("%04x %04x\n", buf[0], buf[1]);
+
+    return buf[0] << 1;
+}
+#else
+// ic-MU: SPI_POLARITY_LOW, SPI_PHASE_1EDGE, 8BIT
 uint16_t encoder_read(void)
 {
     uint8_t buf[4];
@@ -115,6 +136,7 @@ uint16_t encoder_read(void)
     //d_debug("= %08x\n", ret_val);
     return ret_val;
 }
+#endif
 
 static uint16_t drv_read_reg(uint8_t reg)
 {
@@ -147,7 +169,7 @@ void app_main(void)
     device_init();
     common_service_init();
     d_info("conf (mdrv): %s\n", csa.conf_from ? "load from flash" : "use default");
-    //csa_list_show();
+    csa_list_show();
 
     delay_systick(50);
     d_debug("drv 02: %04x\n", drv_read_reg(0x02));
@@ -157,17 +179,19 @@ void app_main(void)
     app_motor_init();
     HAL_ADC_Start(&hadc1);
     HAL_ADC_Start(&hadc2);
+    HAL_ADCEx_InjectedStart_IT(&hadc2);
     HAL_ADCEx_InjectedStart_IT(&hadc1);
 
     d_info("start pwm...\n");
     __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, DRV_PWM_HALF);
     __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_2, DRV_PWM_HALF);
     __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_3, DRV_PWM_HALF);
-    __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_4, 100);
+    __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_4, 1); // ```|_|``` triger on neg-edge
     HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
     HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_2);
     HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_3);
     HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_4);
+    __HAL_TIM_ENABLE_IT(&htim1, TIM_IT_CC4);
 
     d_info("pwm on.\n");
     set_led_state(LED_POWERON);
@@ -184,6 +208,13 @@ void app_main(void)
     }
 }
 
+// execute synchronously with adc
+void tim_cb(void)
+{
+    //gpio_set_value(&dbg_out, !gpio_get_value(&dbg_out));
+    gpio_set_value(&dbg_out, 1);
+    gpio_set_value(&dbg_out, 0);
+}
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {

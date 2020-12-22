@@ -249,9 +249,12 @@ static inline void speed_loop_compute(void)
 
 #define HIST_LEN 10
 static uint16_t hist[HIST_LEN] = { 0 };
+static int8_t hist_err = -2;
 
 void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
 {
+    gpio_set_value(&led_r, 1);
+
     static float ia_idle, ib_idle;
     float sin_sen_angle_elec, cos_sen_angle_elec; // reduce the amount of calculations
     int16_t out_pwm_u = 0, out_pwm_v = 0, out_pwm_w = 0;
@@ -261,6 +264,9 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
     csa.noc_encoder = csa.ori_encoder - csa.bias_encoder;
     int16_t delta_enc = csa.noc_encoder - csa.sen_encoder; // sen_encoder is previous value
 
+    gpio_set_value(&dbg_out, 1);
+
+#if 0
     // v--- Encoder Filter: ---v
 
     for (int i = 0; i < HIST_LEN - 1; i++)
@@ -320,12 +326,59 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
 
     if (csa.delta_encoder > 0x8000)
         csa.delta_encoder -= 0x10000;
-    else if  (csa.delta_encoder < -0x8000)
+    else if (csa.delta_encoder < -0x8000)
         csa.delta_encoder += 0x10000;
 
     // csa.sen_encoder = tto + csa.delta_encoder * 4;
 
     // ^--- END of Encoder Filter ---^
+#else
+
+    if (hist_err < 0 || abs(hist[1] - hist[0]) > 500) {
+        csa.sen_encoder = csa.noc_encoder;
+        csa.delta_encoder = delta_enc;
+        if (hist_err < 0)
+            hist_err++;
+    } else {
+        uint32_t hist_raised[2] = {hist[0], hist[1]};
+        uint32_t sen_raised = csa.noc_encoder;
+
+        // empty in range: 1/3 to 2/3
+        if ((hist[0] < 0x10000/3 || hist[0] >= 0x10000*2/3) && (hist[1] < 0x10000/3 || hist[1] >= 0x10000*2/3)) {
+            if (hist[0] < 0x10000/3 && hist[1] < 0x10000/3) {
+                if (csa.noc_encoder < 0x10000*2/3)
+                    sen_raised += 0x10000;
+            } else if (csa.noc_encoder < 0x10000/3) {
+                    sen_raised += 0x10000;
+            }
+            if (hist[0] < 0x10000/3)
+                hist_raised[0] += 0x10000;
+            if (hist[1] < 0x10000/3)
+                hist_raised[1] += 0x10000;
+        }
+        int16_t hist_delta = lroundf((int16_t)(hist_raised[1] - hist_raised[0]) * 0.8f);
+        uint32_t estimate = hist_raised[1] + hist_delta;
+        if (abs(sen_raised - estimate) > 500) {
+            csa.sen_encoder = estimate >= 0x10000 ? (estimate - 0x10000) : estimate;
+            csa.delta_encoder = hist_delta;
+            if(++hist_err > 2)
+                hist_err = -2;
+        } else {
+            csa.sen_encoder = csa.noc_encoder;
+            csa.delta_encoder = delta_enc;
+            hist_err = 0;
+        }
+    }
+
+    //csa.sen_encoder = csa.noc_encoder;
+    //csa.delta_encoder = delta_enc;
+
+    hist[0] = hist[1];
+    hist[1] = csa.sen_encoder;
+#endif
+
+    gpio_set_value(&dbg_out, 0);
+
 
     if (abs((uint16_t)(csa.ori_pos & 0xffff) - csa.sen_encoder) > 0x10000/2) {
         if (csa.sen_encoder < 0x10000/2)
@@ -340,8 +393,8 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
             d_debug("%04x %d %08x", csa.ori_encoder, delta_enc, csa.sen_pos);
 
     float angle_mech = csa.sen_encoder*((float)M_PI*2/0x10000);
-    uint16_t encoder_sub = csa.sen_encoder % lroundf(0x10000/21.0f);
-    csa.sen_angle_elec = encoder_sub*((float)M_PI*2/(0x10000/21.0f));
+    uint16_t encoder_sub = csa.sen_encoder % lroundf((float)0x10000/csa.motor_poles);
+    csa.sen_angle_elec = encoder_sub*((float)M_PI*2/((float)0x10000/csa.motor_poles));
     sin_sen_angle_elec = sinf(csa.sen_angle_elec);
     cos_sen_angle_elec = cosf(csa.sen_angle_elec);
 
@@ -445,4 +498,5 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
     speed_loop_compute();
     raw_dbg(0);
     csa.loop_cnt++;
+    gpio_set_value(&led_r, 0);
 }

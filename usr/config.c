@@ -52,7 +52,8 @@ csa_t csa = {
                 .period = 25.0 / CURRENT_LOOP_FREQ
         },
 
-        .bias_encoder = 0x44d3,
+        .motor_poles = 7,
+        .bias_encoder = 0x1b31,
 
         .qxchg_set = {
                 { .offset = offsetof(csa_t, tc_pos), .size = 4 * 3 }
@@ -61,7 +62,7 @@ csa_t csa = {
                 { .offset = offsetof(csa_t, cal_pos), .size = 8 }
         },
 
-        .dbg_str_msk = 0, //0xff,
+        .dbg_str_msk = 0x0, //0 or 0xff,
         .dbg_str_skip = 0x1fff, // 0x01ff,
 
         .dbg_raw_dst = { .addr = {0x80, 0x00, 0x00}, .port = 0xa },
@@ -72,8 +73,8 @@ csa_t csa = {
                 { // cur : target, i_term, last_input, cal_i_sq,
                         { .offset = offsetof(csa_t, pid_cur) + offsetof(pid_f_t, target), .size = 4 * 3 },
                         { .offset = offsetof(csa_t, cal_i_sq), .size = 4 },
-                        { .offset = offsetof(csa_t, sen_encoder), .size = 2 }//,
-                        //{ .offset = offsetof(csa_t, noc_encoder), .size = 2 }
+                        { .offset = offsetof(csa_t, sen_encoder), .size = 2 },
+                        { .offset = offsetof(csa_t, noc_encoder), .size = 2 }
                 }, { // speed
                         { .offset = offsetof(csa_t, pid_speed) + offsetof(pid_f_t, target), .size = 4 * 3 },
                         { .offset = offsetof(csa_t, cal_current), .size = 4 },
@@ -101,7 +102,7 @@ csa_t csa = {
 
         .cali_angle_elec = (float)M_PI/2,
         .cali_current = 200,
-        //.cali_angle_step = 0.003f // @ ic-MU3 10KHz spi
+        //.cali_angle_step = 0.003179136f // @ ic-MU3 25KHz spi
         //.cali_angle_step = 0
 };
 
