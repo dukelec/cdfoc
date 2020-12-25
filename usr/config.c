@@ -34,26 +34,26 @@ csa_t csa = {
         .dbg_dst = { .addr = {0x80, 0x00, 0x00}, .port = 9 },
 
         .pid_cur =  {
-                .kp = 1, .ki = 1200,
+                .kp = 1, .ki = 600,
                 .out_min = DRV_PWM_HALF * -0.9,
                 .out_max = DRV_PWM_HALF * 0.9,
                 .period = 1.0 / CURRENT_LOOP_FREQ
         },
         .pid_speed = {
-                .kp = 0.02, .ki = 8,
+                .kp = 0.01, .ki = 4,
                 .out_min = -3000,
                 .out_max = 3000, // limit output current
                 .period = 5.0 / CURRENT_LOOP_FREQ
         },
         .pid_pos = {
-                .kp = 15, .ki = 250, .kd = 0.02,
+                .kp = 10, .ki = 150, .kd = 0.01,
                 .out_min = -400000,
                 .out_max = 400000, // limit output speed
                 .period = 25.0 / CURRENT_LOOP_FREQ
         },
 
         .motor_poles = 7,
-        .bias_encoder = 0x1b31,
+        .bias_encoder = 0x4c89,
 
         .qxchg_set = {
                 { .offset = offsetof(csa_t, tc_pos), .size = 4 * 3 }
@@ -89,16 +89,13 @@ csa_t csa = {
                         { .offset = offsetof(csa_t, cal_pos), .size = 4 },
                         //{ .offset = offsetof(csa_t, sen_pos), .size = 4 },
                         { .offset = offsetof(csa_t, tc_vc), .size = 4 },
-                        { .offset = offsetof(csa_t, tc_ve), .size = 4 }//,
+                        { .offset = offsetof(csa_t, tc_ac), .size = 4 }//,
                         //{ .offset = offsetof(csa_t, sen_speed), .size = 4 }
                 }
         },
 
-        .tc_speed = 180000,
-        .tc_accel = 6000,
-        .tc_pos_d = 0, //2000,
-        .tc_speed_m = 5000,
-        .tc_accel_m = 100,
+        .tc_speed = 65536,
+        .tc_accel = 65536,//*20,
 
         .cali_angle_elec = (float)M_PI/2,
         .cali_current = 200,
@@ -227,12 +224,6 @@ void csa_list_show(void)
     CSA_SHOW(tc_accel);
     d_info("\n");
 
-    CSA_SHOW(tc_pos_d);
-    CSA_SHOW(tc_pos_m);
-    CSA_SHOW(tc_speed_m);
-    CSA_SHOW(tc_accel_m);
-    d_info("\n");
-
     CSA_SHOW(cali_angle_elec);
     CSA_SHOW(cali_current);
     CSA_SHOW(cali_angle_step);
@@ -266,6 +257,6 @@ void csa_list_show(void)
 
     CSA_SHOW(tc_state);
     CSA_SHOW(tc_vc);
-    CSA_SHOW(tc_ve);
+    CSA_SHOW(tc_ac);
     d_info("\n");
 }

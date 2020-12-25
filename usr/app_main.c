@@ -123,7 +123,7 @@ uint16_t encoder_read(void)
 
     //d_debug("%04x %04x\n", buf[0], buf[1]);
 
-    return buf[0] << 1;
+    return 0xffff - (buf[0] << 1);
 }
 #else
 // ic-MU: SPI_POLARITY_LOW, SPI_PHASE_1EDGE, 8BIT

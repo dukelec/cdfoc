@@ -23,7 +23,7 @@
 #define P_3F(x) (int)(x), abs(((x)-(int)(x))*1000) // "%d.%.3d"
 
 
-#define APP_CONF_ADDR       0x0800c000 // sector 3
+#define APP_CONF_ADDR       0x0801f800 // page 63, the last page
 #define APP_CONF_VER        0x0001
 
 #define CURRENT_LOOP_FREQ   (170000000 / 4096 / 2)
@@ -100,11 +100,6 @@ typedef struct {
     uint32_t        tc_speed;
     uint32_t        tc_accel;
 
-    uint32_t        tc_pos_d;        // delta for middle
-    int32_t         tc_pos_m;
-    uint32_t        tc_speed_m;
-    uint32_t        tc_accel_m;
-
     float           cali_angle_elec;
     float           cali_current;
     float           cali_angle_step; // increase cali_angle_elec
@@ -136,7 +131,7 @@ typedef struct {
     // for t_curve
     uint8_t         tc_state; // 0: stop, 1: run, 2: tailer
     float           tc_vc;    // cur speed
-    float           tc_ve;    // end speed
+    float           tc_ac;    // cur accel
 
 } csa_t; // config status area
 

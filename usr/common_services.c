@@ -236,7 +236,6 @@ static void p6_service_routine(void)
             local_irq_save(flags);
             if (csa.cal_pos != csa.tc_pos) {
                 csa.tc_state = 1; // restart t_curve
-                csa.tc_pos_m = csa.tc_pos - sign(csa.tc_pos - csa.cal_pos) * csa.tc_pos_d;
             }
             local_irq_restore(flags);
         }

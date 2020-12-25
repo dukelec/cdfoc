@@ -130,10 +130,6 @@ static void raw_dbg(int idx)
 
 static inline void t_curve_compute(void)
 {
-    int32_t pos;
-    float   speed;
-    float   accel;
-
     if (csa.state != ST_POS_TC) {
         csa.tc_state = 0;
         csa.tc_vc = 0;
@@ -141,53 +137,46 @@ static inline void t_curve_compute(void)
         return;
     }
 
-    if ((csa.tc_pos >= csa.cal_pos && csa.cal_pos >= csa.tc_pos_m) ||
-            (csa.tc_pos <= csa.cal_pos && csa.cal_pos <= csa.tc_pos_m)) {
-        pos = csa.tc_pos;
-        speed = csa.tc_speed_m / (CURRENT_LOOP_FREQ / 25.0f);
-        accel = csa.tc_accel_m / (CURRENT_LOOP_FREQ / 25.0f);
-        csa.tc_ve = 0;
-    } else { // target is middle point
-        pos = csa.tc_pos_m;
-        speed = csa.tc_speed / (CURRENT_LOOP_FREQ / 25.0f);
-        accel = csa.tc_accel / (CURRENT_LOOP_FREQ / 25.0f);
-        csa.tc_ve = sign(csa.tc_pos - csa.cal_pos) * ((float)csa.tc_speed_m) / (CURRENT_LOOP_FREQ / 25.0f);
-    }
-
     if (csa.tc_state) {
-        float tc_ac = 0;
-        if (pos != csa.cal_pos)
-            tc_ac = ((csa.tc_ve + csa.tc_vc) / 2.0f) * (csa.tc_ve - csa.tc_vc) / (pos - csa.cal_pos);
-        //tc_ac = sign(tc_ac) * min(fabsf(tc_ac), accel * 2.0f);
 
-        if (fabsf(tc_ac) < accel) {
+        if (csa.tc_pos != csa.cal_pos && (csa.tc_pos - csa.cal_pos >= 0) != (csa.tc_vc >= 0.0f)) { // different direction
+
+            csa.tc_ac = sign(csa.tc_pos - csa.cal_pos) * min((float)csa.tc_accel, fabsf(csa.tc_vc));
+            csa.tc_state = 1;
+
+        } else {
+            csa.tc_ac = sign(csa.tc_pos - csa.cal_pos) * (float)csa.tc_accel;
+
+            if (csa.tc_pos != csa.cal_pos)
+                csa.tc_ac = ((/* tc_ve + */ csa.tc_vc) / 2.0f) * (/* tc_ve */ - csa.tc_vc) / (csa.tc_pos - csa.cal_pos);
+
+            // Slightly more than allowed, such as 1.1 times.
+            csa.tc_ac = sign(csa.tc_ac) * min(fabsf(csa.tc_ac), (float)csa.tc_accel * 1.1f);
+        }
+
+        if (fabsf(csa.tc_ac) < csa.tc_accel) {
             if (csa.tc_state == 1) {
-                csa.tc_vc += sign(pos - csa.cal_pos) * accel;
-                csa.tc_vc = clip(csa.tc_vc, -speed, speed);
+                csa.tc_vc += sign(csa.tc_pos - csa.cal_pos) * ((float)csa.tc_accel / (CURRENT_LOOP_FREQ / 25.0f));
+                csa.tc_vc = clip(csa.tc_vc, -(float)csa.tc_speed, (float)csa.tc_speed);
             }
         } else {
             csa.tc_state = 2;
-            csa.tc_vc += tc_ac;
+            csa.tc_vc += csa.tc_ac / (CURRENT_LOOP_FREQ / 25.0f);
         }
 
-        if (abs(pos - csa.cal_pos) <= max(lroundf(accel), 1)) {
-            csa.cal_pos = pos;
-            csa.tc_vc = csa.tc_ve;
+        //if (fabsf(csa.tc_vc) < (float)csa.tc_speed_min)
+        //    csa.tc_vc = sign(csa.tc_pos - csa.cal_pos) * (float)csa.tc_speed_min;
 
-        } else {
-            if (fabsf(csa.tc_vc) < accel)
-                csa.tc_vc = sign(pos - csa.cal_pos) * accel;
-
-            if (csa.cal_pos <= pos) {
-                csa.cal_pos = min(lroundf(csa.cal_pos + csa.tc_vc), pos);
-            } else {
-                csa.cal_pos = max(lroundf(csa.cal_pos + csa.tc_vc), pos);
-            }
-        }
+        int32_t new_pos = lroundf((float)csa.cal_pos + csa.tc_vc / (CURRENT_LOOP_FREQ / 25.0f));
+        csa.cal_pos = new_pos;
     }
 
-    if (csa.cal_pos == csa.tc_pos)
+    if (abs(csa.cal_pos - csa.tc_pos) <= 1 /*&& fabsf(csa.tc_vc) <= (float)csa.tc_speed_min*/) {
         csa.tc_state = 0;
+        csa.tc_vc = 0;
+        csa.tc_ac = 0;
+        csa.cal_pos = csa.tc_pos;
+    }
     if (!csa.tc_state)
         csa.tc_vc = 0;
 }
@@ -239,7 +228,7 @@ static inline void speed_loop_compute(void)
                 csa.cal_current = 0;
         } else {
             pid_f_set_target(&csa.pid_speed, csa.cal_speed); // TODO: only set once after modified
-            csa.cal_current = -lroundf(pid_f_compute_no_d(&csa.pid_speed, csa.sen_speed));
+            csa.cal_current = lroundf(pid_f_compute_no_d(&csa.pid_speed, csa.sen_speed));
         }
 
         raw_dbg(1);
@@ -463,7 +452,7 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
             if (csa.cali_angle_elec >= (float)M_PI*2)
                 csa.cali_angle_elec -= (float)M_PI*2;
 
-            csa.cal_i_sq = csa.cali_current;
+            csa.cal_i_sq = -csa.cali_current; // sign select direction
             i_alpha = -csa.cal_i_sq * sinf(csa.cali_angle_elec);
             i_beta =  csa.cal_i_sq * cosf(csa.cali_angle_elec);
         }
