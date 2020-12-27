@@ -94,8 +94,8 @@ csa_t csa = {
                 }
         },
 
-        .tc_speed = 65536,
-        .tc_accel = 65536,//*20,
+        .tc_speed = 65536*10,//*1
+        .tc_accel = 65536*5,//*20,
 
         .cali_angle_elec = (float)M_PI/2,
         .cali_current = 200,

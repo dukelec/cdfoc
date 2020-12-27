@@ -125,6 +125,34 @@ uint16_t encoder_read(void)
 
     return 0xffff - (buf[0] << 1);
 }
+
+uint16_t encoder_reg_r(uint8_t addr)
+{
+    uint16_t buf[2];
+    buf[0] = 0x8001 | (addr << 4);
+
+    gpio_set_value(&s_cs, 0);
+    HAL_SPI_Transmit(&hspi3, (uint8_t *)buf, 1, HAL_MAX_DELAY);
+
+    GPIOB->MODER &= ~(1 << (5 * 2 + 1)); // PB5
+    HAL_SPI_Receive(&hspi3, (uint8_t *)buf, 1, HAL_MAX_DELAY);
+    gpio_set_value(&s_cs, 1);
+    GPIOB->MODER |= 1 << (5 * 2 + 1);
+
+    return buf[0];
+}
+
+void encoder_reg_w(uint8_t addr, uint16_t val)
+{
+    uint16_t buf[2];
+    buf[0] = 0x0001 | (addr << 4);
+    buf[1] = val;
+
+    gpio_set_value(&s_cs, 0);
+    HAL_SPI_Transmit(&hspi3, (uint8_t *)buf, 2, HAL_MAX_DELAY);
+    gpio_set_value(&s_cs, 1);
+}
+
 #else
 // ic-MU: SPI_POLARITY_LOW, SPI_PHASE_1EDGE, 8BIT
 uint16_t encoder_read(void)
@@ -175,6 +203,11 @@ void app_main(void)
     d_debug("drv 02: %04x\n", drv_read_reg(0x02));
     drv_write_reg(0x02, drv_read_reg(0x02) | 0x1 << 5);
     d_debug("drv 02: %04x\n", drv_read_reg(0x02));
+
+    d_debug("sen reg1: %x\n", encoder_reg_r(1));
+    //encoder_reg_w(1, encoder_reg_r(1) & ~0xe4);
+    encoder_reg_w(1, encoder_reg_r(1) & ~0xee);
+    d_debug("sen reg1: %x\n", encoder_reg_r(1));
 
     app_motor_init();
     HAL_ADC_Start(&hadc1);
