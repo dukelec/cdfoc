@@ -140,45 +140,49 @@ static inline void t_curve_compute(void)
     if (csa.tc_state) {
 
         if (csa.tc_pos != csa.cal_pos && (csa.tc_pos - csa.cal_pos >= 0) != (csa.tc_vc >= 0.0f)) { // different direction
-
             csa.tc_ac = sign(csa.tc_pos - csa.cal_pos) * min((float)csa.tc_accel, fabsf(csa.tc_vc));
             csa.tc_state = 1;
-
         } else {
-            csa.tc_ac = sign(csa.tc_pos - csa.cal_pos) * (float)csa.tc_accel;
-
-            if (csa.tc_pos != csa.cal_pos)
+            if (csa.tc_pos != csa.cal_pos) {
                 csa.tc_ac = ((/* tc_ve + */ csa.tc_vc) / 2.0f) * (/* tc_ve */ - csa.tc_vc) / (csa.tc_pos - csa.cal_pos);
-
-            // Slightly more than allowed, such as 1.1 times.
-            csa.tc_ac = sign(csa.tc_ac) * min(fabsf(csa.tc_ac), (float)csa.tc_accel * 1.1f);
+                csa.tc_ac = sign(csa.tc_ac) * min(fabsf(csa.tc_ac), (float)csa.tc_accel);
+            } else {
+                csa.tc_ac = -sign(csa.tc_vc) * (float)csa.tc_accel;
+            }
         }
 
-        if (fabsf(csa.tc_ac) < csa.tc_accel) {
+        if (fabsf(csa.tc_ac) * 1.1f < csa.tc_accel) {
             if (csa.tc_state == 1) {
                 csa.tc_vc += sign(csa.tc_pos - csa.cal_pos) * ((float)csa.tc_accel / (CURRENT_LOOP_FREQ / 25.0f));
                 csa.tc_vc = clip(csa.tc_vc, -(float)csa.tc_speed, (float)csa.tc_speed);
             }
         } else {
             csa.tc_state = 2;
-            csa.tc_vc += csa.tc_ac / (CURRENT_LOOP_FREQ / 25.0f);
+            // Slightly more than allowed, such as 1.1 times.
+            csa.tc_vc += csa.tc_ac * 1.1f / (CURRENT_LOOP_FREQ / 25.0f);
         }
 
-        //if (fabsf(csa.tc_vc) < (float)csa.tc_speed_min)
-        //    csa.tc_vc = sign(csa.tc_pos - csa.cal_pos) * (float)csa.tc_speed_min;
+        float v_step = (float)csa.tc_accel / (CURRENT_LOOP_FREQ / 25.0f);
+        int32_t dt_pos = lroundf(csa.tc_vc / (CURRENT_LOOP_FREQ / 25.0f));
+        if (dt_pos == 0)
+            dt_pos = sign(csa.tc_pos - csa.cal_pos);
+        int32_t new_pos = csa.cal_pos + dt_pos;
 
-        int32_t new_pos = lroundf((float)csa.cal_pos + csa.tc_vc / (CURRENT_LOOP_FREQ / 25.0f));
-        csa.cal_pos = new_pos;
-    }
+        if (fabsf(csa.tc_vc) <= v_step * 4.4f) { // avoid exceeding
+            csa.cal_pos = (csa.tc_pos >= csa.cal_pos) ? min(new_pos, csa.tc_pos) : max(new_pos, csa.tc_pos);
+            if (csa.cal_pos == csa.tc_pos) {
+                csa.tc_state = 0;
+                csa.tc_vc = 0;
+                csa.tc_ac = 0;
+            }
+        } else {
+            csa.cal_pos = new_pos;
+        }
 
-    if (abs(csa.cal_pos - csa.tc_pos) <= 1 /*&& fabsf(csa.tc_vc) <= (float)csa.tc_speed_min*/) {
-        csa.tc_state = 0;
+    } else {
         csa.tc_vc = 0;
         csa.tc_ac = 0;
-        csa.cal_pos = csa.tc_pos;
     }
-    if (!csa.tc_state)
-        csa.tc_vc = 0;
 }
 
 static inline void position_loop_compute(void)
@@ -236,7 +240,7 @@ static inline void speed_loop_compute(void)
 }
 
 
-#define HIST_LEN 10
+#define HIST_LEN 2
 static uint16_t hist[HIST_LEN] = { 0 };
 static int8_t hist_err = -2;
 
@@ -255,74 +259,7 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
 
     gpio_set_value(&dbg_out, 1);
 
-#if 0
-    // v--- Encoder Filter: ---v
-
-    for (int i = 0; i < HIST_LEN - 1; i++)
-        hist[i] = hist[i + 1];
-    hist[HIST_LEN - 1] = csa.noc_encoder;
-
-    uint32_t order[HIST_LEN];
-    uint32_t hist32[HIST_LEN];
-    for (int i = 0; i < HIST_LEN; i++) {
-        hist32[i] = hist[i];
-        order[i] = i;
-    }                                          // hist: 1, 2, 9, 8 -> hist32: 1, 2, 8, 9
-    selection_sort_u(hist32, HIST_LEN, order); // order 0, 1, 2, 3    order:  0, 1, 3, 2
-
-    int longest_idx = 0;
-    uint32_t longest_dt = hist32[0] + 0x10000 - hist32[HIST_LEN - 1]; // 1+10-9=2
-    for (int i = 0; i < HIST_LEN - 1; i++) {
-        if (hist32[i + 1] - hist32[i] > longest_dt) {
-            longest_dt = hist32[i + 1] - hist32[i];
-            longest_idx = i + 1; // idx: 2, val: 8
-        }
-    }
-    for (int i = 0; i < longest_idx; i++)      // hist32: 1, 2, 8, 9 -> hist32: 11, 12, 8, 9 (range: [0,9])
-            hist32[i] += 0x10000;              // order:  0, 1, 3, 2    order:   0,  1, 3, 2
-
-                                               // hist32: 11, 12, 8, 9 -> hist32: 8, 9, 11, 12
-    selection_sort_u(hist32, HIST_LEN, order); // order:   0,  1, 3, 2    order:  3, 2,  0,  1
-
-    selection_sort_u(order+3, HIST_LEN-6, hist32+3); // hist32: 8, 9, 11, 12 -> hist32: 8, 11, 9, 12
-                                                     // order:  3, 2,  0,  1    order:  3,  0, 2,  1
-
-    float iavg = 0;
-    for (int i = 3; i < HIST_LEN - 3; i++)
-        iavg += order[i];
-    iavg = iavg / (HIST_LEN - 6); // (0 + 2) / 2 = 1
-
-    float davg = 0;
-    for (int i = 3; i < HIST_LEN - 3 - 1; i++) { // (hist[2] - hist[0]) / (2 - 0) => (9 - 1) / 2
-        //davg += (float)((int16_t)(hist[order[i+1]] - hist[order[i]])) / (float)(order[i+1] - order[i]);
-        int v_delta = (int)hist32[order[i+1]] - (int)hist32[order[i]]; // (9 - 11) = -2
-        int v_distant = order[i+1] - order[i];
-        davg += (float)v_delta / (float)v_distant; // -2 / 2 = -1
-    }
-    davg = davg / (HIST_LEN - 6 - 1);
-
-    uint32_t ttt = 0;
-    for (int i = 3; i < HIST_LEN - 3; i++)
-        ttt += hist32[i];
-    float tto = (float)ttt / (float)(HIST_LEN - 6); // (11 + 9) / 2 = 10
-
-    if (tto >= 0x10000)
-        tto = tto - (float)0x10000; // 10 - 10 = 0
-
-    csa.sen_encoder = lroundf(tto + davg * (HIST_LEN /*- 1*/ - iavg));
-    csa.delta_encoder = tto - tto_last;
-    tto_last = tto;
-
-    if (csa.delta_encoder > 0x8000)
-        csa.delta_encoder -= 0x10000;
-    else if (csa.delta_encoder < -0x8000)
-        csa.delta_encoder += 0x10000;
-
-    // csa.sen_encoder = tto + csa.delta_encoder * 4;
-
-    // ^--- END of Encoder Filter ---^
-#else
-
+#if 1
     if (hist_err < 0 || abs(hist[1] - hist[0]) > 500) {
         csa.sen_encoder = csa.noc_encoder;
         csa.delta_encoder = delta_enc;
@@ -359,11 +296,11 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
         }
     }
 
-    //csa.sen_encoder = csa.noc_encoder;
-    //csa.delta_encoder = delta_enc;
-
     hist[0] = hist[1];
     hist[1] = csa.sen_encoder;
+#else
+    csa.sen_encoder = csa.noc_encoder;
+    csa.delta_encoder = delta_enc;
 #endif
 
     gpio_set_value(&dbg_out, 0);
