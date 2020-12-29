@@ -204,11 +204,23 @@ void app_main(void)
     drv_write_reg(0x02, drv_read_reg(0x02) | 0x1 << 5);
     d_debug("drv 02: %04x\n", drv_read_reg(0x02));
 
+
+    d_debug("drv 03: %04x\n", drv_read_reg(0x03));
+    d_debug("drv 04: %04x\n", drv_read_reg(0x04));
+
+    drv_write_reg(0x03, 0x0300); // 10mA, 20mA
+    drv_write_reg(0x04, 0x0400); // 10mA, 20mA, 500-ns peak gate-current
+    d_debug("drv 03: %04x\n", drv_read_reg(0x03));
+    d_debug("drv 04: %04x\n", drv_read_reg(0x04));
+
+
+
+#if 0
     d_debug("sen reg1: %x\n", encoder_reg_r(1));
     //encoder_reg_w(1, encoder_reg_r(1) & ~0xe4);
     encoder_reg_w(1, encoder_reg_r(1) & ~0xee);
     d_debug("sen reg1: %x\n", encoder_reg_r(1));
-
+#endif
     app_motor_init();
     HAL_ADC_Start(&hadc1);
     HAL_ADC_Start(&hadc2);
