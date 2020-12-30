@@ -14,7 +14,8 @@ regr_t csa_w_allow[] = {
         { .offset = offsetof(csa_t, magic_code), .size = offsetof(csa_t, pid_pos) - offsetof(csa_t, magic_code) },
         { .offset = offsetof(csa_t, pid_pos), .size = offsetof(pid_i_t, target) },
         { .offset = offsetof(csa_t, pid_speed), .size = offsetof(pid_f_t, target) },
-        { .offset = offsetof(csa_t, pid_speed), .size = offsetof(pid_f_t, target) },
+        { .offset = offsetof(csa_t, pid_i_sq), .size = offsetof(pid_f_t, target) },
+        { .offset = offsetof(csa_t, pid_i_sd), .size = offsetof(pid_f_t, target) },
         { .offset = offsetof(csa_t, peak_cur_threshold),
                 .size = offsetof(csa_t, cal_i_sq) - offsetof(csa_t, peak_cur_threshold) }
 };
@@ -45,13 +46,13 @@ csa_t csa = {
         .dbg_dst = { .addr = {0x80, 0x00, 0x00}, .port = 9 },
 
         .pid_pos = {
-                .kp = 10, .ki = 150, .kd = 0.01,
-                .out_min = -400000,
-                .out_max = 400000, // limit output speed
+                .kp = 18, .ki = 250, .kd = 0.02,
+                .out_min = -65536*100,
+                .out_max = 65536*100, // limit output speed
                 .period = 25.0 / CURRENT_LOOP_FREQ
         },
         .pid_speed = {
-                .kp = 0.01, .ki = 4,
+                .kp = 0.002, .ki = 1.2,
                 .out_min = -3000,
                 .out_max = 3000, // limit output current
                 .period = 5.0 / CURRENT_LOOP_FREQ
@@ -63,9 +64,9 @@ csa_t csa = {
                 .period = 1.0 / CURRENT_LOOP_FREQ
         },
         .pid_i_sd =  {
-                .kp = 1, .ki = 600,
-                .out_min = DRV_PWM_HALF * -0.2,
-                .out_max = DRV_PWM_HALF * 0.2,
+                .kp = 0.5, .ki = 400,
+                .out_min = DRV_PWM_HALF * -0.4, // TODO: limit q + d
+                .out_max = DRV_PWM_HALF * 0.4,
                 .period = 1.0 / CURRENT_LOOP_FREQ
         },
 
@@ -87,9 +88,8 @@ csa_t csa = {
         .dbg_raw_th = 200,
         .dbg_raw_skip = { 0, 0, 0, 0 },
         .dbg_raw = {
-                { // cur : target, i_term, last_input, cal_current,
+                { // cur : target (cal_current), i_term, last_input
                         { .offset = offsetof(csa_t, pid_i_sq) + offsetof(pid_f_t, target), .size = 4 * 3 },
-                        { .offset = offsetof(csa_t, cal_current), .size = 4 },
                         { .offset = offsetof(csa_t, sen_encoder), .size = 2 },
                         { .offset = offsetof(csa_t, noc_encoder), .size = 2 }
                 }, { // speed
@@ -111,7 +111,7 @@ csa_t csa = {
                 }
         },
 
-        .tc_speed = 65536*5,//*1
+        .tc_speed = 65536*20,//*1
         .tc_accel = 65536*20,//*20,
 
         .tc_rpt_end = false,
