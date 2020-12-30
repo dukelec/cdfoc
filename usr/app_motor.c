@@ -10,42 +10,23 @@
 #include "math.h"
 #include "app_main.h"
 
+static cdn_sock_t sock_tc_rpt = { .port = 0x10, .ns = &dft_ns };
 static cdn_sock_t sock_raw_dbg = { .port = 0xa, .ns = &dft_ns }; // raw debug
 static list_head_t raw_pend = { 0 };
 
-static float tto_last; // encoder last value
 
-
-void selection_sort(int32_t arr[], int len, int32_t order[])
+uint8_t motor_w_hook(uint16_t sub_offset, uint8_t len, uint8_t *dat)
 {
-    for (int i = 0 ; i < len - 1 ; i++) {
-        int min = i;
-        for (int j = i + 1; j < len; j++) {
-            if (arr[j] < arr[min])
-                min = j;
-        }
-        if (min != i) {
-            swap(arr[min], arr[i]);
-            if (order)
-                swap(order[min], order[i]);
-        }
-    }
-}
+    uint32_t flags;
 
-void selection_sort_u(uint32_t arr[], int len, uint32_t order[])
-{
-    for (int i = 0 ; i < len - 1 ; i++) {
-        int min = i;
-        for (int j = i + 1; j < len; j++) {
-            if (arr[j] < arr[min])
-                min = j;
+    if (csa.state == ST_POS_TC) {
+        local_irq_save(flags);
+        if (csa.cal_pos != csa.tc_pos) {
+            csa.tc_state = 1; // restart t_curve
         }
-        if (min != i) {
-            swap(arr[min], arr[i]);
-            if (order)
-                swap(order[min], order[i]);
-        }
+        local_irq_restore(flags);
     }
+    return 0;
 }
 
 
@@ -56,7 +37,6 @@ void app_motor_init(void)
     pid_i_init(&csa.pid_pos, true);
 
     csa.sen_encoder = encoder_read(); // init last value
-    tto_last = csa.sen_encoder;
     cdn_sock_bind(&sock_raw_dbg);
 }
 
@@ -67,6 +47,20 @@ void app_motor_routine(void)
         if (pkt)
             cdn_sock_sendto(&sock_raw_dbg, pkt);
     }
+
+    static uint8_t tc_state_old = 0;
+    if (csa.tc_rpt_end) {
+        if (csa.tc_state == 0 && tc_state_old != 0) {
+            cdn_pkt_t *pkt = cdn_pkt_get(&dft_ns.free_pkts);
+            if (pkt) {
+                pkt->dst = csa.tc_rpt_dst;
+                pkt->dat[0] = 0x40;
+                pkt->len = 1;
+                cdn_sock_sendto(&sock_tc_rpt, pkt);
+            }
+        }
+    }
+    tc_state_old = csa.tc_state;
 }
 
 static void raw_dbg(int idx)
@@ -138,7 +132,6 @@ static inline void t_curve_compute(void)
     }
 
     if (csa.tc_state) {
-
         if (csa.tc_pos != csa.cal_pos && (csa.tc_pos - csa.cal_pos >= 0) != (csa.tc_vc >= 0.0f)) { // different direction
             csa.tc_ac = sign(csa.tc_pos - csa.cal_pos) * min((float)csa.tc_accel, fabsf(csa.tc_vc));
             csa.tc_state = 1;

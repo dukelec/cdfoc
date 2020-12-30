@@ -100,6 +100,9 @@ typedef struct {
     uint32_t        tc_speed;
     uint32_t        tc_accel;
 
+    bool            tc_rpt_end;
+    cdn_sockaddr_t  tc_rpt_dst;
+
     float           cali_angle_elec;
     float           cali_current;
     float           cali_angle_step; // increase cali_angle_elec
@@ -135,9 +138,26 @@ typedef struct {
 
 } csa_t; // config status area
 
+
+typedef uint8_t (*hook_func_t)(uint16_t sub_offset, uint8_t len, uint8_t *dat);
+
+typedef struct {
+    regr_t          range;
+    hook_func_t     before;
+    hook_func_t     after;
+} csa_hook_t;
+
+
 extern csa_t csa;
-extern regr_t regr_wa[]; // writable list
-extern int regr_wa_num;
+
+extern regr_t csa_w_allow[]; // writable list
+extern int csa_w_allow_num;
+
+extern csa_hook_t csa_w_hook[];
+extern int csa_w_hook_num;
+extern csa_hook_t csa_r_hook[];
+extern int csa_r_hook_num;
+
 
 void app_main(void);
 void tim_cb(void);
@@ -150,6 +170,7 @@ void common_service_routine(void);
 
 void set_led_state(led_state_t state);
 
+uint8_t motor_w_hook(uint16_t sub_offset, uint8_t len, uint8_t *dat);
 void app_motor_init(void);
 void app_motor_routine(void);
 void selection_sort(int32_t arr[], int len, int32_t order[]);
