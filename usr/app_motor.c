@@ -32,7 +32,8 @@ uint8_t motor_w_hook(uint16_t sub_offset, uint8_t len, uint8_t *dat)
 
 void app_motor_init(void)
 {
-    pid_f_init(&csa.pid_cur, true);
+    pid_f_init(&csa.pid_i_sq, true);
+    pid_f_init(&csa.pid_i_sd, true);
     pid_f_init(&csa.pid_speed, true);
     pid_i_init(&csa.pid_pos, true);
 
@@ -127,6 +128,7 @@ static inline void t_curve_compute(void)
     if (csa.state != ST_POS_TC) {
         csa.tc_state = 0;
         csa.tc_vc = 0;
+        csa.tc_ac = 0;
         csa.tc_pos = csa.sen_pos;
         return;
     }
@@ -186,6 +188,7 @@ static inline void position_loop_compute(void)
         csa.cal_pos = csa.sen_pos;
         if (csa.state == ST_STOP)
             csa.cal_speed = 0;
+        t_curve_compute(); // reset t_curve
         return;
     }
 
@@ -232,6 +235,8 @@ static inline void speed_loop_compute(void)
     }
 }
 
+
+// TODO: adc avg during run; read sensor at same time of adc sampling
 
 #define HIST_LEN 2
 static uint16_t hist[HIST_LEN] = { 0 };
@@ -328,8 +333,8 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
         float i_alpha = ia;
         float i_beta = (ia + ib * 2) / 1.732050808f; // √3
 
-        csa.sen_current = -i_alpha * sin_sen_angle_elec + i_beta * cos_sen_angle_elec; // i_sq
-        float i_sd = i_alpha * cos_sen_angle_elec + i_beta * sin_sen_angle_elec; // i_sd
+        csa.sen_i_sq = -i_alpha * sin_sen_angle_elec + i_beta * cos_sen_angle_elec;
+        csa.sen_i_sd = i_alpha * cos_sen_angle_elec + i_beta * sin_sen_angle_elec;
 
         /*
         if (in_current > peak_cur_threshold) {
@@ -345,7 +350,7 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
         if (dbg_str)
             d_debug_c(", in %5d %5d %5d", ia, ib, ic);
         if (dbg_str)
-            d_debug_c(", i %5d.%.2d, %5d.%.2d", P_2F(csa.sen_current), P_2F(i_sd));
+            d_debug_c(", i %5d.%.2d, %5d.%.2d", P_2F(csa.sen_i_sq), P_2F(csa.sen_i_sd));
 
     } else { // state: stop
         static int i_cnt = 0;
@@ -363,7 +368,7 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
         if (dbg_str)
             d_debug_c(", in %5d.%.2d %5d.%.2d", P_2F(ia_idle), P_2F(ib_idle));
 
-        csa.sen_current = 0;
+        csa.sen_i_sq = csa.sen_i_sd = 0;
     }
 
     // current --> pwm
@@ -372,10 +377,11 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
 
         // calculate angle
         if (csa.state != ST_CALI) {
-            pid_f_set_target(&csa.pid_cur, csa.cal_current);
-            csa.cal_i_sq = pid_f_compute_no_d(&csa.pid_cur, csa.sen_current);
-            i_alpha = -csa.cal_i_sq * sin_sen_angle_elec;
-            i_beta =  csa.cal_i_sq * cos_sen_angle_elec;
+            pid_f_set_target(&csa.pid_i_sq, csa.cal_current);
+            csa.cal_i_sq = pid_f_compute_no_d(&csa.pid_i_sq, csa.sen_i_sq);
+            csa.cal_i_sd = pid_f_compute_no_d(&csa.pid_i_sd, csa.sen_i_sd); // target default 0
+            i_alpha = csa.cal_i_sd * cos_sen_angle_elec - csa.cal_i_sq * sin_sen_angle_elec;
+            i_beta =  csa.cal_i_sd * sin_sen_angle_elec + csa.cal_i_sq * cos_sen_angle_elec;
 
         } else {
             csa.cali_angle_elec += csa.cali_angle_step;
@@ -400,8 +406,10 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
             d_debug_c(", o %5d.%.2d %5d %5d %5d\n", P_2F(csa.cal_i_sq), out_pwm_u, out_pwm_v, out_pwm_w);
     } else {
         csa.cal_i_sq = 0;
-        pid_f_set_target(&csa.pid_cur, 0);
-        pid_f_reset(&csa.pid_cur, 0, 0);
+        pid_f_set_target(&csa.pid_i_sq, 0);
+        pid_f_set_target(&csa.pid_i_sd, 0);
+        pid_f_reset(&csa.pid_i_sq, 0, 0);
+        pid_f_reset(&csa.pid_i_sd, 0, 0);
 
         //peak_cur_cnt = 0;
         if (dbg_str)

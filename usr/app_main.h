@@ -74,7 +74,8 @@ typedef struct {
 
     pid_i_t         pid_pos;
     pid_f_t         pid_speed;
-    pid_f_t         pid_cur;
+    pid_f_t         pid_i_sq;
+    pid_f_t         pid_i_sd;
 
     float           peak_cur_threshold;
     int32_t         peak_cur_duration;
@@ -116,6 +117,7 @@ typedef struct {
     float           cal_speed;
     int32_t         cal_current;
     float           cal_i_sq;
+    float           cal_i_sd;
 
     uint16_t        ori_encoder;
     int32_t         ori_pos;
@@ -125,7 +127,8 @@ typedef struct {
     uint16_t        sen_encoder;
     int32_t         sen_pos;
     float           sen_speed;
-    float           sen_current;
+    float           sen_i_sq;
+    float           sen_i_sd;
     float           sen_angle_elec;
 
     uint32_t        loop_cnt;

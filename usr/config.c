@@ -44,11 +44,11 @@ csa_t csa = {
         .dbg_en = true,
         .dbg_dst = { .addr = {0x80, 0x00, 0x00}, .port = 9 },
 
-        .pid_cur =  {
-                .kp = 1, .ki = 600,
-                .out_min = DRV_PWM_HALF * -0.9,
-                .out_max = DRV_PWM_HALF * 0.9,
-                .period = 1.0 / CURRENT_LOOP_FREQ
+        .pid_pos = {
+                .kp = 10, .ki = 150, .kd = 0.01,
+                .out_min = -400000,
+                .out_max = 400000, // limit output speed
+                .period = 25.0 / CURRENT_LOOP_FREQ
         },
         .pid_speed = {
                 .kp = 0.01, .ki = 4,
@@ -56,11 +56,17 @@ csa_t csa = {
                 .out_max = 3000, // limit output current
                 .period = 5.0 / CURRENT_LOOP_FREQ
         },
-        .pid_pos = {
-                .kp = 10, .ki = 150, .kd = 0.01,
-                .out_min = -400000,
-                .out_max = 400000, // limit output speed
-                .period = 25.0 / CURRENT_LOOP_FREQ
+        .pid_i_sq =  {
+                .kp = 1, .ki = 600,
+                .out_min = DRV_PWM_HALF * -0.9,
+                .out_max = DRV_PWM_HALF * 0.9,
+                .period = 1.0 / CURRENT_LOOP_FREQ
+        },
+        .pid_i_sd =  {
+                .kp = 1, .ki = 600,
+                .out_min = DRV_PWM_HALF * -0.2,
+                .out_max = DRV_PWM_HALF * 0.2,
+                .period = 1.0 / CURRENT_LOOP_FREQ
         },
 
         .motor_poles = 7,
@@ -82,8 +88,8 @@ csa_t csa = {
         .dbg_raw_skip = { 0, 0, 0, 0 },
         .dbg_raw = {
                 { // cur : target, i_term, last_input, cal_i_sq,
-                        { .offset = offsetof(csa_t, pid_cur) + offsetof(pid_f_t, target), .size = 4 * 3 },
-                        { .offset = offsetof(csa_t, cal_i_sq), .size = 4 },
+                        { .offset = offsetof(csa_t, pid_i_sq) + offsetof(pid_f_t, target), .size = 4 * 3 },
+                        { .offset = offsetof(csa_t, cal_current), .size = 4 },
                         { .offset = offsetof(csa_t, sen_encoder), .size = 2 },
                         { .offset = offsetof(csa_t, noc_encoder), .size = 2 }
                 }, { // speed
@@ -108,6 +114,7 @@ csa_t csa = {
         .tc_speed = 65536*5,//*1
         .tc_accel = 65536*20,//*20,
 
+        .tc_rpt_end = true,
         .tc_rpt_dst = { .addr = {0x80, 0x00, 0x00}, .port = 0x10 },
 
         .cali_angle_elec = (float)M_PI/2,
@@ -220,16 +227,24 @@ void csa_list_show(void)
     CSA_SHOW_SUB(pid_speed, pid_f_t, period, "");
     d_info("\n");
 
-    CSA_SHOW_SUB(pid_cur, pid_f_t, kp, "");
-    CSA_SHOW_SUB(pid_cur, pid_f_t, ki, "");
-    CSA_SHOW_SUB(pid_cur, pid_f_t, kd, "");
-    CSA_SHOW_SUB(pid_cur, pid_f_t, out_min, "");
-    CSA_SHOW_SUB(pid_cur, pid_f_t, out_max, "");
-    CSA_SHOW_SUB(pid_cur, pid_f_t, period, "");
+    CSA_SHOW_SUB(pid_i_sq, pid_f_t, kp, "");
+    CSA_SHOW_SUB(pid_i_sq, pid_f_t, ki, "");
+    CSA_SHOW_SUB(pid_i_sq, pid_f_t, kd, "");
+    CSA_SHOW_SUB(pid_i_sq, pid_f_t, out_min, "");
+    CSA_SHOW_SUB(pid_i_sq, pid_f_t, out_max, "");
+    CSA_SHOW_SUB(pid_i_sq, pid_f_t, period, "");
     d_info("\n");
 
-    CSA_SHOW(bias_encoder, "offset for encoder value");
-    CSA_SHOW(bias_pos, "offset for pos value");
+    CSA_SHOW_SUB(pid_i_sd, pid_f_t, kp, "");
+    CSA_SHOW_SUB(pid_i_sd, pid_f_t, ki, "");
+    CSA_SHOW_SUB(pid_i_sd, pid_f_t, kd, "");
+    CSA_SHOW_SUB(pid_i_sd, pid_f_t, out_min, "");
+    CSA_SHOW_SUB(pid_i_sd, pid_f_t, out_max, "");
+    CSA_SHOW_SUB(pid_i_sd, pid_f_t, period, "");
+    d_info("\n");
+
+    CSA_SHOW(bias_encoder, "Offset for encoder value");
+    CSA_SHOW(bias_pos, "Offset for pos value");
     CSA_SHOW(qxchg_set, "Config the write data components for quick-exchange channel");
     CSA_SHOW(qxchg_ret, "Config the return data components for quick-exchange channel");
     CSA_SHOW(qxchg_ro, "Config the return data components for the read only quick-exchange channel");
@@ -251,11 +266,13 @@ void csa_list_show(void)
     CSA_SHOW(tc_speed, "Set target speed");
     CSA_SHOW(tc_accel, "Set target accel");
     CSA_SHOW(tc_rpt_end, "Report finish event");
+    CSA_SHOW_SUB(tc_rpt_dst, cdn_sockaddr_t, addr, "Send report to this address");
+    CSA_SHOW_SUB(tc_rpt_dst, cdn_sockaddr_t, port, "Send report to this port");
     d_info("\n");
 
-    CSA_SHOW(cali_angle_elec, "calibration mode angle");
-    CSA_SHOW(cali_current, "calibration mode current");
-    CSA_SHOW(cali_angle_step, "calibration mode speed");
+    CSA_SHOW(cali_angle_elec, "Calibration mode angle");
+    CSA_SHOW(cali_current, "Calibration mode current");
+    CSA_SHOW(cali_angle_step, "Calibration mode speed");
     d_info("\n");
 
     CSA_SHOW(state, "0: stop, 1: cur loop, 2: speed loop, 3: pos loop, 4: t_curve");
@@ -266,6 +283,7 @@ void csa_list_show(void)
     CSA_SHOW(cal_speed, "speed loop target");
     CSA_SHOW(cal_current, "cur loop target");
     CSA_SHOW(cal_i_sq, "i_sq info");
+    CSA_SHOW(cal_i_sd, "i_sd info");
     d_info("\n");
 
     CSA_SHOW(ori_encoder, "noc_encoder before add offset");
@@ -277,11 +295,12 @@ void csa_list_show(void)
     CSA_SHOW(sen_encoder, "encoder value filtered");
     CSA_SHOW(sen_pos, "multiturn + sen_encoder data");
     CSA_SHOW(sen_speed, "delta_encoder filtered");
-    CSA_SHOW(sen_current, "i_sq from adc");
-    CSA_SHOW(sen_angle_elec, "get elec angle from sen_encoder");
+    CSA_SHOW(sen_i_sq, "i_sq from adc");
+    CSA_SHOW(sen_i_sd, "i_sd from adc");
+    CSA_SHOW(sen_angle_elec, "Get electric angle from sen_encoder");
     d_info("\n");
 
-    CSA_SHOW(loop_cnt, "inc at cur loop, for raw dbg");
+    CSA_SHOW(loop_cnt, "Increase at current loop, for raw dbg");
     d_info("\n");
 
     d_debug("   #--------------- Follows are not writable: -------------------\n");
