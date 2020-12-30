@@ -87,7 +87,7 @@ csa_t csa = {
         .dbg_raw_th = 200,
         .dbg_raw_skip = { 0, 0, 0, 0 },
         .dbg_raw = {
-                { // cur : target, i_term, last_input, cal_i_sq,
+                { // cur : target, i_term, last_input, cal_current,
                         { .offset = offsetof(csa_t, pid_i_sq) + offsetof(pid_f_t, target), .size = 4 * 3 },
                         { .offset = offsetof(csa_t, cal_current), .size = 4 },
                         { .offset = offsetof(csa_t, sen_encoder), .size = 2 },
@@ -114,7 +114,7 @@ csa_t csa = {
         .tc_speed = 65536*5,//*1
         .tc_accel = 65536*20,//*20,
 
-        .tc_rpt_end = true,
+        .tc_rpt_end = false,
         .tc_rpt_dst = { .addr = {0x80, 0x00, 0x00}, .port = 0x10 },
 
         .cali_angle_elec = (float)M_PI/2,

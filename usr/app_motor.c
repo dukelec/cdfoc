@@ -10,6 +10,10 @@
 #include "math.h"
 #include "app_main.h"
 
+#define CUR_AVG_WINDOW  18 // moving average window sample size is 2^18
+#define CUR_OFFSET_MAX  2200 // current offset max limit (middle 2048)
+#define CUR_OFFSET_MIN  1900 // current offset min limit (middle 2048)
+
 static cdn_sock_t sock_tc_rpt = { .port = 0x10, .ns = &dft_ns };
 static cdn_sock_t sock_raw_dbg = { .port = 0xa, .ns = &dft_ns }; // raw debug
 static list_head_t raw_pend = { 0 };
@@ -236,7 +240,7 @@ static inline void speed_loop_compute(void)
 }
 
 
-// TODO: adc avg during run; read sensor at same time of adc sampling
+// TODO: read sensor at same time of adc sampling
 
 #define HIST_LEN 2
 static uint16_t hist[HIST_LEN] = { 0 };
@@ -246,7 +250,6 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
 {
     gpio_set_value(&led_r, 1);
 
-    static float ia_idle, ib_idle;
     float sin_sen_angle_elec, cos_sen_angle_elec; // reduce the amount of calculations
     int16_t out_pwm_u = 0, out_pwm_v = 0, out_pwm_w = 0;
     bool dbg_str = csa.dbg_str_msk && (csa.loop_cnt % csa.dbg_str_skip) == 0;
@@ -325,9 +328,25 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
     if (dbg_str)
         d_debug_c(" a %d.%.2d %d.%.2d %d.%.2d", P_2F(angle_mech), P_2F(csa.sen_angle_elec), P_2F(csa.cali_angle_elec));
 
-    if (csa.state != ST_STOP) {
-        int32_t ia = HAL_ADCEx_InjectedGetValue(&hadc1, 1) - ia_idle;
-        int32_t ib = HAL_ADCEx_InjectedGetValue(&hadc2, 1) - ib_idle;
+    {
+        static uint32_t cumulative_a, cumulative_b, offset_a, offset_b;
+
+        int32_t adc_a = HAL_ADCEx_InjectedGetValue(&hadc1, 1);
+        int32_t adc_b = HAL_ADCEx_InjectedGetValue(&hadc2, 1);
+
+        if (csa.state == ST_STOP) {
+            cumulative_a = adc_a << CUR_AVG_WINDOW;
+            cumulative_b = adc_b << CUR_AVG_WINDOW;
+            offset_a = adc_a;
+            offset_b = adc_b;
+        }
+
+        cumulative_a  += adc_a - offset_a;
+        cumulative_b  += adc_b - offset_b;
+        offset_a = clip(cumulative_a >> CUR_AVG_WINDOW, CUR_OFFSET_MIN, CUR_OFFSET_MAX);
+        offset_b = clip(cumulative_b >> CUR_AVG_WINDOW, CUR_OFFSET_MIN, CUR_OFFSET_MAX);
+        int32_t ia = adc_a - offset_a;
+        int32_t ib = adc_b - offset_b;
         int32_t ic = -ia - ib;
 
         float i_alpha = ia;
@@ -336,39 +355,10 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
         csa.sen_i_sq = -i_alpha * sin_sen_angle_elec + i_beta * cos_sen_angle_elec;
         csa.sen_i_sd = i_alpha * cos_sen_angle_elec + i_beta * sin_sen_angle_elec;
 
-        /*
-        if (in_current > peak_cur_threshold) {
-            if (++peak_cur_cnt >= peak_cur_duration) {
-                error_flag = ERR_CUR_PROTECT;
-                control_mode = M_STOP;
-                dprintf(DBG_ERROR, "err: current protected, in_cur: %.3f, threshold: %.3f",
-                        in_current, peak_cur_threshold);
-            }
-        } else
-            peak_cur_cnt = 0;
-        */
         if (dbg_str)
-            d_debug_c(", in %5d %5d %5d", ia, ib, ic);
+            d_debug_c(", i %5d %5d %5d", ia, ib, ic);
         if (dbg_str)
-            d_debug_c(", i %5d.%.2d, %5d.%.2d", P_2F(csa.sen_i_sq), P_2F(csa.sen_i_sd));
-
-    } else { // state: stop
-        static int i_cnt = 0;
-        static int32_t ia_sum = 0;
-        static int32_t ib_sum = 0;
-        ia_sum += HAL_ADCEx_InjectedGetValue(&hadc1, 1);
-        ib_sum += HAL_ADCEx_InjectedGetValue(&hadc2, 1);
-
-        if (++i_cnt == 5) {
-            ia_idle = DIV_ROUND_CLOSEST(ia_sum, 5);
-            ib_idle = DIV_ROUND_CLOSEST(ib_sum, 5);
-            ia_sum = ib_sum = 0;
-            i_cnt = 0;
-        }
-        if (dbg_str)
-            d_debug_c(", in %5d.%.2d %5d.%.2d", P_2F(ia_idle), P_2F(ib_idle));
-
-        csa.sen_i_sq = csa.sen_i_sd = 0;
+            d_debug_c(" (q %5d.%.2d, d %5d.%.2d)", P_2F(csa.sen_i_sq), P_2F(csa.sen_i_sd));
     }
 
     // current --> pwm
