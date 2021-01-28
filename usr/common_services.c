@@ -166,8 +166,9 @@ static uint8_t csa_w_hook_exec(bool rw, uint16_t offset, uint8_t len, uint8_t *d
 static void p5_service_routine(void)
 {
     uint8_t ret_val = 0;
-    // read:  0x00, offset_16, len_8   | return [0x80, data]
-    // write: 0x20, offset_16 + [data] | return [0x80] on success
+    // read:        0x00, offset_16, len_8   | return [0x80, data]
+    // read_dft:    0x01, offset_16, len_8   | return [0x80, data]
+    // write:       0x20, offset_16 + [data] | return [0x80] on success
 
     cdn_pkt_t *pkt = cdn_sock_recvfrom(&sock5);
     if (!pkt)
@@ -221,6 +222,14 @@ static void p5_service_routine(void)
         pkt->len = 1;
         pkt->dat[0] = 0x80 | ret_val;
 
+    } else if (pkt->dat[0] == 0x01 && pkt->len == 4) {
+            uint16_t offset = *(uint16_t *)(pkt->dat + 1);
+            uint8_t len = min(pkt->dat[3], CDN_MAX_DAT - 1);
+            memcpy(pkt->dat + 1, ((void *) &csa_dft) + offset, len);
+            d_debug("csa read_dft: %04x %d\n", offset, len);
+            pkt->dat[0] = 0x80;
+            pkt->len = len + 1;
+
     } else {
         list_put(&dft_ns.free_pkts, &pkt->node);
         d_warn("csa: wrong cmd, len: %d\n", pkt->len);
@@ -239,6 +248,14 @@ static void p6_service_routine(void)
     cdn_pkt_t *pkt = cdn_sock_recvfrom(&sock6);
     if (!pkt)
         return;
+
+    if (pkt->dat[0] == 0x2f) { // multicast
+        if (1 + csa.qxchg_mcast.offset + csa.qxchg_mcast.size <= pkt->len) {
+            memmove(&pkt->dat[1], &pkt->dat[1 + csa.qxchg_mcast.offset], csa.qxchg_mcast.size);
+            pkt->dat[0] = 0x20;
+            pkt->len = 1 + csa.qxchg_mcast.size;
+        }
+    }
 
     if (pkt->dat[0] == 0x20 && pkt->len >= 1) {
         uint8_t *src_dat = pkt->dat + 1;

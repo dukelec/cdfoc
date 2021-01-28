@@ -14,8 +14,8 @@
 #define CUR_OFFSET_MAX  2200 // current offset max limit (middle 2048)
 #define CUR_OFFSET_MIN  1900 // current offset min limit (middle 2048)
 
-static cdn_sock_t sock_tc_rpt = { .port = 0x10, .ns = &dft_ns };
-static cdn_sock_t sock_raw_dbg = { .port = 0xa, .ns = &dft_ns }; // raw debug
+static cdn_sock_t sock_tc_rpt = { .port = 0x10, .ns = &dft_ns, .tx_only = true };
+static cdn_sock_t sock_raw_dbg = { .port = 0xa, .ns = &dft_ns, .tx_only = true }; // raw debug
 static list_head_t raw_pend = { 0 };
 
 
@@ -58,6 +58,7 @@ void app_motor_routine(void)
         if (csa.tc_state == 0 && tc_state_old != 0) {
             cdn_pkt_t *pkt = cdn_pkt_get(&dft_ns.free_pkts);
             if (pkt) {
+                cdn_init_pkt(pkt);
                 pkt->dst = csa.tc_rpt_dst;
                 pkt->dat[0] = 0x40;
                 pkt->len = 1;
@@ -101,6 +102,7 @@ static void raw_dbg(int idx)
 
         } else {
             pkt_raw[idx] = cdn_pkt_get(&dft_ns.free_pkts);
+            cdn_init_pkt(pkt_raw[idx]);
             pkt_raw[idx]->dst = csa.dbg_raw_dst;
             pkt_raw[idx]->dat[0] = 0x40 | idx;
             *(uint32_t *)(pkt_raw[idx]->dat + 1) = csa.loop_cnt;

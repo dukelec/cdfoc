@@ -84,12 +84,13 @@ typedef struct {
     uint16_t        bias_encoder;
     int32_t         bias_pos;
 
+    regr_t          qxchg_mcast;     // for multicast
     regr_t          qxchg_set[10];
     regr_t          qxchg_ret[10];
     regr_t          qxchg_ro[10];
 
     uint8_t         dbg_str_msk;
-    uint16_t        dbg_str_skip;     // for period string debug
+    uint16_t        dbg_str_skip;    // for period string debug
 
     cdn_sockaddr_t  dbg_raw_dst;
     uint8_t         dbg_raw_msk;
@@ -152,6 +153,7 @@ typedef struct {
 
 
 extern csa_t csa;
+extern const csa_t csa_dft;
 
 extern regr_t csa_w_allow[]; // writable list
 extern int csa_w_allow_num;
