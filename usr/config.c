@@ -86,7 +86,6 @@ const csa_t csa_dft = {
         .dbg_raw_dst = { .addr = {0x80, 0x00, 0x00}, .port = 0xa },
         .dbg_raw_msk = 0,
         .dbg_raw_th = 200,
-        .dbg_raw_skip = { 0, 0, 0, 0 },
         .dbg_raw = {
                 { // cur : target (cal_current), i_term, last_input
                         { .offset = offsetof(csa_t, pid_i_sq) + offsetof(pid_f_t, target), .size = 4 * 3 },
@@ -262,7 +261,6 @@ void csa_list_show(void)
     CSA_SHOW_SUB(dbg_raw_dst, cdn_sockaddr_t, port, "Send raw debug data to this port");
     CSA_SHOW(dbg_raw_msk, "Config which raw debug data to be send");
     CSA_SHOW(dbg_raw_th, "Config raw debug data package size");
-    CSA_SHOW(dbg_raw_skip, "Reduce raw debug data");
     CSA_SHOW(dbg_raw[0], "Config raw debug for current loop");
     CSA_SHOW(dbg_raw[1], "Config raw debug for speed loop");
     CSA_SHOW(dbg_raw[2], "Config raw debug for position loop");

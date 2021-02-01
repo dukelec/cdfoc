@@ -95,7 +95,6 @@ typedef struct {
     cdn_sockaddr_t  dbg_raw_dst;
     uint8_t         dbg_raw_msk;
     uint8_t         dbg_raw_th;      // len threshold (+ 1 samples < pkt size)
-    uint8_t         dbg_raw_skip[4]; // take samples every few times
     regr_t          dbg_raw[4][10];  // for: cur, speed, pos, tcurve
 
     int32_t         tc_pos;

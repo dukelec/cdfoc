@@ -72,22 +72,15 @@ void app_motor_routine(void)
 static void raw_dbg(int idx)
 {
     static cdn_pkt_t *pkt_raw[4] = { NULL };
-    static uint8_t skip_cnt[4] = { 0 };
     static bool pkt_less = false;
 
     if (!(csa.dbg_raw_msk & (1 << idx))) {
-        skip_cnt[idx] = 0;
         if (pkt_raw[idx]) {
             list_put(&dft_ns.free_pkts, &pkt_raw[idx]->node);
             pkt_raw[idx] = NULL;
         }
         return;
     }
-
-    if (++skip_cnt[idx] >= csa.dbg_raw_skip[idx])
-        skip_cnt[idx] = 0;
-    if (skip_cnt[idx] != 0)
-        return;
 
     if (pkt_less) {
         if (raw_pend.len == 0) {
@@ -106,8 +99,7 @@ static void raw_dbg(int idx)
             pkt_raw[idx]->dst = csa.dbg_raw_dst;
             pkt_raw[idx]->dat[0] = 0x40 | idx;
             *(uint32_t *)(pkt_raw[idx]->dat + 1) = csa.loop_cnt;
-            pkt_raw[idx]->dat[5] = csa.dbg_raw_skip[idx];
-            pkt_raw[idx]->len = 6;
+            pkt_raw[idx]->len = 5;
         }
     }
     if (!pkt_raw[idx])
