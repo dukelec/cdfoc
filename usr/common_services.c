@@ -64,9 +64,10 @@ static void p1_service_routine(void)
 // flash memory manipulation
 static void p8_service_routine(void)
 {
-    // erase: 0x2f, addr_32, len_32  | return [0x80] on success
-    // read:  0x00, addr_32, len_8   | return [0x80, data]
-    // write: 0x20, addr_32 + [data] | return [0x80] on success
+    // erase:   0x2f, addr_32, len_32  | return [0x80] on success
+    // write:   0x20, addr_32 + [data] | return [0x80] on success
+    // read:    0x00, addr_32, len_8   | return [0x80, data]
+    // cal crc: 0x10, addr_32, len_32  | return [0x80, crc_16]
 
     cdn_pkt_t *pkt = cdn_sock_recvfrom(&sock8);
     if (!pkt)
@@ -116,7 +117,17 @@ static void p8_service_routine(void)
         d_debug("nvm write: %08x %d(%d), ret: %d\n", dst_dat, len, cnt, ret);
         pkt->len = 1;
         pkt->dat[0] = ret == HAL_OK ? 0x80 : 0x81;
+/*
+    } else if (pkt->len == 9 && pkt->dat[0] == 0x10) {
+        uint32_t f_addr = *(uint32_t *)(pkt->dat + 1);
+        uint32_t f_len = *(uint32_t *)(pkt->dat + 5);
+        uint16_t crc = crc16((const uint8_t *)f_addr, f_len);
 
+        d_debug("nvm crc addr: %x, len: %x, crc: %02x", f_addr, f_len, crc);
+        *(uint16_t *)(pkt->dat + 1) = crc;
+        pkt->dat[0] = 0x80;
+        pkt->len = 3;
+*/
     } else {
         list_put(&dft_ns.free_pkts, &pkt->node);
         d_warn("nvm: wrong cmd, len: %d\n", pkt->len);
