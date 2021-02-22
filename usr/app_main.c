@@ -19,8 +19,8 @@ gpio_t led_g = { .group = LED_G_GPIO_Port, .num = LED_G_Pin };
 gpio_t dbg_out = { .group = DBG_OUT_GPIO_Port, .num = DBG_OUT_Pin };
 
 static gpio_t drv_cs = { .group = DRV_CS_GPIO_Port, .num = DRV_CS_Pin };
-static gpio_t s_cs = { .group = SEN_CS_GPIO_Port, .num = SEN_CS_Pin };
-static spi_t s_spi = { .hspi = &hspi3, .ns_pin = &s_cs };
+//static gpio_t s_cs = { .group = SEN_CS_GPIO_Port, .num = SEN_CS_Pin };
+//static spi_t s_spi = { .hspi = &hspi3, .ns_pin = &s_cs };
 
 uart_t debug_uart = { .huart = &huart3 };
 
@@ -48,9 +48,8 @@ static void device_init(void)
     for (i = 0; i < PACKET_MAX; i++)
         list_put(&dft_ns.free_pkts, &packet_alloc[i].node);
 
-    cdctl_dev_init(&r_dev, &frame_free_head, csa.bus_mac,
-            csa.bus_baud_low, csa.bus_baud_high, &r_spi, &r_rst, &r_int);
-    cdn_add_intf(&dft_ns, &r_dev.cd_dev, csa.bus_net, csa.bus_mac);
+    cdctl_dev_init(&r_dev, &frame_free_head, &csa.bus_cfg, &r_spi, &r_rst, &r_int);
+    cdn_add_intf(&dft_ns, &r_dev.cd_dev, csa.bus_net, csa.bus_cfg.mac);
 }
 
 void set_led_state(led_state_t state)
@@ -106,6 +105,18 @@ static void stack_check(void)
 }
 
 #if 1
+// MA73x: SPI_POLARITY_LOW, SPI_PHASE_1EDGE, 16BIT, hw-cs
+uint16_t encoder_read(void)
+{
+    uint16_t buf_tx[1] = { 0 };
+    uint16_t buf_rx[1];
+
+    HAL_SPI_TransmitReceive(&hspi3, (uint8_t *)buf_tx, (uint8_t *)buf_rx, 1, HAL_MAX_DELAY);
+    //d_debug("%04x %04x\n", buf[0], buf[1]);
+    return 0xffff - buf_rx[0];
+}
+
+#elif 1
 // TLE5012B: SPI_POLARITY_LOW, SPI_PHASE_2EDGE, 16BIT
 uint16_t encoder_read(void)
 {

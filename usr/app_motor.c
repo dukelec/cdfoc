@@ -194,7 +194,7 @@ static inline void position_loop_compute(void)
     pid_i_set_target(&csa.pid_pos, csa.cal_pos);
     csa.cal_speed = pid_i_compute(&csa.pid_pos, csa.sen_pos);
 
-    raw_dbg(3);
+    raw_dbg(4);
 }
 
 
@@ -216,7 +216,7 @@ static inline void speed_loop_compute(void)
         if (++sub_cnt == 5) {
             sub_cnt = 0;
             position_loop_compute();
-            raw_dbg(2);
+            raw_dbg(3);
         }
 
         if (csa.state < ST_CONST_SPEED) {
@@ -229,7 +229,7 @@ static inline void speed_loop_compute(void)
             csa.cal_current = lroundf(pid_f_compute_no_d(&csa.pid_speed, csa.sen_speed));
         }
 
-        raw_dbg(1);
+        raw_dbg(2);
     }
 }
 
@@ -408,6 +408,7 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
 
     speed_loop_compute();
     raw_dbg(0);
+    raw_dbg(1);
     csa.loop_cnt++;
     gpio_set_value(&led_r, 0);
 }

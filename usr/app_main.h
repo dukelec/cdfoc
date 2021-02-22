@@ -24,7 +24,7 @@
 
 
 #define APP_CONF_ADDR       0x0801f800 // page 63, the last page
-#define APP_CONF_VER        0x0002
+#define APP_CONF_VER        0x0102
 
 #define CURRENT_LOOP_FREQ   (170000000 / 4096 / 2)
 #define DRV_PWM_HALF        2048
@@ -62,13 +62,8 @@ typedef struct {
     bool            _reserved;
     bool            save_conf;
 
-    //uint8_t       bus_mode; // a, bs, trad
     uint8_t         bus_net;
-    uint8_t         bus_mac;
-    uint32_t        bus_baud_low;
-    uint32_t        bus_baud_high;
-    //uint16_t      bus_tx_premit_len;
-    //uint16_t      bus_max_idle_len;
+    cdctl_cfg_t     bus_cfg;
     bool            dbg_en;
     cdn_sockaddr_t  dbg_dst;
 
@@ -85,9 +80,9 @@ typedef struct {
     int32_t         bias_pos;
 
     regr_t          qxchg_mcast;     // for multicast
-    regr_t          qxchg_set[10];
-    regr_t          qxchg_ret[10];
-    regr_t          qxchg_ro[10];
+    regr_t          qxchg_set[5];
+    regr_t          qxchg_ret[5];
+    regr_t          qxchg_ro[5];
 
     uint8_t         dbg_str_msk;
     uint16_t        dbg_str_skip;    // for period string debug
@@ -95,7 +90,7 @@ typedef struct {
     cdn_sockaddr_t  dbg_raw_dst;
     uint8_t         dbg_raw_msk;
     uint8_t         dbg_raw_th;      // len threshold (+ 1 samples < pkt size)
-    regr_t          dbg_raw[4][10];  // for: cur, speed, pos, tcurve
+    regr_t          dbg_raw[5][6];  // for: cur, speed, pos, tcurve
 
     int32_t         tc_pos;
     uint32_t        tc_speed;
