@@ -204,7 +204,8 @@ void cali_elec_angle(void)
     static int sub_cnt;
     static uint32_t t_last;
     static uint16_t a0, a1;
-    static int amount;
+    static int amount_f, amount_r;
+    static int dir = 1; // -1 or +1
 
     if (!csa.cali_run)
         return;
@@ -215,7 +216,8 @@ void cali_elec_angle(void)
         csa.state = ST_CALI;
         t_last = get_systick();
         pole_cnt = sub_cnt = 0;
-        amount = 0;
+        amount_f = amount_r = 0;
+        dir = 1;
         d_info("cali: init...\n");
         d_info("cali: ----------------\n");
     }
@@ -225,37 +227,61 @@ void cali_elec_angle(void)
         return;
     t_last = t_cur;
 
-    d_info("cali: pole: %d, sub: %d\n", pole_cnt, sub_cnt);
+    d_debug("cali [%d, %d]", pole_cnt, sub_cnt);
 
     if (sub_cnt == 0) {
         a0 = csa.ori_encoder;
-        d_info("cali: a0: %04x\n", a0);
-    }
-
-    if (sub_cnt == 2) {
+        d_debug_c(" - a0: %04x\n", a0);
+    } else if (sub_cnt == 2) {
         a1 = csa.ori_encoder;
-        d_info("cali: a1: %04x\n", a1);
+        d_debug_c(" - a1: %04x\n", a1);
+    } else {
+        d_debug_c("\n");
     }
 
-    if (sub_cnt == 3) {
+    if ((dir == 1 && sub_cnt == 3) || (dir == -1 && sub_cnt == 0)) {
 
         uint16_t n = a0 + (a1 - a0) / 2;
         uint16_t m = a0 + (a1 - a0) / 2 - (65536 * pole_cnt / csa.motor_poles);
         d_info("cali: n: %04x, m: %04x\n", n, m);
         d_info("cali: ----------------\n");
-        amount += m;
+        if (dir == 1)
+            amount_f += m;
+        else
+            amount_r += m;
 
-        sub_cnt = 0;
-        pole_cnt++;
-        if (pole_cnt == csa.motor_poles) {
+        if (dir == -1 && pole_cnt == 0) {
+            d_info("cali: finished, avg+: %04x\n", amount_f / csa.motor_poles);
+            d_info("cali: finished, avg-: %04x\n", amount_r / csa.motor_poles);
+            d_info("cali: finished, avg : %04x\n", (amount_f + amount_r) / csa.motor_poles / 2);
             csa.state = ST_STOP;
             csa.cali_run = false;
             pole_cnt = -1;
-            d_info("cali: finished, avg: %04x\n", amount / csa.motor_poles);
         }
-    } else {
-        sub_cnt++;
     }
+
+    if (csa.cali_run) {
+        if (dir == 1) {
+            sub_cnt++;
+            if (sub_cnt > 3) {
+                sub_cnt = 0;
+                pole_cnt++;
+                if (pole_cnt == csa.motor_poles) {
+                    pole_cnt = csa.motor_poles - 1;
+                    dir = -1;
+                    sub_cnt = 3;
+                    d_info("cali: ================\n");
+                }
+            }
+        } else {
+            sub_cnt--;
+            if (sub_cnt < 0) {
+                sub_cnt = 3;
+                pole_cnt--;
+            }
+        }
+    }
+
     csa.cali_angle_elec = (float)M_PI/2 * sub_cnt;
 }
 
