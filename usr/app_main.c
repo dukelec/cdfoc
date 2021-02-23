@@ -113,7 +113,7 @@ uint16_t encoder_read(void)
 
     HAL_SPI_TransmitReceive(&hspi3, (uint8_t *)buf_tx, (uint8_t *)buf_rx, 1, HAL_MAX_DELAY);
     //d_debug("%04x %04x\n", buf[0], buf[1]);
-    return 0xffff - buf_rx[0];
+    return buf_rx[0];
 }
 
 #elif 1

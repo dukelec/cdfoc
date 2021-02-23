@@ -228,31 +228,24 @@ void csa_list_show(void)
     CSA_SHOW_SUB(0, pid_pos, pid_i_t, kd, "");
     CSA_SHOW_SUB(0, pid_pos, pid_i_t, out_min, "");
     CSA_SHOW_SUB(0, pid_pos, pid_i_t, out_max, "");
-    CSA_SHOW_SUB(0, pid_pos, pid_i_t, period, "");
     d_info("\n"); debug_flush(true);
 
     CSA_SHOW_SUB(0, pid_speed, pid_f_t, kp, "");
     CSA_SHOW_SUB(0, pid_speed, pid_f_t, ki, "");
-    CSA_SHOW_SUB(0, pid_speed, pid_f_t, kd, "");
     CSA_SHOW_SUB(0, pid_speed, pid_f_t, out_min, "");
     CSA_SHOW_SUB(0, pid_speed, pid_f_t, out_max, "");
-    CSA_SHOW_SUB(0, pid_speed, pid_f_t, period, "");
     d_info("\n"); debug_flush(true);
 
     CSA_SHOW_SUB(0, pid_i_sq, pid_f_t, kp, "");
     CSA_SHOW_SUB(0, pid_i_sq, pid_f_t, ki, "");
-    CSA_SHOW_SUB(0, pid_i_sq, pid_f_t, kd, "");
     CSA_SHOW_SUB(0, pid_i_sq, pid_f_t, out_min, "");
     CSA_SHOW_SUB(0, pid_i_sq, pid_f_t, out_max, "");
-    CSA_SHOW_SUB(0, pid_i_sq, pid_f_t, period, "");
     d_info("\n"); debug_flush(true);
 
     CSA_SHOW_SUB(0, pid_i_sd, pid_f_t, kp, "");
     CSA_SHOW_SUB(0, pid_i_sd, pid_f_t, ki, "");
-    CSA_SHOW_SUB(0, pid_i_sd, pid_f_t, kd, "");
     CSA_SHOW_SUB(0, pid_i_sd, pid_f_t, out_min, "");
     CSA_SHOW_SUB(0, pid_i_sd, pid_f_t, out_max, "");
-    CSA_SHOW_SUB(0, pid_i_sd, pid_f_t, period, "");
     d_info("\n"); debug_flush(true);
 
     CSA_SHOW(0, bias_encoder, "Offset for encoder value");
@@ -270,10 +263,11 @@ void csa_list_show(void)
     CSA_SHOW_SUB(1, dbg_raw_dst, cdn_sockaddr_t, port, "Send raw debug data to this port");
     CSA_SHOW(1, dbg_raw_msk, "Config which raw debug data to be send");
     CSA_SHOW(0, dbg_raw_th, "Config raw debug data package size");
-    CSA_SHOW(1, dbg_raw[0], "Config raw debug for current loop");
-    CSA_SHOW(1, dbg_raw[1], "Config raw debug for speed loop");
-    CSA_SHOW(1, dbg_raw[2], "Config raw debug for position loop");
-    CSA_SHOW(1, dbg_raw[3], "Config raw debug for position plan");
+    CSA_SHOW(1, dbg_raw[0], "Config raw debug for current sq loop");
+    CSA_SHOW(1, dbg_raw[1], "Config raw debug for current sd loop");
+    CSA_SHOW(1, dbg_raw[2], "Config raw debug for speed loop");
+    CSA_SHOW(1, dbg_raw[3], "Config raw debug for position loop");
+    CSA_SHOW(1, dbg_raw[4], "Config raw debug for position plan");
     d_info("\n"); debug_flush(true);
 
     CSA_SHOW(0, tc_pos, "Set target position");
@@ -289,7 +283,7 @@ void csa_list_show(void)
     CSA_SHOW(0, cali_angle_step, "Calibration mode speed");
     d_info("\n"); debug_flush(true);
 
-    CSA_SHOW(0, state, "0: stop, 1: cur loop, 2: speed loop, 3: pos loop, 4: t_curve");
+    CSA_SHOW(0, state, "0: stop, 1: calibrate, 2: cur loop, 3: speed loop, 4: pos loop, 5: t_curve");
     //CSA_SHOW(0, err_flag, "not used");
     d_info("\n"); debug_flush(true);
 

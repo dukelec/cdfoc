@@ -71,7 +71,7 @@ void app_motor_routine(void)
 
 static void raw_dbg(int idx)
 {
-    static cdn_pkt_t *pkt_raw[4] = { NULL };
+    static cdn_pkt_t *pkt_raw[5] = { NULL };
     static bool pkt_less = false;
 
     if (!(csa.dbg_raw_msk & (1 << idx))) {
@@ -105,7 +105,7 @@ static void raw_dbg(int idx)
     if (!pkt_raw[idx])
         return;
 
-    for (int i = 0; i < 10; i++) {
+    for (int i = 0; i < 6; i++) {
         regr_t *regr = &csa.dbg_raw[idx][i];
         if (!regr->size)
             break;
