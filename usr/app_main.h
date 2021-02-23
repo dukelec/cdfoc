@@ -24,7 +24,7 @@
 
 
 #define APP_CONF_ADDR       0x0801f800 // page 63, the last page
-#define APP_CONF_VER        0x0102
+#define APP_CONF_VER        0x0103
 
 #define CURRENT_LOOP_FREQ   (170000000 / 4096 / 2)
 #define DRV_PWM_HALF        2048
@@ -102,6 +102,7 @@ typedef struct {
     float           cali_angle_elec;
     float           cali_current;
     float           cali_angle_step; // increase cali_angle_elec
+    bool            cali_run;
 
     // end of eeprom
 

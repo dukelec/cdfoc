@@ -7,6 +7,7 @@
  * Author: Duke Fong <duke@dukelec.com>
  */
 
+#include "math.h"
 #include "app_main.h"
 
 extern SPI_HandleTypeDef hspi1;
@@ -197,6 +198,68 @@ static void drv_write_reg(uint8_t reg, uint16_t val)
 }
 
 
+void cali_elec_angle(void)
+{
+    static int pole_cnt = -1;
+    static int sub_cnt;
+    static uint32_t t_last;
+    static uint16_t a0, a1;
+    static int amount;
+
+    if (!csa.cali_run)
+        return;
+
+    if (pole_cnt == -1) {
+        csa.cali_angle_elec = 0;
+        csa.cali_angle_step = 0;
+        csa.state = ST_CALI;
+        t_last = get_systick();
+        pole_cnt = sub_cnt = 0;
+        amount = 0;
+        d_info("cali: init...\n");
+        d_info("cali: ----------------\n");
+    }
+
+    uint32_t t_cur = get_systick();
+    if (t_cur - t_last < 1000000 / SYSTICK_US_DIV)
+        return;
+    t_last = t_cur;
+
+    d_info("cali: pole: %d, sub: %d\n", pole_cnt, sub_cnt);
+
+    if (sub_cnt == 0) {
+        a0 = csa.ori_encoder;
+        d_info("cali: a0: %04x\n", a0);
+    }
+
+    if (sub_cnt == 2) {
+        a1 = csa.ori_encoder;
+        d_info("cali: a1: %04x\n", a1);
+    }
+
+    if (sub_cnt == 3) {
+
+        uint16_t n = a0 + (a1 - a0) / 2;
+        uint16_t m = a0 + (a1 - a0) / 2 - (65536 * pole_cnt / csa.motor_poles);
+        d_info("cali: n: %04x, m: %04x\n", n, m);
+        d_info("cali: ----------------\n");
+        amount += m;
+
+        sub_cnt = 0;
+        pole_cnt++;
+        if (pole_cnt == csa.motor_poles) {
+            csa.state = ST_STOP;
+            csa.cali_run = false;
+            pole_cnt = -1;
+            d_info("cali: finished, avg: %04x\n", amount / csa.motor_poles);
+        }
+    } else {
+        sub_cnt++;
+    }
+    csa.cali_angle_elec = (float)M_PI/2 * sub_cnt;
+}
+
+
 void app_main(void)
 {
     printf("\nstart app_main (mdrv)...\n");
@@ -259,6 +322,7 @@ void app_main(void)
         app_motor_routine();
         cdn_routine(&dft_ns); // handle cdnet
         common_service_routine();
+        cali_elec_angle();
         debug_flush(false);
     }
 }

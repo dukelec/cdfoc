@@ -248,7 +248,8 @@ void csa_list_show(void)
     CSA_SHOW_SUB(0, pid_i_sd, pid_f_t, out_max, "");
     d_info("\n"); debug_flush(true);
 
-    CSA_SHOW(0, bias_encoder, "Offset for encoder value");
+    CSA_SHOW(0, motor_poles, "Motor poles");
+    CSA_SHOW(1, bias_encoder, "Offset for encoder value");
     CSA_SHOW(0, bias_pos, "Offset for pos value");
     CSA_SHOW(1, qxchg_set, "Config the write data components for quick-exchange channel");
     CSA_SHOW(1, qxchg_ret, "Config the return data components for quick-exchange channel");
@@ -281,6 +282,7 @@ void csa_list_show(void)
     CSA_SHOW(0, cali_angle_elec, "Calibration mode angle");
     CSA_SHOW(0, cali_current, "Calibration mode current");
     CSA_SHOW(0, cali_angle_step, "Calibration mode speed");
+    CSA_SHOW(0, cali_run, "0: stopped, write 1 start calibration");
     d_info("\n"); debug_flush(true);
 
     CSA_SHOW(0, state, "0: stop, 1: calibrate, 2: cur loop, 3: speed loop, 4: pos loop, 5: t_curve");
@@ -294,13 +296,13 @@ void csa_list_show(void)
     CSA_SHOW(0, cal_i_sd, "i_sd info");
     d_info("\n"); debug_flush(true);
 
-    CSA_SHOW(0, ori_encoder, "noc_encoder before add offset");
+    CSA_SHOW(1, ori_encoder, "noc_encoder before add offset");
     CSA_SHOW(0, ori_pos, "sen_pos before add offset");
     d_info("\n"); debug_flush(true);
 
     CSA_SHOW(0, delta_encoder, "encoder value delta");
-    CSA_SHOW(0, noc_encoder, "encoder value");
-    CSA_SHOW(0, sen_encoder, "encoder value filtered");
+    CSA_SHOW(1, noc_encoder, "encoder value");
+    CSA_SHOW(1, sen_encoder, "encoder value filtered");
     CSA_SHOW(0, sen_pos, "multiturn + sen_encoder data");
     CSA_SHOW(0, sen_speed, "delta_encoder filtered");
     CSA_SHOW(0, sen_i_sq, "i_sq from adc");
