@@ -117,6 +117,33 @@ uint16_t encoder_read(void)
     return buf_rx[0];
 }
 
+uint16_t encoder_reg_r(uint8_t addr)
+{
+    uint16_t buf_tx[1];
+    uint16_t buf_rx[1];
+    buf_tx[0] = (0x40 | addr) << 8;
+    HAL_SPI_TransmitReceive(&hspi3, (uint8_t *)buf_tx, (uint8_t *)buf_rx, 1, HAL_MAX_DELAY);
+    buf_tx[0] = 0;
+    HAL_SPI_TransmitReceive(&hspi3, (uint8_t *)buf_tx, (uint8_t *)buf_rx, 1, HAL_MAX_DELAY);
+    if ((buf_rx[0] & 0xff) != 0)
+        d_error("enc reg r, err ret: %04x\n", buf_rx[0]);
+    return buf_rx[0] >> 8;
+}
+
+void encoder_reg_w(uint8_t addr, uint16_t val)
+{
+    uint16_t buf_tx[1];
+    uint16_t buf_rx[1];
+    buf_tx[0] = ((0x80 | addr) << 8) | val;
+    HAL_SPI_TransmitReceive(&hspi3, (uint8_t *)buf_tx, (uint8_t *)buf_rx, 1, HAL_MAX_DELAY);
+    delay_systick(50000 / SYSTICK_US_DIV);
+    buf_tx[0] = 0;
+    HAL_SPI_TransmitReceive(&hspi3, (uint8_t *)buf_tx, (uint8_t *)buf_rx, 1, HAL_MAX_DELAY);
+    if (((buf_rx[0] & 0xff) != 0) || (buf_rx[0] >> 8) != val)
+        d_error("enc reg w, err ret: %04x\n", buf_rx[0]);
+    return;
+}
+
 #elif 1
 // TLE5012B: SPI_POLARITY_LOW, SPI_PHASE_2EDGE, 16BIT
 uint16_t encoder_read(void)
@@ -251,9 +278,10 @@ void cali_elec_angle(void)
             amount_r += m;
 
         if (dir == -1 && pole_cnt == 0) {
-            d_info("cali: finished, avg+: %04x\n", amount_f / csa.motor_poles);
-            d_info("cali: finished, avg-: %04x\n", amount_r / csa.motor_poles);
-            d_info("cali: finished, avg : %04x\n", (amount_f + amount_r) / csa.motor_poles / 2);
+            d_info("cali: finished, result:\n");
+            d_info("cali:  cw: %02x\n", amount_f / csa.motor_poles);
+            d_info("cali: ccw: %02x\n", amount_r / csa.motor_poles);
+            d_info("cali: avg: %02x\n", (amount_f + amount_r) / csa.motor_poles / 2);
             csa.state = ST_STOP;
             csa.cali_run = false;
             pole_cnt = -1;
@@ -312,7 +340,19 @@ void app_main(void)
     d_debug("drv 03: %04x\n", drv_read_reg(0x03));
     d_debug("drv 04: %04x\n", drv_read_reg(0x04));
 
-
+    d_debug("sen reg  RD: %04x\n", encoder_reg_r(0x9));
+    d_debug("sen reg  FW: %04x\n", encoder_reg_r(0xe));
+    d_debug("sen reg HYS: %04x\n", encoder_reg_r(0x10));
+    d_debug("sen reg  MG: %04x\n", encoder_reg_r(0x1b));
+    if (encoder_reg_r(0xe) > 0x77) {
+        d_debug("sen set FW to 0x77 (119)\n");
+        encoder_reg_w(0xe, 0x77);
+    }
+    /*
+    if (encoder_reg_r(0x9) != 0) {
+        d_debug("sen set RD to 0\n");
+        encoder_reg_w(0x9, 0);
+    }*/
 
 #if 0
     d_debug("sen reg1: %x\n", encoder_reg_r(1));
