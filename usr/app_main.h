@@ -24,7 +24,7 @@
 
 
 #define APP_CONF_ADDR       0x0801f800 // page 63, the last page
-#define APP_CONF_VER        0x0103
+#define APP_CONF_VER        0x0104
 
 #define CURRENT_LOOP_FREQ   (170000000 / 4096 / 2)
 #define DRV_PWM_HALF        2048
@@ -90,7 +90,7 @@ typedef struct {
     cdn_sockaddr_t  dbg_raw_dst;
     uint8_t         dbg_raw_msk;
     uint8_t         dbg_raw_th;      // len threshold (+ 1 samples < pkt size)
-    regr_t          dbg_raw[5][6];  // for: cur, speed, pos, tcurve
+    regr_t          dbg_raw[4][6];  // for: cur, speed, pos, tcurve
 
     int32_t         tc_pos;
     uint32_t        tc_speed;

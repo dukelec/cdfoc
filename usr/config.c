@@ -87,12 +87,10 @@ const csa_t csa_dft = {
         .dbg_raw = {
                 { // cur : target (i_sq), i_term, last_input
                         { .offset = offsetof(csa_t, pid_i_sq) + offsetof(pid_f_t, target), .size = 4 * 3 },
-                        { .offset = offsetof(csa_t, sen_encoder), .size = 2 },
-                        { .offset = offsetof(csa_t, noc_encoder), .size = 2 }
-                }, { // cur : target (i_sd), i_term, last_input
-                        { .offset = offsetof(csa_t, pid_i_sd) + offsetof(pid_f_t, target), .size = 4 * 3 },
-                        { .offset = offsetof(csa_t, sen_encoder), .size = 2 },
-                        { .offset = offsetof(csa_t, noc_encoder), .size = 2 }
+                        // i_term, last_input
+                        { .offset = offsetof(csa_t, pid_i_sd) + offsetof(pid_f_t, i_term), .size = 4 * 2 },
+                        { .offset = offsetof(csa_t, sen_encoder), .size = 2 }
+                        //{ .offset = offsetof(csa_t, noc_encoder), .size = 2 }
                 }, { // speed
                         { .offset = offsetof(csa_t, pid_speed) + offsetof(pid_f_t, target), .size = 4 * 3 },
                         { .offset = offsetof(csa_t, cal_current), .size = 4 },
@@ -264,16 +262,15 @@ void csa_list_show(void)
     CSA_SHOW_SUB(1, dbg_raw_dst, cdn_sockaddr_t, port, "Send raw debug data to this port");
     CSA_SHOW(1, dbg_raw_msk, "Config which raw debug data to be send");
     CSA_SHOW(0, dbg_raw_th, "Config raw debug data package size");
-    CSA_SHOW(1, dbg_raw[0], "Config raw debug for current sq loop");
-    CSA_SHOW(1, dbg_raw[1], "Config raw debug for current sd loop");
-    CSA_SHOW(1, dbg_raw[2], "Config raw debug for speed loop");
-    CSA_SHOW(1, dbg_raw[3], "Config raw debug for position loop");
-    CSA_SHOW(1, dbg_raw[4], "Config raw debug for position plan");
+    CSA_SHOW(1, dbg_raw[0], "Config raw debug for current loop");
+    CSA_SHOW(1, dbg_raw[1], "Config raw debug for speed loop");
+    CSA_SHOW(1, dbg_raw[2], "Config raw debug for position loop");
+    CSA_SHOW(1, dbg_raw[3], "Config raw debug for position plan");
     d_info("\n"); debug_flush(true);
 
-    CSA_SHOW(0, tc_pos, "Set target position");
-    CSA_SHOW(0, tc_speed, "Set target speed");
-    CSA_SHOW(0, tc_accel, "Set target accel");
+    CSA_SHOW(1, tc_pos, "Set target position");
+    CSA_SHOW(1, tc_speed, "Set target speed");
+    CSA_SHOW(1, tc_accel, "Set target accel");
     CSA_SHOW(0, tc_rpt_end, "Report finish event");
     CSA_SHOW_SUB(2, tc_rpt_dst, cdn_sockaddr_t, addr, "Send report to this address");
     CSA_SHOW_SUB(1, tc_rpt_dst, cdn_sockaddr_t, port, "Send report to this port");
@@ -289,22 +286,22 @@ void csa_list_show(void)
     //CSA_SHOW(0, err_flag, "not used");
     d_info("\n"); debug_flush(true);
 
-    CSA_SHOW(0, cal_pos, "pos loop target");
-    CSA_SHOW(0, cal_speed, "speed loop target");
+    CSA_SHOW(1, cal_pos, "pos loop target");
+    CSA_SHOW(1, cal_speed, "speed loop target");
     CSA_SHOW(0, cal_current, "cur loop target");
     CSA_SHOW(0, cal_i_sq, "i_sq info");
     CSA_SHOW(0, cal_i_sd, "i_sd info");
     d_info("\n"); debug_flush(true);
 
     CSA_SHOW(1, ori_encoder, "noc_encoder before add offset");
-    CSA_SHOW(0, ori_pos, "sen_pos before add offset");
+    CSA_SHOW(1, ori_pos, "sen_pos before add offset");
     d_info("\n"); debug_flush(true);
 
-    CSA_SHOW(0, delta_encoder, "encoder value delta");
+    CSA_SHOW(1, delta_encoder, "encoder value delta");
     CSA_SHOW(1, noc_encoder, "encoder value");
     CSA_SHOW(1, sen_encoder, "encoder value filtered");
-    CSA_SHOW(0, sen_pos, "multiturn + sen_encoder data");
-    CSA_SHOW(0, sen_speed, "delta_encoder filtered");
+    CSA_SHOW(1, sen_pos, "multiturn + sen_encoder data");
+    CSA_SHOW(1, sen_speed, "delta_encoder filtered");
     CSA_SHOW(0, sen_i_sq, "i_sq from adc");
     CSA_SHOW(0, sen_i_sd, "i_sd from adc");
     CSA_SHOW(0, sen_angle_elec, "Get electric angle from sen_encoder");
