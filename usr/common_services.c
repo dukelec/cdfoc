@@ -8,10 +8,13 @@
  */
 
 #include "app_main.h"
+#include "speck.h"
+#include "../.sw_key.h"
 #include <math.h>
 
 static char cpu_id[25];
 static char info_str[100];
+static int ok = false;
 
 static cdn_sock_t sock1 = { .port = 1, .ns = &dft_ns };
 static cdn_sock_t sock5 = { .port = 5, .ns = &dft_ns };
@@ -26,8 +29,8 @@ static void get_uid(char *buf)
 
     for (i = 0; i < 12; i++) {
         uint8_t val = *((char *)UID_BASE + i);
-        buf[i * 2 + 0] = tlb[val & 0xf];
-        buf[i * 2 + 1] = tlb[val >> 4];
+        buf[i * 2 + 0] = tlb[val >> 4];
+        buf[i * 2 + 1] = tlb[val & 0xf];
     }
     buf[24] = '\0';
 }
@@ -38,6 +41,40 @@ static void init_info_str(void)
     get_uid(cpu_id);
     sprintf(info_str, "M: mdrv; S: %s; SW: %s", cpu_id, SW_VER);
     d_info("info: %s\n", info_str);
+
+    speck64_t speck_ctx;
+    static const uint8_t k96[12+1] = ENC_KEY; // random
+    static uint8_t ori[8] = ENC_ORI;
+    uint8_t *c_id = (uint8_t *)UID_BASE;
+    uint8_t k[12];
+    for (int i = 0; i < 12; i++)
+        k[i] = k96[i] ^ c_id[i] ^ 0xcd;
+
+    crypto_speck64_setkey(&speck_ctx, k, SPECK64_96_KEY_SIZE);
+#ifdef ENC_FLASH
+    static uint8_t enc[8] = {0};
+    crypto_speck64_encrypt(&speck_ctx, enc, ori);
+    d_info("enc: %02x %02x %02x %02x %02x %02x %02x %02x\n", enc[0], enc[1], enc[2], enc[3], enc[4], enc[5], enc[6], enc[7]);
+#endif
+    uint8_t *otp = (uint8_t *)0x1FFF7000;
+
+#ifdef ENC_FLASH
+    if (*((uint64_t *)0x1FFF7000) == 0xffffffffffffffffUL) {
+        uint64_t *src_dat = (uint64_t *)enc;
+        int ret = HAL_FLASH_Unlock();
+        ret |= HAL_FLASH_Program(FLASH_TYPEPROGRAM_DOUBLEWORD, 0x1FFF7000, *src_dat);
+        ret |= HAL_FLASH_Lock();
+        d_debug("enc write ret: %d\n", ret);
+        d_info("otp: %02x %02x %02x %02x %02x %02x %02x %02x\n", otp[0], otp[1], otp[2], otp[3], otp[4], otp[5], otp[6], otp[7]);
+    }
+#endif
+    uint8_t back[8]= {0};
+    crypto_speck64_decrypt(&speck_ctx, back, otp);
+    //d_info("back: %s\n", back);
+    if (strncmp((char *)ori, (char *)back, 8) == 0) {
+        d_debug("ok\n");
+        ok = true;
+    }
 }
 
 
@@ -366,4 +403,8 @@ void common_service_routine(void)
     p5_service_routine();
     p6_service_routine();
     p8_service_routine();
+
+    uint32_t t_cur = get_systick();
+    if (!ok && t_cur > 1000000 * 60 / SYSTICK_US_DIV)
+        NVIC_SystemReset();
 }

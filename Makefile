@@ -77,7 +77,8 @@ usr/common_services.c \
 usr/app_main.c \
 usr/app_motor.c \
 usr/pid_i.c \
-usr/pid_f.c
+usr/pid_f.c \
+usr/speck.c
 
 # ASM sources
 ASM_SOURCES =  \
