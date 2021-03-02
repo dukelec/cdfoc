@@ -18,6 +18,7 @@ extern UART_HandleTypeDef huart3;
 gpio_t led_r = { .group = LED_R_GPIO_Port, .num = LED_R_Pin };
 gpio_t led_g = { .group = LED_G_GPIO_Port, .num = LED_G_Pin };
 gpio_t dbg_out = { .group = DBG_OUT_GPIO_Port, .num = DBG_OUT_Pin };
+gpio_t sen_int = { .group = SEN_INT_GPIO_Port, .num = SEN_INT_Pin };
 
 static gpio_t drv_cs = { .group = DRV_CS_GPIO_Port, .num = DRV_CS_Pin };
 //static gpio_t s_cs = { .group = SEN_CS_GPIO_Port, .num = SEN_CS_Pin };
@@ -331,7 +332,6 @@ void app_main(void)
     drv_write_reg(0x02, drv_read_reg(0x02) | 0x1 << 5);
     d_debug("drv 02: %04x\n", drv_read_reg(0x02));
 
-
     d_debug("drv 03: %04x\n", drv_read_reg(0x03));
     d_debug("drv 04: %04x\n", drv_read_reg(0x04));
 
@@ -344,9 +344,9 @@ void app_main(void)
     d_debug("sen reg  FW: %04x\n", encoder_reg_r(0xe));
     d_debug("sen reg HYS: %04x\n", encoder_reg_r(0x10));
     d_debug("sen reg  MG: %04x\n", encoder_reg_r(0x1b));
-    if (encoder_reg_r(0xe) > 0x77) {
-        d_debug("sen set FW to 0x77 (119)\n");
-        encoder_reg_w(0xe, 0x77);
+    if (encoder_reg_r(0xe) > 0x33) {
+        d_debug("sen set FW to 0x33 (51)\n");
+        encoder_reg_w(0xe, 0x33);
     }
     /*
     if (encoder_reg_r(0x9) != 0) {

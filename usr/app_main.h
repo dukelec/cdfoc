@@ -184,6 +184,7 @@ extern TIM_HandleTypeDef htim1;
 extern gpio_t led_r;
 extern gpio_t led_g;
 extern gpio_t dbg_out;
+extern gpio_t sen_int;
 extern cdn_ns_t dft_ns;
 extern list_head_t frame_free_head;
 

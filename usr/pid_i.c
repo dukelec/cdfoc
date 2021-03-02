@@ -23,13 +23,13 @@ float pid_i_compute(pid_i_t *pid, int input)
     error = pid->target - input;
 
     pid->i_term += pid->_ki * error;
-    //pid->i_term = clip(pid->i_term, pid->out_min, pid->out_max);
 
     if (abs(csa.tc_pos - csa.cal_pos) < 65536/3) {
         //                                                            max_out         %
         float i_lim = (float)(abs(csa.tc_pos - csa.cal_pos) + 60) * (65536 * 6) / 20000.0f;
         pid->i_term = clip(pid->i_term, -i_lim, i_lim);
     }
+    pid->i_term = clip(pid->i_term, pid->out_min, pid->out_max);
 
     //float kp_term = (csa.tc_state == 0 ? (pid->kp / 2.0f) : pid->kp) * error;
     //float kp_term = (csa.tc_state == 0 ? (pid->kp * 0.6f) : pid->kp) * error;
