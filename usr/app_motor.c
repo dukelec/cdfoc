@@ -47,6 +47,12 @@ void app_motor_init(void)
 
 void app_motor_routine(void)
 {
+    // update _ki, _kd
+    pid_f_init(&csa.pid_i_sq, false);
+    pid_f_init(&csa.pid_i_sd, false);
+    pid_f_init(&csa.pid_speed, false);
+    pid_i_init(&csa.pid_pos, false);
+
     if (frame_free_head.len > 1) {
         cdn_pkt_t *pkt = cdn_pkt_get(&raw_pend);
         if (pkt)
