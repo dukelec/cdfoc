@@ -231,9 +231,10 @@ void cali_elec_angle(void)
     static int pole_cnt = -1;
     static int sub_cnt;
     static uint32_t t_last;
-    static uint16_t a0, a1;
+    static uint32_t a0, a1;
     static int amount_f, amount_r;
     static int dir = 1; // -1 or +1
+    static int m_first;
 
     if (!csa.cali_run)
         return;
@@ -246,6 +247,7 @@ void cali_elec_angle(void)
         pole_cnt = sub_cnt = 0;
         amount_f = amount_r = 0;
         dir = 1;
+        m_first = -1;
         d_info("cali: init...\n");
         d_info("cali: ----------------\n");
     }
@@ -268,9 +270,14 @@ void cali_elec_angle(void)
     }
 
     if ((dir == 1 && sub_cnt == 3) || (dir == -1 && sub_cnt == 0)) {
-
-        uint16_t n = a0 + (a1 - a0) / 2;
-        uint16_t m = a0 + (a1 - a0) / 2 - (65536 * pole_cnt / csa.motor_poles);
+        if (a1 < a0)
+            a1 += 0x10000;
+        uint32_t n = (a0 + (a1 - a0) / 2) & 0xffff;
+        int m = (uint16_t)(n - (65536 * pole_cnt / csa.motor_poles));
+        if (m_first < 0)
+            m_first = m;
+        if (m_first < 65536 / 3 && m < 65536 / 2)
+            m += 0x10000;
         d_info("cali: n: %04x, m: %04x\n", n, m);
         d_info("cali: ----------------\n");
         if (dir == 1)
@@ -280,9 +287,9 @@ void cali_elec_angle(void)
 
         if (dir == -1 && pole_cnt == 0) {
             d_info("cali: finished, result:\n");
-            d_info("cali:  cw: %02x\n", amount_f / csa.motor_poles);
-            d_info("cali: ccw: %02x\n", amount_r / csa.motor_poles);
-            d_info("cali: avg: %02x\n", (amount_f + amount_r) / csa.motor_poles / 2);
+            d_info("cali:  cw: %02x\n", (amount_f / csa.motor_poles) & 0xffff);
+            d_info("cali: ccw: %02x\n", (amount_r / csa.motor_poles) & 0xffff);
+            d_info("cali: avg: %02x\n", ((amount_f + amount_r) / csa.motor_poles / 2) & 0xffff);
             csa.state = ST_STOP;
             csa.cali_run = false;
             pole_cnt = -1;
