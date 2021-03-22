@@ -129,12 +129,17 @@ static void raw_dbg(int idx)
 
 static inline void t_curve_compute(void)
 {
+    static double p64f = (double)INFINITY;
+
     if (csa.state != ST_POS_TC) {
         csa.tc_state = 0;
         csa.tc_vc = 0;
         csa.tc_ac = 0;
         csa.tc_pos = csa.sen_pos;
+        p64f = (double)INFINITY;
         return;
+    } else if (p64f == (double)INFINITY) {
+        p64f = csa.cal_pos;
     }
 
     if (csa.tc_state) {
@@ -162,20 +167,21 @@ static inline void t_curve_compute(void)
         }
 
         float v_step = (float)csa.tc_accel / (CURRENT_LOOP_FREQ / 25.0f);
-        int32_t dt_pos = lroundf(csa.tc_vc / (CURRENT_LOOP_FREQ / 25.0f));
-        if (dt_pos == 0)
-            dt_pos = sign(csa.tc_pos - csa.cal_pos);
-        int32_t new_pos = csa.cal_pos + dt_pos;
+        float dt_pos = csa.tc_vc / (CURRENT_LOOP_FREQ / 25.0f);
+        if (fabsf(dt_pos) < min(v_step, 1.0f))
+            dt_pos = sign(csa.tc_pos - csa.cal_pos) * min(v_step, 1.0f);
+        p64f += (double)dt_pos;
+        int32_t p32i = lround(p64f);
 
         if (fabsf(csa.tc_vc) <= v_step * 4.4f) { // avoid exceeding
-            csa.cal_pos = (csa.tc_pos >= csa.cal_pos) ? min(new_pos, csa.tc_pos) : max(new_pos, csa.tc_pos);
+            csa.cal_pos = (csa.tc_pos >= csa.cal_pos) ? min(p32i, csa.tc_pos) : max(p32i, csa.tc_pos);
             if (csa.cal_pos == csa.tc_pos) {
                 csa.tc_state = 0;
                 csa.tc_vc = 0;
                 csa.tc_ac = 0;
             }
         } else {
-            csa.cal_pos = new_pos;
+            csa.cal_pos = p32i;
         }
 
     } else {
