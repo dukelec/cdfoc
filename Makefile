@@ -69,7 +69,6 @@ cdnet/parser/cdnet_l0.c \
 cdnet/parser/cdnet_l1.c \
 cdnet/dev/cdctl_it.c \
 cdnet/utils/cd_list.c \
-cdnet/utils/rbtree.c \
 cdnet/utils/cd_debug.c \
 cdnet/utils/hex_dump.c \
 usr/config.c \

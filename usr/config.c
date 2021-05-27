@@ -4,7 +4,7 @@
  * Copyright (c) 2017, DUKELEC, Inc.
  * All rights reserved.
  *
- * Author: Duke Fong <duke@dukelec.com>
+ * Author: Duke Fong <d@d-l.io>
  */
 
 #include "app_main.h"
@@ -127,16 +127,19 @@ csa_t csa;
 
 void load_conf(void)
 {
-    csa_t app_tmp;
-    memcpy(&app_tmp, (void *)APP_CONF_ADDR, offsetof(csa_t, state));
-    memset(&app_tmp.conf_from, 0, 4);
+    uint16_t magic_code = *(uint16_t *)APP_CONF_ADDR;
+    uint16_t conf_ver = *(uint16_t *)(APP_CONF_ADDR + 2);
+    csa = csa_dft;
 
-    if (app_tmp.magic_code == 0xcdcd && app_tmp.conf_ver == APP_CONF_VER) {
-        memcpy(&csa, &app_tmp, offsetof(csa_t, state));
+    if (magic_code == 0xcdcd && conf_ver == APP_CONF_VER) {
+        memcpy(&csa, (void *)APP_CONF_ADDR, offsetof(csa_t, _end_save));
         csa.conf_from = 1;
-    } else {
-        csa = csa_dft;
+    } else if (magic_code == 0xcdcd && (conf_ver >> 8) == (APP_CONF_VER >> 8)) {
+        memcpy(&csa, (void *)APP_CONF_ADDR, offsetof(csa_t, _end_common));
+        csa.conf_from = 2;
     }
+    if (csa.conf_from)
+        memset(&csa.do_reboot, 0, 3);
 }
 
 int save_conf(void)
@@ -158,7 +161,7 @@ int save_conf(void)
 
     uint64_t *dst_dat = (uint64_t *)APP_CONF_ADDR;
     uint64_t *src_dat = (uint64_t *)&csa;
-    int cnt = (offsetof(csa_t, state) + 7) / 8;
+    int cnt = (offsetof(csa_t, _end_save) + 7) / 8;
 
     for (int i = 0; ret == HAL_OK && i < cnt; i++)
         ret = HAL_FLASH_Program(FLASH_TYPEPROGRAM_DOUBLEWORD, (uint32_t)(dst_dat + i), *(src_dat + i));
@@ -184,6 +187,7 @@ int save_conf(void)
                 float: "f", \
                 char *: "[c]", \
                 uint8_t *: "[B]", \
+                regr_t: "H,H", \
                 regr_t *: "{H,H}", \
                 default: "-"))
 

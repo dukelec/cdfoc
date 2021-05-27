@@ -4,7 +4,7 @@
  * Copyright (c) 2017, DUKELEC, Inc.
  * All rights reserved.
  *
- * Author: Duke Fong <duke@dukelec.com>
+ * Author: Duke Fong <d@d-l.io>
  */
 
 #ifndef __APP_MAIN_H__
@@ -55,17 +55,18 @@ typedef struct {
 
 
 typedef struct {
-    uint16_t        magic_code; // 0xcdcd
+    uint16_t        magic_code;     // 0xcdcd
     uint16_t        conf_ver;
-    bool            conf_from;  // 0: default, 1: load from flash
+    uint8_t         conf_from;      // 0: default, 1: load from flash
     bool            do_reboot;
-    bool            _reserved;
+    bool            _reserved_bl;   // keep_in_bl for bl
     bool            save_conf;
 
     uint8_t         bus_net;
     cdctl_cfg_t     bus_cfg;
     bool            dbg_en;
     cdn_sockaddr_t  dbg_dst;
+    #define         _end_common pid_pos
 
     pid_i_t         pid_pos;
     pid_f_t         pid_speed;
@@ -104,7 +105,8 @@ typedef struct {
     float           cali_angle_step; // increase cali_angle_elec
     bool            cali_run;
 
-    // end of eeprom
+    // end of flash
+    #define         _end_save state
 
     state_t         state;
     uint16_t        err_flag;
