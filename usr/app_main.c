@@ -108,15 +108,21 @@ static void stack_check(void)
 }
 
 #if 1
+
+static volatile uint16_t sen_rx_val = 0;
+
 // MA73x: SPI_POLARITY_LOW, SPI_PHASE_1EDGE, 16BIT, hw-cs
 uint16_t encoder_read(void)
 {
+    return sen_rx_val;
+#if 0
     uint16_t buf_tx[1] = { 0 };
     uint16_t buf_rx[1];
 
     HAL_SPI_TransmitReceive(&hspi3, (uint8_t *)buf_tx, (uint8_t *)buf_rx, 1, HAL_MAX_DELAY);
     //d_debug("%04x %04x\n", buf[0], buf[1]);
     return buf_rx[0];
+#endif
 }
 
 uint16_t encoder_reg_r(uint8_t addr)
@@ -323,6 +329,15 @@ void cali_elec_angle(void)
 }
 
 
+
+void mySPI_DMAReceiveCplt(struct __DMA_HandleTypeDef *hdma)
+{
+    gpio_set_value(&dbg_out2, 1);
+    gpio_set_value(&dbg_out2, 0);
+}
+
+
+
 void app_main(void)
 {
     printf("\nstart app_main (mdrv)...\n");
@@ -374,23 +389,27 @@ void app_main(void)
     HAL_ADCEx_InjectedStart_IT(&hadc2);
     HAL_ADCEx_InjectedStart_IT(&hadc1);
 
+    static uint16_t sen_tx_val = 0;
+    HAL_DMA_Start(htim1.hdma[TIM_DMA_ID_CC4], (uint32_t)&sen_tx_val, (uint32_t)&hspi3.Instance->DR, 1);
+    __HAL_TIM_ENABLE_DMA(&htim1, TIM_DMA_CC4);
+
+    hspi3.hdmarx->XferCpltCallback = mySPI_DMAReceiveCplt;
+    SET_BIT(hspi3.Instance->CR2, SPI_RXFIFO_THRESHOLD);
+    HAL_DMA_Start_IT(hspi3.hdmarx, (uint32_t)&hspi3.Instance->DR, (uint32_t)&sen_rx_val, 1);
+    SET_BIT(hspi3.Instance->CR2, SPI_CR2_RXDMAEN);
+    __HAL_SPI_ENABLE(&hspi3);
+
     d_info("start pwm...\n");
     __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, DRV_PWM_HALF);
     __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_2, DRV_PWM_HALF);
     __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_3, DRV_PWM_HALF);
-    __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_4, 100); // >= 1, ```|_|``` triger on neg-edge
-    __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_5, 700); // >= 1, ```|_|``` triger on neg-edge
+    __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_4, 1); // >= 1, ```|_|``` trigger on neg-edge, sensor
+    __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_5, 100); // >= 1, ```|_|``` trigger on neg-edge, adc
     HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
     HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_2);
     HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_3);
     HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_4);
-    __HAL_TIM_ENABLE_IT(&htim1, TIM_IT_CC4);
-
-
-    static uint16_t txBuffer = 0x80;
-    GPIO_TypeDef *gpiob = (GPIO_TypeDef *)GPIOB;
-    HAL_DMA_Start(htim1.hdma[TIM_DMA_ID_CC4], (uint32_t)&txBuffer, (uint32_t)&gpiob->BSRR, 1);
-    __HAL_TIM_ENABLE_DMA(&htim1, TIM_DMA_CC4);
+    //__HAL_TIM_ENABLE_IT(&htim1, TIM_IT_CC4);
 
     d_info("pwm on.\n");
     set_led_state(LED_POWERON);
