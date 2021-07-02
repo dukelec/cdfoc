@@ -162,7 +162,6 @@ extern int csa_r_hook_num;
 
 
 void app_main(void);
-void tim_cb(void);
 void load_conf(void);
 int save_conf(void);
 void csa_list_show(void);
@@ -185,7 +184,8 @@ extern TIM_HandleTypeDef htim1;
 
 extern gpio_t led_r;
 extern gpio_t led_g;
-extern gpio_t dbg_out;
+extern gpio_t dbg_out1;
+extern gpio_t dbg_out2;
 extern gpio_t sen_int;
 extern cdn_ns_t dft_ns;
 extern list_head_t frame_free_head;

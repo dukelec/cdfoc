@@ -17,7 +17,8 @@ extern UART_HandleTypeDef huart3;
 
 gpio_t led_r = { .group = LED_R_GPIO_Port, .num = LED_R_Pin };
 gpio_t led_g = { .group = LED_G_GPIO_Port, .num = LED_G_Pin };
-gpio_t dbg_out = { .group = DBG_OUT_GPIO_Port, .num = DBG_OUT_Pin };
+gpio_t dbg_out1 = { .group = DBG_OUT1_GPIO_Port, .num = DBG_OUT1_Pin };
+gpio_t dbg_out2 = { .group = DBG_OUT2_GPIO_Port, .num = DBG_OUT2_Pin };
 gpio_t sen_int = { .group = SEN_INT_GPIO_Port, .num = SEN_INT_Pin };
 
 static gpio_t drv_cs = { .group = DRV_CS_GPIO_Port, .num = DRV_CS_Pin };
@@ -377,12 +378,19 @@ void app_main(void)
     __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, DRV_PWM_HALF);
     __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_2, DRV_PWM_HALF);
     __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_3, DRV_PWM_HALF);
-    __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_4, 1); // ```|_|``` triger on neg-edge
+    __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_4, 100); // >= 1, ```|_|``` triger on neg-edge
+    __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_5, 700); // >= 1, ```|_|``` triger on neg-edge
     HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
     HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_2);
     HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_3);
     HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_4);
     __HAL_TIM_ENABLE_IT(&htim1, TIM_IT_CC4);
+
+
+    static uint16_t txBuffer = 0x80;
+    GPIO_TypeDef *gpiob = (GPIO_TypeDef *)GPIOB;
+    HAL_DMA_Start(htim1.hdma[TIM_DMA_ID_CC4], (uint32_t)&txBuffer, (uint32_t)&gpiob->BSRR, 1);
+    __HAL_TIM_ENABLE_DMA(&htim1, TIM_DMA_CC4);
 
     d_info("pwm on.\n");
     set_led_state(LED_POWERON);
@@ -400,13 +408,6 @@ void app_main(void)
     }
 }
 
-// execute synchronously with adc
-void tim_cb(void)
-{
-    //gpio_set_value(&dbg_out, !gpio_get_value(&dbg_out));
-    gpio_set_value(&dbg_out, 1);
-    gpio_set_value(&dbg_out, 0);
-}
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {

@@ -254,7 +254,7 @@ static int8_t hist_err = -2;
 
 void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
 {
-    gpio_set_value(&led_r, 1);
+    gpio_set_value(&dbg_out1, 1);
 
     float sin_sen_angle_elec, cos_sen_angle_elec; // reduce the amount of calculations
     int16_t out_pwm_u = 0, out_pwm_v = 0, out_pwm_w = 0;
@@ -264,7 +264,7 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
     csa.noc_encoder = csa.ori_encoder - csa.bias_encoder;
     int16_t delta_enc = csa.noc_encoder - csa.sen_encoder; // sen_encoder is previous value
 
-    gpio_set_value(&dbg_out, 1);
+    gpio_set_value(&dbg_out2, 1);
 
 #if 1
     if (hist_err < 0 || abs(hist[1] - hist[0]) > 500) {
@@ -310,7 +310,7 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
     csa.delta_encoder = delta_enc;
 #endif
 
-    gpio_set_value(&dbg_out, 0);
+    gpio_set_value(&dbg_out2, 0);
 
 
     if (abs((uint16_t)(csa.ori_pos & 0xffff) - csa.sen_encoder) > 0x10000/2) {
@@ -421,5 +421,5 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
     speed_loop_compute();
     raw_dbg(0);
     csa.loop_cnt++;
-    gpio_set_value(&led_r, 0);
+    gpio_set_value(&dbg_out1, 0);
 }
