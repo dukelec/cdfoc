@@ -424,21 +424,6 @@ void app_main(void)
         common_service_routine();
         cali_elec_angle();
         debug_flush(false);
-
-        HAL_ADC_Start(&hadc1);
-        //HAL_ADC_Start(&hadc2);
-
-        HAL_ADC_PollForConversion(&hadc1, HAL_MAX_DELAY);
-        int32_t adc_temperature = HAL_ADC_GetValue(&hadc1);
-
-        HAL_ADC_PollForConversion(&hadc2, HAL_MAX_DELAY);
-        int32_t adc_dc = HAL_ADC_GetValue(&hadc2);
-
-        static uint32_t t_last = 0;
-        if (get_systick() - t_last > 1000) {
-            t_last = get_systick();
-            d_info("temperature: %d, dc: %d\n", adc_temperature, adc_dc);
-        }
     }
 }
 

@@ -362,7 +362,8 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
         csa.sen_i_sd = i_alpha * cos_sen_angle_elec + i_beta * sin_sen_angle_elec;
 
         if (dbg_str)
-            d_debug_c(", i %5d %5d %5d", ia, ib, ic);
+            //d_debug_c(", i %5d %5d %5d", ia, ib, ic);
+            d_debug_c(", i %5d %5d", adc_a, adc_b);
         if (dbg_str)
             d_debug_c(" (q %5d.%.2d, d %5d.%.2d)", P_2F(csa.sen_i_sq), P_2F(csa.sen_i_sd));
     }
@@ -421,6 +422,30 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
     speed_loop_compute();
     raw_dbg(0);
     csa.loop_cnt++;
+
+#if 0
+    if (!LL_ADC_REG_IsConversionOngoing(hadc1.Instance)) {
+
+        //HAL_ADC_PollForConversion(&hadc1, HAL_MAX_DELAY);
+        int32_t adc_temperature = HAL_ADC_GetValue(&hadc1);
+
+        //HAL_ADC_PollForConversion(&hadc2, HAL_MAX_DELAY);
+        int32_t adc_dc = HAL_ADC_GetValue(&hadc2);
+
+#if 1
+
+        static uint32_t t_last = 0;
+        if (get_systick() - t_last > 1000) {
+            t_last = get_systick();
+            d_info("temperature: %d, dc: %d\n", adc_temperature, adc_dc);
+        }
+#endif
+
+        LL_ADC_REG_StartConversion(hadc1.Instance);
+//          delay_systick(10);
+
+    }
+#endif
 
     uint16_t enc_check = encoder_read();
     if (enc_check != csa.ori_encoder)
