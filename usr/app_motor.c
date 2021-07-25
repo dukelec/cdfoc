@@ -260,9 +260,10 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
     int16_t out_pwm_u = 0, out_pwm_v = 0, out_pwm_w = 0;
     bool dbg_str = csa.dbg_str_msk && (csa.loop_cnt % csa.dbg_str_skip) == 0;
 
+    uint16_t noc_encoder_bk = csa.noc_encoder;
     csa.ori_encoder = encoder_read();
     csa.noc_encoder = csa.ori_encoder - csa.bias_encoder;
-    int16_t delta_enc = csa.noc_encoder - csa.sen_encoder; // sen_encoder is previous value
+    int16_t delta_enc = csa.noc_encoder - noc_encoder_bk;
 
     //gpio_set_value(&dbg_out2, 1);
 
@@ -309,6 +310,9 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
     csa.sen_encoder = csa.noc_encoder;
     csa.delta_encoder = delta_enc;
 #endif
+
+    // 9us lag steps = step/sec * 0.000009 sec
+    csa.sen_encoder += delta_enc * ((float)CURRENT_LOOP_FREQ * 0.000009f);
 
     //gpio_set_value(&dbg_out2, 0);
 
