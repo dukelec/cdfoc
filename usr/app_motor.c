@@ -423,7 +423,7 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
     raw_dbg(0);
     csa.loop_cnt++;
 
-#if 0
+#if 1
     if (!LL_ADC_REG_IsConversionOngoing(hadc1.Instance)) {
 
         //HAL_ADC_PollForConversion(&hadc1, HAL_MAX_DELAY);
@@ -432,8 +432,7 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
         //HAL_ADC_PollForConversion(&hadc2, HAL_MAX_DELAY);
         int32_t adc_dc = HAL_ADC_GetValue(&hadc2);
 
-#if 1
-
+#if 0
         static uint32_t t_last = 0;
         if (get_systick() - t_last > 1000) {
             t_last = get_systick();
