@@ -21,6 +21,7 @@ gpio_t dbg_out1 = { .group = DBG_OUT1_GPIO_Port, .num = DBG_OUT1_Pin };
 gpio_t dbg_out2 = { .group = DBG_OUT2_GPIO_Port, .num = DBG_OUT2_Pin };
 gpio_t sen_int = { .group = SEN_INT_GPIO_Port, .num = SEN_INT_Pin };
 
+static gpio_t drv_fault = { .group = DRV_FAULT_GPIO_Port, .num = DRV_FAULT_Pin };
 static gpio_t drv_cs = { .group = DRV_CS_GPIO_Port, .num = DRV_CS_Pin };
 //static gpio_t s_cs = { .group = SEN_CS_GPIO_Port, .num = SEN_CS_Pin };
 //static spi_t s_spi = { .hspi = &hspi3, .ns_pin = &s_cs };
@@ -384,6 +385,8 @@ void app_main(void)
     d_debug("sen reg1: %x\n", encoder_reg_r(1));
 #endif
     app_motor_init();
+    HAL_ADCEx_Calibration_Start(&hadc1, ADC_SINGLE_ENDED);
+    HAL_ADCEx_Calibration_Start(&hadc2, ADC_SINGLE_ENDED);
     HAL_ADC_Start(&hadc1);
     HAL_ADC_Start(&hadc2);
     HAL_ADCEx_InjectedStart_IT(&hadc2);
@@ -416,9 +419,20 @@ void app_main(void)
     d_info("pwm on.\n");
     set_led_state(LED_POWERON);
 
+    bool last_fault_val = gpio_get_value(&drv_fault);
+
     while (true) {
         //encoder_read();
         //d_debug("drv: %08x\n", drv_read_reg(0x01) << 16 | drv_read_reg(0x00));
+
+        bool cur_fault_val = gpio_get_value(&drv_fault);
+        if (!cur_fault_val && cur_fault_val != last_fault_val) {
+            gpio_set_value(&led_r, 1);
+            d_error("drv status: %04x %04x\n", drv_read_reg(0x00), drv_read_reg(0x01));
+            csa.state = ST_STOP;
+            csa.cali_run = false;
+        }
+        last_fault_val = cur_fault_val;
 
         stack_check();
         app_motor_routine();
