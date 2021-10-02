@@ -18,8 +18,31 @@ static cdn_sock_t sock_tc_rpt = { .port = 0x10, .ns = &dft_ns, .tx_only = true }
 static cdn_sock_t sock_raw_dbg = { .port = 0xa, .ns = &dft_ns, .tx_only = true }; // raw debug
 static list_head_t raw_pend = { 0 };
 
+uint8_t state_w_hook_before(uint16_t sub_offset, uint8_t len, uint8_t *dat)
+{
+    if (*dat == ST_STOP) {
+        gpio_set_value(&drv_en, 0);
 
-uint8_t motor_w_hook(uint16_t sub_offset, uint8_t len, uint8_t *dat)
+    } else if (csa.state == ST_STOP && *dat != ST_STOP) {
+        gpio_set_value(&drv_en, 1);
+        delay_systick(50);
+
+        d_debug("drv 02: %04x\n", drv_read_reg(0x02));
+        drv_write_reg(0x02, drv_read_reg(0x02) | 0x1 << 5);
+        d_debug("drv 02: %04x\n", drv_read_reg(0x02));
+
+        d_debug("drv 03: %04x\n", drv_read_reg(0x03));
+        d_debug("drv 04: %04x\n", drv_read_reg(0x04));
+
+        drv_write_reg(0x03, 0x0344); // 550mA, 1100mA
+        drv_write_reg(0x04, 0x0544); // 550mA, 1100mA, 1000-ns peak gate-current
+        d_debug("drv 03: %04x\n", drv_read_reg(0x03));
+        d_debug("drv 04: %04x\n", drv_read_reg(0x04));
+    }
+    return 0;
+}
+
+uint8_t motor_w_hook_after(uint16_t sub_offset, uint8_t len, uint8_t *dat)
 {
     uint32_t flags;
 

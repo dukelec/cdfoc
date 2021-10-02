@@ -228,6 +228,7 @@ static uint8_t csa_hook_exec(bool after, uint16_t offset, uint8_t len, uint8_t *
 // csa manipulation
 static void p5_service_routine(void)
 {
+    uint32_t flags;
     uint8_t ret_val = 0;
     // read:        0x00, offset_16, len_8   | return [0x80, data]
     // read_dft:    0x01, offset_16, len_8   | return [0x80, data]
@@ -248,7 +249,9 @@ static void p5_service_routine(void)
 
         ret_val = csa_hook_exec(false, offset, len, NULL);
         if (!ret_val) {
+            local_irq_save(flags);
             memcpy(pkt->dat + 1, ((void *) &csa) + offset, len);
+            local_irq_restore(flags);
             ret_val = csa_hook_exec(true, offset, len, NULL);
         }
 
@@ -260,9 +263,7 @@ static void p5_service_routine(void)
         uint16_t offset = *(uint16_t *)(pkt->dat + 1);
         uint8_t len = pkt->len - 3;
         uint8_t *src_dat = pkt->dat + 3;
-        uint32_t flags;
 
-        local_irq_save(flags);
         ret_val = csa_hook_exec(false, offset, len, src_dat);
         if (!ret_val) {
             for (int i = 0; i < csa_w_allow_num; i++) {
@@ -280,11 +281,12 @@ static void p5_service_routine(void)
                 //printf("csa @ %p, %p <- %p, len %d, dat[0]: %x\n",
                 //        &csa, ((void *) &csa) + start, src_dat + (start - offset), end - start,
                 //        *(src_dat + (start - offset)));
+                local_irq_save(flags);
                 memcpy(((void *) &csa) + start, src_dat + (start - offset), end - start);
+                local_irq_restore(flags);
             }
             ret_val = csa_hook_exec(true, offset, len, src_dat);
         }
-        local_irq_restore(flags);
 
         d_debug("csa write: %04x %d, ret: %02x\n", offset, len, ret_val);
         pkt->len = 1;
@@ -312,6 +314,7 @@ static void p5_service_routine(void)
 // qxchg
 static void p6_service_routine(void)
 {
+    uint32_t flags;
     uint8_t ret_val = 0;
     cdn_pkt_t *pkt = cdn_sock_recvfrom(&sock6);
     if (!pkt)
@@ -328,9 +331,6 @@ static void p6_service_routine(void)
     if (pkt->dat[0] == 0x20 && pkt->len >= 1) {
         uint8_t *src_dat = pkt->dat + 1;
         uint8_t *dst_dat = pkt->dat + 1;
-        uint32_t flags;
-
-        local_irq_save(flags);
 
         for (int i = 0; !ret_val && i < 5; i++) {
             regr_t *regr = csa.qxchg_set + i;
@@ -342,7 +342,9 @@ static void p6_service_routine(void)
 
             ret_val = csa_hook_exec(false, regr->offset, lim_size, src_dat);
             if (!ret_val) {
+                local_irq_save(flags);
                 memcpy(((void *) &csa) + regr->offset, src_dat, lim_size);
+                local_irq_restore(flags);
                 ret_val = csa_hook_exec(true, regr->offset, lim_size, src_dat);
             }
 
@@ -355,13 +357,13 @@ static void p6_service_routine(void)
                 break;
             ret_val = csa_hook_exec(false, regr->offset, regr->size, NULL);
             if (!ret_val) {
+                local_irq_save(flags);
                 memcpy(dst_dat, ((void *) &csa) + regr->offset, regr->size);
+                local_irq_restore(flags);
                 ret_val = csa_hook_exec(true, regr->offset, regr->size, NULL);
             }
             dst_dat += regr->size;
         }
-
-        local_irq_restore(flags);
 
         pkt->len = dst_dat - pkt->dat;
         pkt->dat[0] = 0x80 | ret_val;
@@ -369,9 +371,6 @@ static void p6_service_routine(void)
 
     } else if (pkt->dat[0] == 0x00 && pkt->len == 1) {
             uint8_t *dst_dat = pkt->dat + 1;
-            uint32_t flags;
-
-            local_irq_save(flags);
 
             for (int i = 0; !ret_val && i < 5; i++) {
                 regr_t *regr = csa.qxchg_ro + i;
@@ -379,13 +378,13 @@ static void p6_service_routine(void)
                     break;
                 ret_val = csa_hook_exec(false, regr->offset, regr->size, NULL);
                 if (!ret_val) {
+                    local_irq_save(flags);
                     memcpy(dst_dat, ((void *) &csa) + regr->offset, regr->size);
+                    local_irq_restore(flags);
                     ret_val = csa_hook_exec(true, regr->offset, regr->size, NULL);
                 }
                 dst_dat += regr->size;
             }
-
-            local_irq_restore(flags);
 
             pkt->len = dst_dat - pkt->dat;
             pkt->dat[0] = 0x80 | ret_val;
@@ -419,8 +418,10 @@ void common_service_routine(void)
         csa.save_conf = false;
         save_conf();
     }
-    if (csa.do_reboot)
+    if (csa.do_reboot) {
+        gpio_set_value(&drv_en, 0);
         NVIC_SystemReset();
+    }
     p1_service_routine();
     p5_service_routine();
     p6_service_routine();

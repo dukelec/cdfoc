@@ -19,12 +19,12 @@ extern I2C_HandleTypeDef hi2c1;
 gpio_t led_r = { .group = LED_R_GPIO_Port, .num = LED_R_Pin };
 gpio_t led_g = { .group = LED_G_GPIO_Port, .num = LED_G_Pin };
 gpio_t dbg_out1 = { .group = DBG_OUT1_GPIO_Port, .num = DBG_OUT1_Pin };
-gpio_t dbg_out2 = { .group = DBG_OUT2_GPIO_Port, .num = DBG_OUT2_Pin };
 gpio_t sen_int = { .group = SEN_INT_GPIO_Port, .num = SEN_INT_Pin };
 
 static i2c_t temperature_drv = { .hi2c = &hi2c1, .dev_addr = 0x90 };
 static i2c_t temperature_motor = { .hi2c = &hi2c1, .dev_addr = 0x92 };
 
+gpio_t drv_en = { .group = DBG_OUT2_GPIO_Port, .num = DBG_OUT2_Pin };
 static gpio_t drv_fault = { .group = DRV_FAULT_GPIO_Port, .num = DRV_FAULT_Pin };
 static gpio_t drv_cs = { .group = DRV_CS_GPIO_Port, .num = DRV_CS_Pin };
 //static gpio_t s_cs = { .group = SEN_CS_GPIO_Port, .num = SEN_CS_Pin };
@@ -217,7 +217,7 @@ uint16_t encoder_read(void)
 }
 #endif
 
-static uint16_t drv_read_reg(uint8_t reg)
+uint16_t drv_read_reg(uint8_t reg)
 {
     uint16_t rx_val;
     uint16_t val = 0x8000 | reg << 11;
@@ -228,7 +228,7 @@ static uint16_t drv_read_reg(uint8_t reg)
     return rx_val & 0x7ff;
 }
 
-static void drv_write_reg(uint8_t reg, uint16_t val)
+void drv_write_reg(uint8_t reg, uint16_t val)
 {
     val |= reg << 11;
 
@@ -337,8 +337,8 @@ void cali_elec_angle(void)
 
 void mySPI_DMAReceiveCplt(struct __DMA_HandleTypeDef *hdma)
 {
-    gpio_set_value(&dbg_out2, 1);
-    gpio_set_value(&dbg_out2, 0);
+    //gpio_set_value(&dbg_out2, 1);
+    //gpio_set_value(&dbg_out2, 0);
 }
 
 
@@ -356,18 +356,6 @@ void app_main(void)
     csa_list_show();
 
     delay_systick(50);
-    d_debug("drv 02: %04x\n", drv_read_reg(0x02));
-    drv_write_reg(0x02, drv_read_reg(0x02) | 0x1 << 5);
-    d_debug("drv 02: %04x\n", drv_read_reg(0x02));
-
-    d_debug("drv 03: %04x\n", drv_read_reg(0x03));
-    d_debug("drv 04: %04x\n", drv_read_reg(0x04));
-
-    drv_write_reg(0x03, 0x0344); // 550mA, 1100mA
-    drv_write_reg(0x04, 0x0544); // 550mA, 1100mA, 1000-ns peak gate-current
-    d_debug("drv 03: %04x\n", drv_read_reg(0x03));
-    d_debug("drv 04: %04x\n", drv_read_reg(0x04));
-
     d_debug("sen reg  RD: %04x\n", encoder_reg_r(0x9));
     d_debug("sen reg  FW: %04x\n", encoder_reg_r(0xe));
     d_debug("sen reg HYS: %04x\n", encoder_reg_r(0x10));

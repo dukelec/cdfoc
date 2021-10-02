@@ -22,8 +22,11 @@ regr_t csa_w_allow[] = {
 
 csa_hook_t csa_w_hook[] = {
         {
+            .range = { .offset = offsetof(csa_t, state), .size = 1 },
+            .before = state_w_hook_before
+        }, {
             .range = { .offset = offsetof(csa_t, tc_pos), .size = offsetof(csa_t, tc_state) - offsetof(csa_t, tc_pos) },
-            .after = motor_w_hook
+            .after = motor_w_hook_after
         }
 };
 

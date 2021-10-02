@@ -171,7 +171,10 @@ void common_service_routine(void);
 
 void set_led_state(led_state_t state);
 
-uint8_t motor_w_hook(uint16_t sub_offset, uint8_t len, uint8_t *dat);
+uint8_t state_w_hook_before(uint16_t sub_offset, uint8_t len, uint8_t *dat);
+uint8_t motor_w_hook_after(uint16_t sub_offset, uint8_t len, uint8_t *dat);
+uint16_t drv_read_reg(uint8_t reg);
+void drv_write_reg(uint8_t reg, uint16_t val);
 void app_motor_init(void);
 void app_motor_routine(void);
 void selection_sort(int32_t arr[], int len, int32_t order[]);
@@ -182,10 +185,11 @@ extern ADC_HandleTypeDef hadc1;
 extern ADC_HandleTypeDef hadc2;
 extern TIM_HandleTypeDef htim1;
 
+extern gpio_t drv_en;
 extern gpio_t led_r;
 extern gpio_t led_g;
 extern gpio_t dbg_out1;
-extern gpio_t dbg_out2;
+//extern gpio_t dbg_out2;
 extern gpio_t sen_int;
 extern cdn_ns_t dft_ns;
 extern list_head_t frame_free_head;
