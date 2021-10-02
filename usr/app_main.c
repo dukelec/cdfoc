@@ -14,12 +14,16 @@ extern SPI_HandleTypeDef hspi1;
 extern SPI_HandleTypeDef hspi2;
 extern SPI_HandleTypeDef hspi3;
 extern UART_HandleTypeDef huart3;
+extern I2C_HandleTypeDef hi2c1;
 
 gpio_t led_r = { .group = LED_R_GPIO_Port, .num = LED_R_Pin };
 gpio_t led_g = { .group = LED_G_GPIO_Port, .num = LED_G_Pin };
 gpio_t dbg_out1 = { .group = DBG_OUT1_GPIO_Port, .num = DBG_OUT1_Pin };
 gpio_t dbg_out2 = { .group = DBG_OUT2_GPIO_Port, .num = DBG_OUT2_Pin };
 gpio_t sen_int = { .group = SEN_INT_GPIO_Port, .num = SEN_INT_Pin };
+
+static i2c_t temperature_drv = { .hi2c = &hi2c1, .dev_addr = 0x90 };
+static i2c_t temperature_motor = { .hi2c = &hi2c1, .dev_addr = 0x92 };
 
 static gpio_t drv_fault = { .group = DRV_FAULT_GPIO_Port, .num = DRV_FAULT_Pin };
 static gpio_t drv_cs = { .group = DRV_CS_GPIO_Port, .num = DRV_CS_Pin };
@@ -359,8 +363,8 @@ void app_main(void)
     d_debug("drv 03: %04x\n", drv_read_reg(0x03));
     d_debug("drv 04: %04x\n", drv_read_reg(0x04));
 
-    drv_write_reg(0x03, 0x0300); // 10mA, 20mA
-    drv_write_reg(0x04, 0x0400); // 10mA, 20mA, 500-ns peak gate-current
+    drv_write_reg(0x03, 0x0344); // 550mA, 1100mA
+    drv_write_reg(0x04, 0x0544); // 550mA, 1100mA, 1000-ns peak gate-current
     d_debug("drv 03: %04x\n", drv_read_reg(0x03));
     d_debug("drv 04: %04x\n", drv_read_reg(0x04));
 
@@ -384,6 +388,14 @@ void app_main(void)
     encoder_reg_w(1, encoder_reg_r(1) & ~0xee);
     d_debug("sen reg1: %x\n", encoder_reg_r(1));
 #endif
+
+    uint16_t temp_drv_id = 0;
+    uint16_t temp_motor_id = 0;
+    int temp_drv_ret = i2c_mem_read(&temperature_drv, 0x0f, (uint8_t *)&temp_drv_id, 2);
+    int temp_motor_ret = i2c_mem_read(&temperature_motor, 0x0f, (uint8_t *)&temp_motor_id, 2);
+    d_debug("temperature id: drv %d: %x, motor %d: %x\n",
+            temp_drv_ret, temp_drv_id, temp_motor_ret, temp_motor_id);
+
     app_motor_init();
     HAL_ADCEx_Calibration_Start(&hadc1, ADC_SINGLE_ENDED);
     HAL_ADCEx_Calibration_Start(&hadc2, ADC_SINGLE_ENDED);
@@ -429,7 +441,6 @@ void app_main(void)
         if (!cur_fault_val && cur_fault_val != last_fault_val) {
             gpio_set_value(&led_r, 1);
             d_error("drv status: %04x %04x\n", drv_read_reg(0x00), drv_read_reg(0x01));
-            csa.state = ST_STOP;
             csa.cali_run = false;
         }
         last_fault_val = cur_fault_val;

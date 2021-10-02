@@ -11,6 +11,7 @@
 #define __CD_CONFIG_H__
 
 #define ARCH_SPI
+#define ARCH_I2C
 #define CD_LIST_IT
 
 #define DEBUG

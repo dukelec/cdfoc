@@ -312,7 +312,7 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
 #endif
 
     // 9us lag steps = step/sec * 0.000009 sec
-    csa.sen_encoder += delta_enc * ((float)CURRENT_LOOP_FREQ * 0.000009f);
+    csa.sen_encoder += delta_enc * ((float)CURRENT_LOOP_FREQ * 0.000019f); // 0.000009f
 
     //gpio_set_value(&dbg_out2, 0);
 
@@ -341,7 +341,7 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
     {
         static uint32_t cumulative_a, cumulative_b, offset_a, offset_b;
 
-        int32_t adc_a = HAL_ADCEx_InjectedGetValue(&hadc1, 1);
+        int32_t adc_a = HAL_ADCEx_InjectedGetValue(&hadc1, 1); // change ADC_SMPR1 sample time register
         int32_t adc_b = HAL_ADCEx_InjectedGetValue(&hadc2, 1);
 
         if (csa.state == ST_STOP) {
@@ -419,6 +419,7 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
 
     //gpio_set_value(&led_r, !gpio_get_value(&led_r)); // debug for hw config
 
+    // write 4095 to all pwm channel for brake (set A, B, C to zero)
     __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_3, DRV_PWM_HALF - out_pwm_u); // TIM1_CH3: A
     __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_2, DRV_PWM_HALF - out_pwm_v); // TIM1_CH2: B
     __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, DRV_PWM_HALF - out_pwm_w); // TIM1_CH1: C
