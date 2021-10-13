@@ -34,10 +34,10 @@ uint8_t state_w_hook_before(uint16_t sub_offset, uint8_t len, uint8_t *dat)
         d_debug("drv 03: %04x\n", drv_read_reg(0x03));
         d_debug("drv 04: %04x\n", drv_read_reg(0x04));
 
-        drv_write_reg(0x03, 0x0344); // 550mA, 1100mA
-        drv_write_reg(0x04, 0x0544); // 550mA, 1100mA, 1000-ns peak gate-current
-        d_debug("drv 03: %04x\n", drv_read_reg(0x03));
-        d_debug("drv 04: %04x\n", drv_read_reg(0x04));
+        //drv_write_reg(0x03, 0x0344); // 550mA, 1100mA
+        //drv_write_reg(0x04, 0x0544); // 550mA, 1100mA, 1000-ns peak gate-current
+        //d_debug("drv 03: %04x\n", drv_read_reg(0x03));
+        //d_debug("drv 04: %04x\n", drv_read_reg(0x04));
     }
     return 0;
 }
@@ -245,6 +245,7 @@ static inline void speed_loop_compute(void)
 
     if (++s_filt_cnt == 5) {
         csa.sen_speed = s_avg / 5.0f;
+        csa.sen_speed_rpm = lroundf(csa.sen_speed / 65536 * 60);
         s_avg = 0;
         s_filt_cnt = 0;
 

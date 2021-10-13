@@ -129,6 +129,10 @@ typedef struct {
     float           sen_i_sd;
     float           sen_angle_elec;
 
+    int16_t         sen_speed_rpm;
+    int16_t         vib_angle;  // vibration
+    uint16_t        vib_magnitude;
+
     uint32_t        loop_cnt;
     int32_t         peak_cur_cnt;
 
