@@ -57,7 +57,7 @@ typedef struct {
 typedef struct {
     uint16_t        magic_code;     // 0xcdcd
     uint16_t        conf_ver;
-    uint8_t         conf_from;      // 0: default, 1: load from flash
+    uint8_t         conf_from;      // 0: default, 1: all from flash, 2: partly from flash
     bool            do_reboot;
     bool            _reserved_bl;   // keep_in_bl for bl
     bool            save_conf;
@@ -164,6 +164,15 @@ extern int csa_w_hook_num;
 extern csa_hook_t csa_r_hook[];
 extern int csa_r_hook_num;
 
+uint32_t eflash_read_id(spi_t *dev);
+uint8_t eflash_read_status(spi_t *dev);
+void eflash_read(spi_t *dev, uint32_t addr, int len, uint8_t *buf);
+void eflash_write(spi_t *dev, uint32_t addr, int len, const uint8_t *buf);
+void eflash_erase_chip(spi_t *dev);
+void eflash_cmd(spi_t *dev, uint8_t cmd);
+
+int flash_erase(uint32_t addr, uint32_t len);
+int flash_write(uint32_t addr, uint32_t len, const uint8_t *buf);
 
 void app_main(void);
 void load_conf(void);
