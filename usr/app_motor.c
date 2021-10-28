@@ -13,18 +13,29 @@
 #define CUR_AVG_WINDOW  18 // moving average window sample size is 2^18
 #define CUR_OFFSET_MAX  2200 // current offset max limit (middle 2048)
 #define CUR_OFFSET_MIN  1900 // current offset min limit (middle 2048)
+static uint32_t cumulative_a, cumulative_b, offset_a, offset_b;
+static int32_t adc_a, adc_b;
 
 static cdn_sock_t sock_tc_rpt = { .port = 0x10, .ns = &dft_ns, .tx_only = true };
 static cdn_sock_t sock_raw_dbg = { .port = 0xa, .ns = &dft_ns, .tx_only = true }; // raw debug
 static list_head_t raw_pend = { 0 };
 
+
+static void init_adc_filter(void)
+{
+    cumulative_a = adc_a << CUR_AVG_WINDOW;
+    cumulative_b = adc_b << CUR_AVG_WINDOW;
+}
+
 uint8_t state_w_hook_before(uint16_t sub_offset, uint8_t len, uint8_t *dat)
 {
     if (*dat == ST_STOP) {
         gpio_set_value(&drv_en, 0);
+        csa.adc_sel = 0;
 
     } else if (csa.state == ST_STOP && *dat != ST_STOP) {
         gpio_set_value(&drv_en, 1);
+        csa.adc_sel = 0;
         delay_systick(50);
 
         d_debug("drv 02: %04x\n", drv_read_reg(0x02));
@@ -38,6 +49,9 @@ uint8_t state_w_hook_before(uint16_t sub_offset, uint8_t len, uint8_t *dat)
         //drv_write_reg(0x04, 0x0544); // 550mA, 1100mA, 1000-ns peak gate-current
         //d_debug("drv 03: %04x\n", drv_read_reg(0x03));
         //d_debug("drv 04: %04x\n", drv_read_reg(0x04));
+
+        delay_systick(50);
+        init_adc_filter();
     }
     return 0;
 }
@@ -363,25 +377,22 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
         d_debug_c(" a %d.%.2d %d.%.2d %d.%.2d", P_2F(angle_mech), P_2F(csa.sen_angle_elec), P_2F(csa.cali_angle_elec));
 
     {
-        static uint32_t cumulative_a, cumulative_b, offset_a, offset_b;
+        adc_a = HAL_ADCEx_InjectedGetValue(&hadc1, 1); // change ADC_SMPR1 sample time register
+        adc_b = HAL_ADCEx_InjectedGetValue(&hadc2, 1);
 
-        int32_t adc_a = HAL_ADCEx_InjectedGetValue(&hadc1, 1); // change ADC_SMPR1 sample time register
-        int32_t adc_b = HAL_ADCEx_InjectedGetValue(&hadc2, 1);
-
-        if (csa.state == ST_STOP) {
-            cumulative_a = adc_a << CUR_AVG_WINDOW;
-            cumulative_b = adc_b << CUR_AVG_WINDOW;
-            offset_a = adc_a;
-            offset_b = adc_b;
+        if (csa.state != ST_STOP) {
+            cumulative_a  += adc_a - offset_a;
+            cumulative_b  += adc_b - offset_b;
         }
-
-        cumulative_a  += adc_a - offset_a;
-        cumulative_b  += adc_b - offset_b;
         offset_a = clip(cumulative_a >> CUR_AVG_WINDOW, CUR_OFFSET_MIN, CUR_OFFSET_MAX);
         offset_b = clip(cumulative_b >> CUR_AVG_WINDOW, CUR_OFFSET_MIN, CUR_OFFSET_MAX);
         int32_t ia = adc_a - offset_a;
         int32_t ib = adc_b - offset_b;
         int32_t ic = -ia - ib;
+
+        csa.dbg_ia = ia;
+        csa.dbg_ib = ib;
+        csa.dbg_ic = ic;
 
         float i_alpha = ia;
         float i_beta = (ia + ib * 2) / 1.732050808f; // √3
@@ -443,6 +454,16 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
 
     //gpio_set_value(&led_r, !gpio_get_value(&led_r)); // debug for hw config
 
+    csa.dbg_u = out_pwm_u;
+    csa.dbg_v = out_pwm_v;
+    csa.dbg_w = out_pwm_w;
+
+    int16_t pwm_max = max(max(abs(out_pwm_u), abs(out_pwm_v)), abs(out_pwm_w));
+    if (pwm_max > 1843) { // DRV_PWM_HALF * 0.9 = 1843.2
+        out_pwm_u = (int)out_pwm_u * 1843 / pwm_max;
+        out_pwm_v = (int)out_pwm_v * 1843 / pwm_max;
+        out_pwm_w = (int)out_pwm_w * 1843 / pwm_max;
+    }
     // write 4095 to all pwm channel for brake (set A, B, C to zero)
     __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_3, DRV_PWM_HALF - out_pwm_u); // TIM1_CH3: A
     __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_2, DRV_PWM_HALF - out_pwm_v); // TIM1_CH2: B

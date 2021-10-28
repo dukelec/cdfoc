@@ -353,5 +353,13 @@ void csa_list_show(void)
     CSA_SHOW(0, tc_ac, "Motor current accel");
     d_info("\n"); debug_flush(true);
 
+    CSA_SHOW(0, dbg_ia, "");
+    CSA_SHOW(0, dbg_ib, "");
+    CSA_SHOW(0, dbg_ic, "");
+    CSA_SHOW(0, dbg_u, "");
+    CSA_SHOW(0, dbg_v, "");
+    CSA_SHOW(0, dbg_w, "");
+    d_info("\n"); debug_flush(true);
+
     d_info("\x1b[92mColor Test...\x1b[0m\n");
 }

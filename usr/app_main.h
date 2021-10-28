@@ -141,6 +141,15 @@ typedef struct {
     float           tc_vc;    // cur speed
     float           tc_ac;    // cur accel
 
+    uint8_t         adc_sel;  // cur adc channel group
+
+    int16_t         dbg_ia;
+    int16_t         dbg_ib;
+    int16_t         dbg_ic;
+    int16_t         dbg_u;
+    int16_t         dbg_v;
+    int16_t         dbg_w;
+
 } csa_t; // config status area
 
 
