@@ -60,14 +60,12 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
-#define DRV_FAULT_Pin GPIO_PIN_13
-#define DRV_FAULT_GPIO_Port GPIOC
-#define DRV_CS_Pin GPIO_PIN_4
-#define DRV_CS_GPIO_Port GPIOA
 #define LED_G_Pin GPIO_PIN_0
 #define LED_G_GPIO_Port GPIOB
 #define LED_R_Pin GPIO_PIN_1
 #define LED_R_GPIO_Port GPIOB
+#define DBG_OUT2_Pin GPIO_PIN_2
+#define DBG_OUT2_GPIO_Port GPIOB
 #define CD_RST_Pin GPIO_PIN_11
 #define CD_RST_GPIO_Port GPIOB
 #define CD_CS_Pin GPIO_PIN_12
@@ -77,10 +75,12 @@ void Error_Handler(void);
 #define CD_INT_EXTI_IRQn EXTI9_5_IRQn
 #define DBG_OUT1_Pin GPIO_PIN_12
 #define DBG_OUT1_GPIO_Port GPIOA
-#define SEN_INT_Pin GPIO_PIN_6
-#define SEN_INT_GPIO_Port GPIOB
-#define DBG_OUT2_Pin GPIO_PIN_7
-#define DBG_OUT2_GPIO_Port GPIOB
+#define DRV_EN_Pin GPIO_PIN_15
+#define DRV_EN_GPIO_Port GPIOA
+#define DRV_CS_Pin GPIO_PIN_11
+#define DRV_CS_GPIO_Port GPIOC
+#define DRV_FAULT_Pin GPIO_PIN_6
+#define DRV_FAULT_GPIO_Port GPIOB
 /* USER CODE BEGIN Private defines */
 
 /* USER CODE END Private defines */

@@ -19,16 +19,15 @@ extern I2C_HandleTypeDef hi2c1;
 gpio_t led_r = { .group = LED_R_GPIO_Port, .num = LED_R_Pin };
 gpio_t led_g = { .group = LED_G_GPIO_Port, .num = LED_G_Pin };
 gpio_t dbg_out1 = { .group = DBG_OUT1_GPIO_Port, .num = DBG_OUT1_Pin };
-gpio_t sen_int = { .group = SEN_INT_GPIO_Port, .num = SEN_INT_Pin };
 
 static i2c_t temperature_drv = { .hi2c = &hi2c1, .dev_addr = 0x90 };
 static i2c_t temperature_motor = { .hi2c = &hi2c1, .dev_addr = 0x92 };
 
-gpio_t drv_en = { .group = DBG_OUT2_GPIO_Port, .num = DBG_OUT2_Pin };
+gpio_t drv_en = { .group = DRV_EN_GPIO_Port, .num = DRV_EN_Pin };
 static gpio_t drv_fault = { .group = DRV_FAULT_GPIO_Port, .num = DRV_FAULT_Pin };
 static gpio_t drv_cs = { .group = DRV_CS_GPIO_Port, .num = DRV_CS_Pin };
 //static gpio_t s_cs = { .group = SEN_CS_GPIO_Port, .num = SEN_CS_Pin };
-//static spi_t s_spi = { .hspi = &hspi3, .ns_pin = &s_cs };
+//static spi_t s_spi = { .hspi = &hspi1, .ns_pin = &s_cs };
 
 uart_t debug_uart = { .huart = &huart3 };
 
@@ -126,7 +125,7 @@ uint16_t encoder_read(void)
     uint16_t buf_tx[1] = { 0 };
     uint16_t buf_rx[1];
 
-    HAL_SPI_TransmitReceive(&hspi3, (uint8_t *)buf_tx, (uint8_t *)buf_rx, 1, HAL_MAX_DELAY);
+    HAL_SPI_TransmitReceive(&hspi1, (uint8_t *)buf_tx, (uint8_t *)buf_rx, 1, HAL_MAX_DELAY);
     //d_debug("%04x %04x\n", buf[0], buf[1]);
     return buf_rx[0];
 #endif
@@ -137,9 +136,9 @@ uint16_t encoder_reg_r(uint8_t addr)
     uint16_t buf_tx[1];
     uint16_t buf_rx[1];
     buf_tx[0] = (0x40 | addr) << 8;
-    HAL_SPI_TransmitReceive(&hspi3, (uint8_t *)buf_tx, (uint8_t *)buf_rx, 1, HAL_MAX_DELAY);
+    HAL_SPI_TransmitReceive(&hspi1, (uint8_t *)buf_tx, (uint8_t *)buf_rx, 1, HAL_MAX_DELAY);
     buf_tx[0] = 0;
-    HAL_SPI_TransmitReceive(&hspi3, (uint8_t *)buf_tx, (uint8_t *)buf_rx, 1, HAL_MAX_DELAY);
+    HAL_SPI_TransmitReceive(&hspi1, (uint8_t *)buf_tx, (uint8_t *)buf_rx, 1, HAL_MAX_DELAY);
     if ((buf_rx[0] & 0xff) != 0)
         d_error("enc reg r, err ret: %04x\n", buf_rx[0]);
     return buf_rx[0] >> 8;
@@ -150,10 +149,10 @@ void encoder_reg_w(uint8_t addr, uint16_t val)
     uint16_t buf_tx[1];
     uint16_t buf_rx[1];
     buf_tx[0] = ((0x80 | addr) << 8) | val;
-    HAL_SPI_TransmitReceive(&hspi3, (uint8_t *)buf_tx, (uint8_t *)buf_rx, 1, HAL_MAX_DELAY);
+    HAL_SPI_TransmitReceive(&hspi1, (uint8_t *)buf_tx, (uint8_t *)buf_rx, 1, HAL_MAX_DELAY);
     delay_systick(50000 / SYSTICK_US_DIV);
     buf_tx[0] = 0;
-    HAL_SPI_TransmitReceive(&hspi3, (uint8_t *)buf_tx, (uint8_t *)buf_rx, 1, HAL_MAX_DELAY);
+    HAL_SPI_TransmitReceive(&hspi1, (uint8_t *)buf_tx, (uint8_t *)buf_rx, 1, HAL_MAX_DELAY);
     if (((buf_rx[0] & 0xff) != 0) || (buf_rx[0] >> 8) != val)
         d_error("enc reg w, err ret: %04x\n", buf_rx[0]);
     return;
@@ -167,10 +166,10 @@ uint16_t encoder_read(void)
     buf[0] = 0x8021;
 
     gpio_set_value(&s_cs, 0);
-    HAL_SPI_Transmit(&hspi3, (uint8_t *)buf, 1, HAL_MAX_DELAY);
+    HAL_SPI_Transmit(&hspi1, (uint8_t *)buf, 1, HAL_MAX_DELAY);
 
     GPIOB->MODER &= ~(1 << (5 * 2 + 1)); // PB5
-    HAL_SPI_Receive(&hspi3, (uint8_t *)buf, 2, HAL_MAX_DELAY);
+    HAL_SPI_Receive(&hspi1, (uint8_t *)buf, 2, HAL_MAX_DELAY);
     gpio_set_value(&s_cs, 1);
     GPIOB->MODER |= 1 << (5 * 2 + 1);
 
@@ -185,10 +184,10 @@ uint16_t encoder_reg_r(uint8_t addr)
     buf[0] = 0x8001 | (addr << 4);
 
     gpio_set_value(&s_cs, 0);
-    HAL_SPI_Transmit(&hspi3, (uint8_t *)buf, 1, HAL_MAX_DELAY);
+    HAL_SPI_Transmit(&hspi1, (uint8_t *)buf, 1, HAL_MAX_DELAY);
 
     GPIOB->MODER &= ~(1 << (5 * 2 + 1)); // PB5
-    HAL_SPI_Receive(&hspi3, (uint8_t *)buf, 1, HAL_MAX_DELAY);
+    HAL_SPI_Receive(&hspi1, (uint8_t *)buf, 1, HAL_MAX_DELAY);
     gpio_set_value(&s_cs, 1);
     GPIOB->MODER |= 1 << (5 * 2 + 1);
 
@@ -202,7 +201,7 @@ void encoder_reg_w(uint8_t addr, uint16_t val)
     buf[1] = val;
 
     gpio_set_value(&s_cs, 0);
-    HAL_SPI_Transmit(&hspi3, (uint8_t *)buf, 2, HAL_MAX_DELAY);
+    HAL_SPI_Transmit(&hspi1, (uint8_t *)buf, 2, HAL_MAX_DELAY);
     gpio_set_value(&s_cs, 1);
 }
 
@@ -225,7 +224,7 @@ uint16_t drv_read_reg(uint8_t reg)
     uint16_t val = 0x8000 | reg << 11;
 
     gpio_set_value(&drv_cs, 0);
-    HAL_SPI_TransmitReceive(&hspi1, (uint8_t *)&val, (uint8_t *)&rx_val, 1, HAL_MAX_DELAY);
+    HAL_SPI_TransmitReceive(&hspi3, (uint8_t *)&val, (uint8_t *)&rx_val, 1, HAL_MAX_DELAY);
     gpio_set_value(&drv_cs, 1);
     return rx_val & 0x7ff;
 }
@@ -235,7 +234,7 @@ void drv_write_reg(uint8_t reg, uint16_t val)
     val |= reg << 11;
 
     gpio_set_value(&drv_cs, 0);
-    HAL_SPI_Transmit(&hspi1, (uint8_t *)&val, 1, HAL_MAX_DELAY);
+    HAL_SPI_Transmit(&hspi3, (uint8_t *)&val, 1, HAL_MAX_DELAY);
     gpio_set_value(&drv_cs, 1);
 }
 
@@ -395,14 +394,14 @@ void app_main(void)
     HAL_ADCEx_InjectedStart_IT(&hadc1);
 
     static uint16_t sen_tx_val = 0;
-    HAL_DMA_Start(htim1.hdma[TIM_DMA_ID_CC4], (uint32_t)&sen_tx_val, (uint32_t)&hspi3.Instance->DR, 1);
+    HAL_DMA_Start(htim1.hdma[TIM_DMA_ID_CC4], (uint32_t)&sen_tx_val, (uint32_t)&hspi1.Instance->DR, 1);
     __HAL_TIM_ENABLE_DMA(&htim1, TIM_DMA_CC4);
 
-    hspi3.hdmarx->XferCpltCallback = mySPI_DMAReceiveCplt;
-    SET_BIT(hspi3.Instance->CR2, SPI_RXFIFO_THRESHOLD);
-    HAL_DMA_Start_IT(hspi3.hdmarx, (uint32_t)&hspi3.Instance->DR, (uint32_t)&sen_rx_val, 1);
-    SET_BIT(hspi3.Instance->CR2, SPI_CR2_RXDMAEN);
-    __HAL_SPI_ENABLE(&hspi3);
+    hspi1.hdmarx->XferCpltCallback = mySPI_DMAReceiveCplt;
+    SET_BIT(hspi1.Instance->CR2, SPI_RXFIFO_THRESHOLD);
+    HAL_DMA_Start_IT(hspi1.hdmarx, (uint32_t)&hspi1.Instance->DR, (uint32_t)&sen_rx_val, 1);
+    SET_BIT(hspi1.Instance->CR2, SPI_CR2_RXDMAEN);
+    __HAL_SPI_ENABLE(&hspi1);
 
     d_info("start pwm...\n");
     __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, DRV_PWM_HALF);
