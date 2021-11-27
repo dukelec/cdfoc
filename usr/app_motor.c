@@ -10,11 +10,10 @@
 #include "math.h"
 #include "app_main.h"
 
-#define CUR_AVG_WINDOW  18 // moving average window sample size is 2^18
-#define CUR_OFFSET_MAX  2200 // current offset max limit (middle 2048)
-#define CUR_OFFSET_MIN  1900 // current offset min limit (middle 2048)
-static uint32_t cumulative_a, cumulative_b, offset_a, offset_b;
-static int32_t adc_a, adc_b;
+#define ADC_CALI_LEN 50
+static int adc_cali_cnt;
+static uint32_t adc_ofs[3][2];
+static volatile int adc_cali_st = 0;
 
 static cdn_sock_t sock_tc_rpt = { .port = 0x10, .ns = &dft_ns, .tx_only = true };
 static cdn_sock_t sock_raw_dbg = { .port = 0xa, .ns = &dft_ns, .tx_only = true }; // raw debug
@@ -22,12 +21,6 @@ static list_head_t raw_pend = { 0 };
 
 static int pwm_over_limit = 0;
 
-
-static void init_adc_filter(void)
-{
-    cumulative_a = adc_a << CUR_AVG_WINDOW;
-    cumulative_b = adc_b << CUR_AVG_WINDOW;
-}
 
 uint8_t state_w_hook_before(uint16_t sub_offset, uint8_t len, uint8_t *dat)
 {
@@ -51,14 +44,22 @@ uint8_t state_w_hook_before(uint16_t sub_offset, uint8_t len, uint8_t *dat)
         d_debug("drv 03: %04x\n", drv_read_reg(0x03));
         d_debug("drv 04: %04x\n", drv_read_reg(0x04));
 
-        // TODO: write 1 to COAST, then init adc offset
-
-        d_debug("drv 02: %04x\n", drv_read_reg(0x02));      // default 0x0000
-        drv_write_reg(0x02, drv_read_reg(0x02) | 0x1 << 5); // 3x pwm mode
+        d_debug("drv 02: %04x\n", drv_read_reg(0x02)); // default 0x0000
+        drv_write_reg(0x02, 0x1 << 2); // COAST mode
         d_debug("drv 02: %04x\n", drv_read_reg(0x02));
 
-        delay_systick(50);
-        init_adc_filter();
+        delay_systick(5);
+        csa.adc_sel = 0;
+        memset(adc_ofs, 0, sizeof(adc_ofs));
+        adc_cali_cnt = 0;
+        adc_cali_st = 1; // start adc_cali
+        while (adc_cali_st);
+        delay_systick(5);
+        d_debug("adc cali: ab %d %d, ca %d %d, cb %d %d\n",
+                adc_ofs[0][0], adc_ofs[0][1], adc_ofs[1][0], adc_ofs[1][1], adc_ofs[2][0], adc_ofs[2][1]);
+
+        drv_write_reg(0x02, 0x1 << 5); // 3x pwm mode
+        d_debug("drv 02: %04x\n", drv_read_reg(0x02));
     }
     return 0;
 }
@@ -391,18 +392,51 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
         d_debug_c(" a %d.%.2d %d.%.2d %d.%.2d", P_2F(angle_mech), P_2F(csa.sen_angle_elec), P_2F(csa.cali_angle_elec));
 
     {
-        adc_a = HAL_ADCEx_InjectedGetValue(&hadc1, 1); // change ADC_SMPR1 sample time register
-        adc_b = HAL_ADCEx_InjectedGetValue(&hadc2, 1);
+        int32_t adc1_val = HAL_ADCEx_InjectedGetValue(&hadc1, 1); // change ADC_SMPR1 sample time register
+        int32_t adc2_val = HAL_ADCEx_InjectedGetValue(&hadc2, 1);
+        int32_t ia, ib, ic;
+
+        if (csa.adc_sel == 0) {
+            ia = adc1_val - adc_ofs[0][0];
+            ib = adc2_val - adc_ofs[0][1];
+            ic = -ia - ib;
+        } else if (csa.adc_sel == 1) {
+            ic = adc1_val - adc_ofs[1][0];
+            ia = adc2_val - adc_ofs[1][1];
+            ib = -ia - ic;
+        } else {
+            ic = adc1_val - adc_ofs[2][0];
+            ib = adc2_val - adc_ofs[2][1];
+            ia = -ic - ib;
+        }
 
         if (csa.state != ST_STOP) {
-            cumulative_a  += adc_a - offset_a;
-            cumulative_b  += adc_b - offset_b;
+            // select best csa.adc_sel
+
+        } else if (adc_cali_st) {
+            adc_ofs[csa.adc_sel][0] += adc1_val;
+            adc_ofs[csa.adc_sel][1] += adc2_val;
+            if (++adc_cali_cnt >= ADC_CALI_LEN) {
+                adc_cali_cnt = 0;
+                adc_ofs[csa.adc_sel][0] = DIV_ROUND_CLOSEST(adc_ofs[csa.adc_sel][0], ADC_CALI_LEN);
+                adc_ofs[csa.adc_sel][1] = DIV_ROUND_CLOSEST(adc_ofs[csa.adc_sel][1], ADC_CALI_LEN);
+                if (++csa.adc_sel == 3) {
+                    csa.adc_sel = 0;
+                    adc_cali_st = 0;
+                }
+            }
         }
-        offset_a = clip(cumulative_a >> CUR_AVG_WINDOW, CUR_OFFSET_MIN, CUR_OFFSET_MAX);
-        offset_b = clip(cumulative_b >> CUR_AVG_WINDOW, CUR_OFFSET_MIN, CUR_OFFSET_MAX);
-        int32_t ia = adc_a - offset_a;
-        int32_t ib = adc_b - offset_b;
-        int32_t ic = -ia - ib;
+
+        if (csa.adc_sel == 0) {
+            hadc1.Instance->JSQR = (hadc1.Instance->JSQR & 0x1ff) | (1 << 9); // a
+            hadc2.Instance->JSQR = (hadc2.Instance->JSQR & 0x1ff) | (2 << 9); // b
+        } else if (csa.adc_sel == 1) {
+            hadc1.Instance->JSQR = (hadc1.Instance->JSQR & 0x1ff) | (3 << 9); // c
+            hadc2.Instance->JSQR = (hadc2.Instance->JSQR & 0x1ff) | (1 << 9); // a
+        } else {
+            hadc1.Instance->JSQR = (hadc1.Instance->JSQR & 0x1ff) | (3 << 9); // c
+            hadc2.Instance->JSQR = (hadc2.Instance->JSQR & 0x1ff) | (2 << 9); // b
+        }
 
         csa.dbg_ia = ia;
         csa.dbg_ib = ib;
@@ -415,7 +449,7 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
 
         if (dbg_str)
             //d_debug_c(", i %5d %5d %5d", ia, ib, ic);
-            d_debug_c(", i %5d %5d", adc_a, adc_b);
+            d_debug_c(", i %5d %5d", adc1_val, adc2_val);
         if (dbg_str)
             d_debug_c(" (q %5d.%.2d, d %5d.%.2d)", P_2F(csa.sen_i_sq), P_2F(csa.sen_i_sd));
     }
