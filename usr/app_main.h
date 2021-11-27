@@ -145,10 +145,8 @@ typedef struct {
 
     int16_t         dbg_ia;
     int16_t         dbg_ib;
-    int16_t         dbg_ic;
     int16_t         dbg_u;
     int16_t         dbg_v;
-    int16_t         dbg_w;
 
 } csa_t; // config status area
 

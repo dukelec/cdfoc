@@ -20,6 +20,8 @@ static cdn_sock_t sock_tc_rpt = { .port = 0x10, .ns = &dft_ns, .tx_only = true }
 static cdn_sock_t sock_raw_dbg = { .port = 0xa, .ns = &dft_ns, .tx_only = true }; // raw debug
 static list_head_t raw_pend = { 0 };
 
+static int pwm_over_limit = 0;
+
 
 static void init_adc_filter(void)
 {
@@ -38,17 +40,22 @@ uint8_t state_w_hook_before(uint16_t sub_offset, uint8_t len, uint8_t *dat)
         csa.adc_sel = 0;
         delay_systick(50);
 
-        d_debug("drv 02: %04x\n", drv_read_reg(0x02));
-        drv_write_reg(0x02, drv_read_reg(0x02) | 0x1 << 5);
-        d_debug("drv 02: %04x\n", drv_read_reg(0x02));
+        d_debug("drv 05: %04x\n", drv_read_reg(0x05)); // default 0x016d
+        drv_write_reg(0x05, 0x036d); // 400ns dead time
+        d_debug("drv 05: %04x\n", drv_read_reg(0x05));
 
+        d_debug("drv 03: %04x\n", drv_read_reg(0x03)); // default 0x03ff
+        d_debug("drv 04: %04x\n", drv_read_reg(0x04)); // default 0x07ff
+        drv_write_reg(0x03, 0x03bb); // HS: 700mA, 1400mA
+        drv_write_reg(0x04, 0x07bb); // LS: 700mA, 1400mA
         d_debug("drv 03: %04x\n", drv_read_reg(0x03));
         d_debug("drv 04: %04x\n", drv_read_reg(0x04));
 
-        //drv_write_reg(0x03, 0x0344); // 550mA, 1100mA
-        //drv_write_reg(0x04, 0x0544); // 550mA, 1100mA, 1000-ns peak gate-current
-        //d_debug("drv 03: %04x\n", drv_read_reg(0x03));
-        //d_debug("drv 04: %04x\n", drv_read_reg(0x04));
+        // TODO: write 1 to COAST, then init adc offset
+
+        d_debug("drv 02: %04x\n", drv_read_reg(0x02));      // default 0x0000
+        drv_write_reg(0x02, drv_read_reg(0x02) | 0x1 << 5); // 3x pwm mode
+        d_debug("drv 02: %04x\n", drv_read_reg(0x02));
 
         delay_systick(50);
         init_adc_filter();
@@ -84,6 +91,13 @@ void app_motor_init(void)
 
 void app_motor_routine(void)
 {
+    static uint32_t t_last = 0;
+    if (pwm_over_limit && (t_last == 0 || get_systick() - t_last > 500)) {
+        d_debug("\n\n!~!~ %d ~!~!\n\n", pwm_over_limit);
+        pwm_over_limit = 0;
+        t_last = get_systick();
+    }
+
     // update _ki, _kd
     pid_f_init(&csa.pid_i_sq, false);
     pid_f_init(&csa.pid_i_sd, false);
@@ -392,7 +406,6 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
 
         csa.dbg_ia = ia;
         csa.dbg_ib = ib;
-        csa.dbg_ic = ic;
 
         float i_alpha = ia;
         float i_beta = (ia + ib * 2) / 1.732050808f; // √3
@@ -456,13 +469,13 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
 
     csa.dbg_u = out_pwm_u;
     csa.dbg_v = out_pwm_v;
-    csa.dbg_w = out_pwm_w;
 
     int16_t pwm_max = max(max(abs(out_pwm_u), abs(out_pwm_v)), abs(out_pwm_w));
     if (pwm_max > 1843) { // DRV_PWM_HALF * 0.9 = 1843.2
         out_pwm_u = (int)out_pwm_u * 1843 / pwm_max;
         out_pwm_v = (int)out_pwm_v * 1843 / pwm_max;
         out_pwm_w = (int)out_pwm_w * 1843 / pwm_max;
+        pwm_over_limit = pwm_max;
     }
     // write 4095 to all pwm channel for brake (set A, B, C to zero)
     __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_3, DRV_PWM_HALF - out_pwm_u); // TIM1_CH3: A
