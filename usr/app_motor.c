@@ -19,7 +19,7 @@ static cdn_sock_t sock_tc_rpt = { .port = 0x10, .ns = &dft_ns, .tx_only = true }
 static cdn_sock_t sock_raw_dbg = { .port = 0xa, .ns = &dft_ns, .tx_only = true }; // raw debug
 static list_head_t raw_pend = { 0 };
 
-static int pwm_over_limit = 0;
+static int vector_over_limit = 0;
 
 
 uint8_t state_w_hook_before(uint16_t sub_offset, uint8_t len, uint8_t *dat)
@@ -93,9 +93,9 @@ void app_motor_init(void)
 void app_motor_routine(void)
 {
     static uint32_t t_last = 0;
-    if (pwm_over_limit && (t_last == 0 || get_systick() - t_last > 500)) {
-        d_debug("\n\n!~!~ %d ~!~!\n\n", pwm_over_limit);
-        pwm_over_limit = 0;
+    if (vector_over_limit && (t_last == 0 || get_systick() - t_last > 500)) {
+        d_debug("\n\n!~!~ %d ~!~!\n\n", vector_over_limit);
+        vector_over_limit = 0;
         t_last = get_systick();
     }
 
@@ -410,10 +410,7 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
             ia = -ic - ib;
         }
 
-        if (csa.state != ST_STOP) {
-            // select best csa.adc_sel
-
-        } else if (adc_cali_st) {
+        if (csa.state == ST_STOP && adc_cali_st) {
             adc_ofs[csa.adc_sel][0] += adc1_val;
             adc_ofs[csa.adc_sel][1] += adc2_val;
             if (++adc_cali_cnt >= ADC_CALI_LEN) {
@@ -425,17 +422,6 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
                     adc_cali_st = 0;
                 }
             }
-        }
-
-        if (csa.adc_sel == 0) {
-            hadc1.Instance->JSQR = (hadc1.Instance->JSQR & 0x1ff) | (1 << 9); // a
-            hadc2.Instance->JSQR = (hadc2.Instance->JSQR & 0x1ff) | (2 << 9); // b
-        } else if (csa.adc_sel == 1) {
-            hadc1.Instance->JSQR = (hadc1.Instance->JSQR & 0x1ff) | (3 << 9); // c
-            hadc2.Instance->JSQR = (hadc2.Instance->JSQR & 0x1ff) | (1 << 9); // a
-        } else {
-            hadc1.Instance->JSQR = (hadc1.Instance->JSQR & 0x1ff) | (3 << 9); // c
-            hadc2.Instance->JSQR = (hadc2.Instance->JSQR & 0x1ff) | (2 << 9); // b
         }
 
         csa.dbg_ia = ia;
@@ -463,9 +449,17 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
             pid_f_set_target(&csa.pid_i_sq, csa.cal_current);
             csa.cal_i_sq = pid_f_compute_no_d(&csa.pid_i_sq, csa.sen_i_sq);
             csa.cal_i_sd = pid_f_compute_no_d(&csa.pid_i_sd, csa.sen_i_sd); // target default 0
+            // rotate 2d vector, origin: (sd, sq), after: (alpha, beta)
             i_alpha = csa.cal_i_sd * cos_sen_angle_elec - csa.cal_i_sq * sin_sen_angle_elec;
             i_beta =  csa.cal_i_sd * sin_sen_angle_elec + csa.cal_i_sq * cos_sen_angle_elec;
-
+            // limit vector magnitude
+            float norm = sqrtf(i_alpha * i_alpha + i_beta * i_beta);
+            float limit = 2047; // limit pwm to [1, 4095]
+            if (norm > limit) {
+                i_alpha *= limit / norm;
+                i_beta *= limit / norm;
+                vector_over_limit = norm; // for debug
+            }
         } else {
             csa.cali_angle_elec += csa.cali_angle_step;
             if (csa.cali_angle_elec >= (float)M_PI*2)
@@ -479,6 +473,10 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
         out_pwm_u = lroundf(i_alpha);
         out_pwm_v = lroundf(-i_alpha / 2 + i_beta * 0.866025404f); // (√3÷2)
         out_pwm_w = -out_pwm_u - out_pwm_v;
+        // avoid over range again
+        out_pwm_u = clip(out_pwm_u, 1, 4095);
+        out_pwm_v = clip(out_pwm_v, 1, 4095);
+        out_pwm_w = clip(out_pwm_w, 1, 4095);
 
         /*
         append_dprintf(DBG_CURRENT, "u:%.2f %.2f %d ", pid_cur_u.target, pid_cur_u.i_term, out_pwm_u);
@@ -499,18 +497,37 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
             d_debug_c("\n");
     }
 
-    //gpio_set_value(&led_r, !gpio_get_value(&led_r)); // debug for hw config
+    // select best csa.adc_sel
+    if (csa.state != ST_STOP) {
+        // DRV_PWM_HALF * 0.6 = 1228.8 (the cross point is 0.5)
+        if ((csa.adc_sel == 0 && max(out_pwm_u, out_pwm_v) > 1229) ||
+            (csa.adc_sel == 1 && max(out_pwm_w, out_pwm_u) > 1229) ||
+            (csa.adc_sel == 2 && max(out_pwm_w, out_pwm_v) > 1229)) {
 
+            if (out_pwm_w > max(out_pwm_u, out_pwm_v)) {
+                csa.adc_sel = 0;
+            } else if (out_pwm_v > max(out_pwm_w, out_pwm_u)) {
+                csa.adc_sel = 1;
+            } else {
+                csa.adc_sel = 2;
+            }
+        }
+    }
+    if (csa.adc_sel == 0) {
+        hadc1.Instance->JSQR = (hadc1.Instance->JSQR & 0x1ff) | (1 << 9); // a
+        hadc2.Instance->JSQR = (hadc2.Instance->JSQR & 0x1ff) | (2 << 9); // b
+    } else if (csa.adc_sel == 1) {
+        hadc1.Instance->JSQR = (hadc1.Instance->JSQR & 0x1ff) | (3 << 9); // c
+        hadc2.Instance->JSQR = (hadc2.Instance->JSQR & 0x1ff) | (1 << 9); // a
+    } else {
+        hadc1.Instance->JSQR = (hadc1.Instance->JSQR & 0x1ff) | (3 << 9); // c
+        hadc2.Instance->JSQR = (hadc2.Instance->JSQR & 0x1ff) | (2 << 9); // b
+    }
+
+    //gpio_set_value(&led_r, !gpio_get_value(&led_r)); // debug for hw config
     csa.dbg_u = out_pwm_u;
     csa.dbg_v = out_pwm_v;
 
-    int16_t pwm_max = max(max(abs(out_pwm_u), abs(out_pwm_v)), abs(out_pwm_w));
-    if (pwm_max > 1843) { // DRV_PWM_HALF * 0.9 = 1843.2
-        out_pwm_u = (int)out_pwm_u * 1843 / pwm_max;
-        out_pwm_v = (int)out_pwm_v * 1843 / pwm_max;
-        out_pwm_w = (int)out_pwm_w * 1843 / pwm_max;
-        pwm_over_limit = pwm_max;
-    }
     // write 4095 to all pwm channel for brake (set A, B, C to zero)
     __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_3, DRV_PWM_HALF - out_pwm_u); // TIM1_CH3: A
     __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_2, DRV_PWM_HALF - out_pwm_v); // TIM1_CH2: B
