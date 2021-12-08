@@ -446,7 +446,10 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
 
         // calculate angle
         if (csa.state != ST_CALI) {
-            pid_f_set_target(&csa.pid_i_sq, csa.cal_current);
+            if (fabsf(csa.pid_i_sq.target - csa.cal_current) <= 0.002f)
+                pid_f_set_target(&csa.pid_i_sq, csa.cal_current);
+            else
+                csa.pid_i_sq.target += sign(csa.cal_current - csa.pid_i_sq.target) * 0.002f;
             csa.cal_i_sq = pid_f_compute_no_d(&csa.pid_i_sq, csa.sen_i_sq);
             csa.cal_i_sd = pid_f_compute_no_d(&csa.pid_i_sd, csa.sen_i_sd); // target default 0
             // rotate 2d vector, origin: (sd, sq), after: (alpha, beta)
@@ -474,9 +477,9 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
         out_pwm_v = lroundf(-i_alpha / 2 + i_beta * 0.866025404f); // (√3÷2)
         out_pwm_w = -out_pwm_u - out_pwm_v;
         // avoid over range again
-        out_pwm_u = clip(out_pwm_u, 1, 4095);
-        out_pwm_v = clip(out_pwm_v, 1, 4095);
-        out_pwm_w = clip(out_pwm_w, 1, 4095);
+        out_pwm_u = clip(out_pwm_u, -2047, 2047);
+        out_pwm_v = clip(out_pwm_v, -2047, 2047);
+        out_pwm_w = clip(out_pwm_w, -2047, 2047);
 
         /*
         append_dprintf(DBG_CURRENT, "u:%.2f %.2f %d ", pid_cur_u.target, pid_cur_u.i_term, out_pwm_u);

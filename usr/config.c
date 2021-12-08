@@ -59,15 +59,15 @@ const csa_t csa_dft = {
                 .period = 5.0 / CURRENT_LOOP_FREQ
         },
         .pid_i_sq =  {
-                .kp = 1, .ki = 600,
-                .out_min = DRV_PWM_HALF * -0.9,
-                .out_max = DRV_PWM_HALF * 0.9,
+                .kp = 0.5, .ki = 600,
+                .out_min = -2047,
+                .out_max = 2047,
                 .period = 1.0 / CURRENT_LOOP_FREQ
         },
         .pid_i_sd =  {
-                .kp = 0.5, .ki = 400,
-                .out_min = DRV_PWM_HALF * -0.4, // TODO: limit q + d
-                .out_max = DRV_PWM_HALF * 0.4,
+                .kp = 0.3, .ki = 400,
+                .out_min = -1023,
+                .out_max = 1023,
                 .period = 1.0 / CURRENT_LOOP_FREQ
         },
 
@@ -353,6 +353,7 @@ void csa_list_show(void)
     CSA_SHOW(0, tc_ac, "Motor current accel");
     d_info("\n"); debug_flush(true);
 
+    CSA_SHOW(0, adc_sel, "");
     CSA_SHOW(0, dbg_ia, "");
     CSA_SHOW(0, dbg_ib, "");
     CSA_SHOW(0, dbg_u, "");
