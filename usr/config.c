@@ -59,15 +59,15 @@ const csa_t csa_dft = {
                 .period = 5.0 / CURRENT_LOOP_FREQ
         },
         .pid_i_sq =  {
-                .kp = 0.5, .ki = 600,
-                .out_min = -2047,
-                .out_max = 2047,
+                .kp = 0.25, .ki = 400,
+                .out_min = -2000,
+                .out_max = 2000,
                 .period = 1.0 / CURRENT_LOOP_FREQ
         },
         .pid_i_sd =  {
-                .kp = 0.3, .ki = 400,
-                .out_min = -1023,
-                .out_max = 1023,
+                .kp = 0.15, .ki = 300,
+                .out_min = -1600,
+                .out_max = 1600,
                 .period = 1.0 / CURRENT_LOOP_FREQ
         },
 

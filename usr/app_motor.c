@@ -20,6 +20,7 @@ static cdn_sock_t sock_raw_dbg = { .port = 0xa, .ns = &dft_ns, .tx_only = true }
 static list_head_t raw_pend = { 0 };
 
 static int vector_over_limit = 0;
+static int encoder_err = 0;
 
 
 uint8_t state_w_hook_before(uint16_t sub_offset, uint8_t len, uint8_t *dat)
@@ -58,7 +59,7 @@ uint8_t state_w_hook_before(uint16_t sub_offset, uint8_t len, uint8_t *dat)
         d_debug("adc cali: ab %d %d, ca %d %d, cb %d %d\n",
                 adc_ofs[0][0], adc_ofs[0][1], adc_ofs[1][0], adc_ofs[1][1], adc_ofs[2][0], adc_ofs[2][1]);
 
-        drv_write_reg(0x02, 0x1 << 5); // 3x pwm mode
+        drv_write_reg(0x02, (1 << 10) | (1 << 7) | (1 << 5)); // shutdown all on err, otw err, 3x pwm mode
         d_debug("drv 02: %04x\n", drv_read_reg(0x02));
     }
     return 0;
@@ -93,9 +94,10 @@ void app_motor_init(void)
 void app_motor_routine(void)
 {
     static uint32_t t_last = 0;
-    if (vector_over_limit && (t_last == 0 || get_systick() - t_last > 500)) {
-        d_debug("\n\n!~!~ %d ~!~!\n\n", vector_over_limit);
+    if ((vector_over_limit || encoder_err) && (t_last == 0 || get_systick() - t_last > 500)) {
+        d_debug("\n\n!~!~ %d ~!~! --- %d\n\n", vector_over_limit, encoder_err);
         vector_over_limit = 0;
+        encoder_err = 0;
         t_last = get_systick();
     }
 
@@ -364,6 +366,9 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
     csa.delta_encoder = delta_enc;
 #endif
 
+    if (csa.sen_encoder != csa.noc_encoder)
+        encoder_err++;
+
     // 9us lag steps = step/sec * 0.000009 sec
     csa.sen_encoder += delta_enc * ((float)CURRENT_LOOP_FREQ * 0.000019f); // 0.000009f
 
@@ -443,13 +448,18 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
     // current --> pwm
     if (csa.state != ST_STOP) {
         float i_alpha, i_beta;
+        static bool near_limit = false;
 
         // calculate angle
         if (csa.state != ST_CALI) {
-            if (fabsf(csa.pid_i_sq.target - csa.cal_current) <= 0.002f)
-                pid_f_set_target(&csa.pid_i_sq, csa.cal_current);
-            else
-                csa.pid_i_sq.target += sign(csa.cal_current - csa.pid_i_sq.target) * 0.002f;
+            if (!near_limit) {
+                if (fabsf(csa.pid_i_sq.target - csa.cal_current) <= 0.002f)
+                    pid_f_set_target(&csa.pid_i_sq, csa.cal_current);
+                else
+                    csa.pid_i_sq.target += sign(csa.cal_current - csa.pid_i_sq.target) * 0.002f;
+            } else {
+                csa.pid_i_sq.target -= sign(csa.pid_i_sq.target) * 0.001f;
+            }
             csa.cal_i_sq = pid_f_compute_no_d(&csa.pid_i_sq, csa.sen_i_sq);
             csa.cal_i_sd = pid_f_compute_no_d(&csa.pid_i_sd, csa.sen_i_sd); // target default 0
             // rotate 2d vector, origin: (sd, sq), after: (alpha, beta)
@@ -463,6 +473,7 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
                 i_beta *= limit / norm;
                 vector_over_limit = norm; // for debug
             }
+            near_limit = norm > (limit * 0.96f);
         } else {
             csa.cali_angle_elec += csa.cali_angle_step;
             if (csa.cali_angle_elec >= (float)M_PI*2)

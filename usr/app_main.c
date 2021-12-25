@@ -420,7 +420,7 @@ void app_main(void)
     d_info("pwm on.\n");
     set_led_state(LED_POWERON);
 
-    bool last_fault_val = gpio_get_value(&drv_fault);
+    uint32_t last_fault_val = 0xffffffff;
     cdn_sock_bind(&sock_vib_rx);
     uint32_t t_vib = 0;
 
@@ -439,13 +439,15 @@ void app_main(void)
             }
         }
 
-        bool cur_fault_val = gpio_get_value(&drv_fault);
-        if (!cur_fault_val && cur_fault_val != last_fault_val) {
+        if (!gpio_get_value(&drv_fault)) {
+            uint32_t cur_fault_val = (drv_read_reg(0x00) << 16) | drv_read_reg(0x01);
             gpio_set_value(&led_r, 1);
-            d_error("drv status: %04x %04x\n", drv_read_reg(0x00), drv_read_reg(0x01));
             csa.cali_run = false;
+            if (cur_fault_val != last_fault_val) {
+                d_error("drv status: %08x\n", cur_fault_val);
+                last_fault_val = cur_fault_val;
+            }
         }
-        last_fault_val = cur_fault_val;
 
         stack_check();
         app_motor_routine();
