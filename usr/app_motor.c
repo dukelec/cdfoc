@@ -453,12 +453,12 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
         // calculate angle
         if (csa.state != ST_CALI) {
             if (!near_limit) {
-                if (fabsf(csa.pid_i_sq.target - csa.cal_current) <= 0.002f)
+                if (fabsf(csa.pid_i_sq.target - csa.cal_current) <= 0.01f)
                     pid_f_set_target(&csa.pid_i_sq, csa.cal_current);
                 else
-                    csa.pid_i_sq.target += sign(csa.cal_current - csa.pid_i_sq.target) * 0.002f;
+                    csa.pid_i_sq.target += sign(csa.cal_current - csa.pid_i_sq.target) * 0.01f;
             } else {
-                csa.pid_i_sq.target -= sign(csa.pid_i_sq.target) * 0.001f;
+                csa.pid_i_sq.target -= sign(csa.pid_i_sq.target) * 0.005f;
             }
             csa.cal_i_sq = pid_f_compute_no_d(&csa.pid_i_sq, csa.sen_i_sq);
             csa.cal_i_sd = pid_f_compute_no_d(&csa.pid_i_sd, csa.sen_i_sd); // target default 0
