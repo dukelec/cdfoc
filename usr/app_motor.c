@@ -27,6 +27,7 @@ uint8_t state_w_hook_before(uint16_t sub_offset, uint8_t len, uint8_t *dat)
 {
     if (*dat == ST_STOP) {
         gpio_set_value(&drv_en, 0);
+        gpio_set_value(&led_r, 0);
         csa.adc_sel = 0;
 
     } else if (csa.state == ST_STOP && *dat != ST_STOP) {

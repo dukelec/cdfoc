@@ -386,6 +386,11 @@ void app_main(void)
             temp_drv_ret, temp_drv_id, temp_motor_ret, temp_motor_id);
 
     app_motor_init();
+    LL_ADC_SetChannelSamplingTime(hadc1.Instance, LL_ADC_CHANNEL_1, LL_ADC_SAMPLINGTIME_6CYCLES_5);
+    LL_ADC_SetChannelSamplingTime(hadc1.Instance, LL_ADC_CHANNEL_2, LL_ADC_SAMPLINGTIME_6CYCLES_5);
+    LL_ADC_SetChannelSamplingTime(hadc1.Instance, LL_ADC_CHANNEL_3, LL_ADC_SAMPLINGTIME_6CYCLES_5);
+    LL_ADC_SetChannelSamplingTime(hadc2.Instance, LL_ADC_CHANNEL_1, LL_ADC_SAMPLINGTIME_6CYCLES_5);
+    LL_ADC_SetChannelSamplingTime(hadc2.Instance, LL_ADC_CHANNEL_2, LL_ADC_SAMPLINGTIME_6CYCLES_5);
     HAL_ADCEx_Calibration_Start(&hadc1, ADC_SINGLE_ENDED);
     HAL_ADCEx_Calibration_Start(&hadc2, ADC_SINGLE_ENDED);
     HAL_ADC_Start(&hadc1);
