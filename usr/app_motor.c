@@ -468,13 +468,13 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
             i_beta =  csa.cal_i_sd * sin_sen_angle_elec + csa.cal_i_sq * cos_sen_angle_elec;
             // limit vector magnitude
             float norm = sqrtf(i_alpha * i_alpha + i_beta * i_beta);
-            float limit = 2047; // limit pwm to [1, 4095]
+            float limit = 2020; // 2047; // limit pwm to [1, 4095]
             if (norm > limit) {
                 i_alpha *= limit / norm;
                 i_beta *= limit / norm;
                 vector_over_limit = norm; // for debug
             }
-            near_limit = norm > (limit * 0.96f);
+            near_limit = norm > (limit * 0.97f); // 0.96
         } else {
             csa.cali_angle_elec += csa.cali_angle_step;
             if (csa.cali_angle_elec >= (float)M_PI*2)
