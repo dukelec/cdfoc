@@ -6,13 +6,12 @@
   ******************************************************************************
   * @attention
   *
-  * <h2><center>&copy; Copyright (c) 2019 STMicroelectronics.
-  * All rights reserved.</center></h2>
+  * Copyright (c) 2019 STMicroelectronics.
+  * All rights reserved.
   *
-  * This software component is licensed by ST under BSD 3-Clause license,
-  * the "License"; You may not use this file except in compliance with the
-  * License. You may obtain a copy of the License at:
-  *                        opensource.org/licenses/BSD-3-Clause
+  * This software is licensed under terms that can be found in the LICENSE file
+  * in the root directory of this software component.
+  * If no LICENSE file comes with this software, it is provided AS-IS.
   *
   ******************************************************************************
   */
@@ -393,7 +392,7 @@ typedef struct
                              ADC_SMPR1_SMP6 | ADC_SMPR1_SMP5 | ADC_SMPR1_SMP4 |\
                              ADC_SMPR1_SMP3 | ADC_SMPR1_SMP2 | ADC_SMPR1_SMP1 |\
                              ADC_SMPR1_SMP0)
-#endif
+#endif /* ADC_SMPR1_SMPPLUS */
 /**
   * @}
   */
@@ -482,7 +481,7 @@ typedef struct
   )
 #elif defined(STM32GBK1CB) || defined(STM32G431xx) || defined(STM32G441xx) || defined(STM32G471xx)
 #define ADC_IS_INDEPENDENT(__HANDLE__) (RESET)
-#endif
+#endif /* defined(STM32G474xx) || defined(STM32G484xx) || defined(STM32G473xx) || defined(STM32G483xx) */
 
 /**
   * @brief Set the selected injected Channel rank.
@@ -490,7 +489,8 @@ typedef struct
   * @param __RANKNB__ Rank number.
   * @retval None
   */
-#define ADC_JSQR_RK(__CHANNELNB__, __RANKNB__) ((((__CHANNELNB__) & ADC_CHANNEL_ID_NUMBER_MASK) >> ADC_CHANNEL_ID_NUMBER_BITOFFSET_POS) << ((__RANKNB__) & ADC_INJ_RANK_ID_JSQR_MASK))
+#define ADC_JSQR_RK(__CHANNELNB__, __RANKNB__) ((((__CHANNELNB__)\
+                                                  & ADC_CHANNEL_ID_NUMBER_MASK) >> ADC_CHANNEL_ID_NUMBER_BITOFFSET_POS) << ((__RANKNB__) & ADC_INJ_RANK_ID_JSQR_MASK))
 
 /**
   * @brief Configure ADC injected context queue
@@ -658,7 +658,7 @@ typedef struct
 #define ADC_TEMPERATURE_SENSOR_INSTANCE(__HANDLE__)  ((((__HANDLE__)->Instance) == ADC1) || (((__HANDLE__)->Instance) == ADC5))
 #elif defined(STM32GBK1CB) || defined(STM32G431xx) || defined(STM32G441xx) || defined(STM32G471xx) || defined(STM32G491xx) || defined(STM32G4A1xx)
 #define ADC_TEMPERATURE_SENSOR_INSTANCE(__HANDLE__)  (((__HANDLE__)->Instance) == ADC1)
-#endif
+#endif /* defined(STM32G474xx) || defined(STM32G484xx) || defined(STM32G473xx) || defined(STM32G483xx) */
 
 /**
   * @brief Verify the ADC instance connected to the battery voltage VBAT.
@@ -838,7 +838,7 @@ typedef struct
                                                           ((__CHANNEL__) == ADC_CHANNEL_16)               || \
                                                           ((__CHANNEL__) == ADC_CHANNEL_VOPAMP6)          || \
                                                           ((__CHANNEL__) == ADC_CHANNEL_VREFINT))))
-#endif
+#endif /* defined(STM32G474xx) || defined(STM32G484xx) || defined(STM32G473xx) || defined(STM32G483xx) */
 
 /**
   * @brief Verify the ADC channel setting in differential mode.
@@ -1360,7 +1360,8 @@ HAL_StatusTypeDef HAL_ADCEx_RegularMultiModeStop_DMA(ADC_HandleTypeDef *hadc);
   * @{
   */
 /* Peripheral Control functions ***********************************************/
-HAL_StatusTypeDef       HAL_ADCEx_InjectedConfigChannel(ADC_HandleTypeDef *hadc,ADC_InjectionConfTypeDef* sConfigInjected);
+HAL_StatusTypeDef       HAL_ADCEx_InjectedConfigChannel(ADC_HandleTypeDef *hadc,
+                                                        ADC_InjectionConfTypeDef *sConfigInjected);
 #if defined(ADC_MULTIMODE_SUPPORT)
 HAL_StatusTypeDef       HAL_ADCEx_MultiModeConfigChannel(ADC_HandleTypeDef *hadc, ADC_MultiModeTypeDef *multimode);
 #endif /* ADC_MULTIMODE_SUPPORT */
@@ -1390,6 +1391,3 @@ HAL_StatusTypeDef       HAL_ADCEx_EnterADCDeepPowerDownMode(ADC_HandleTypeDef *h
 #endif
 
 #endif /* STM32G4xx_HAL_ADC_EX_H */
-
-
-/************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

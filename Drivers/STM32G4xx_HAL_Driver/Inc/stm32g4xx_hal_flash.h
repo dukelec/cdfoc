@@ -6,13 +6,12 @@
   ******************************************************************************
   * @attention
   *
-  * <h2><center>&copy; COPYRIGHT(c) 2019 STMicroelectronics</center></h2>
+  * Copyright (c) 2019 STMicroelectronics.
+  * All rights reserved.
   *
-  * This software component is licensed by ST under BSD 3-Clause license,
-  * the "License"; You may not use this file except in compliance with the
-  * License. You may obtain a copy of the License at:
-  *                       opensource.org/licenses/BSD-3-Clause
-  *
+  * This software is licensed under terms that can be found in the LICENSE file in
+  * the root directory of this software component.
+  * If no LICENSE file comes with this software, it is provided AS-IS.
   ******************************************************************************
   */
 
@@ -273,6 +272,9 @@ typedef struct
 #define OB_USER_BFB2              0x00000080U              /*!< Dual-bank boot */
 #define OB_USER_DBANK             0x00000100U              /*!< Single bank with 128-bits data or two banks with 64-bits data */
 #endif
+#if defined (FLASH_OPTR_PB4_PUPEN)
+#define OB_USER_PB4_PUPEN         0x00000100U              /*!< USB power delivery dead-battery/TDI pull-up */
+#endif
 #define OB_USER_nBOOT1            0x00000200U              /*!< Boot configuration */
 #define OB_USER_SRAM_PE           0x00000400U              /*!< SRAM parity check enable (first 32kB of SRAM1 + CCM SRAM) */
 #define OB_USER_CCMSRAM_RST       0x00000800U              /*!< CCMSRAM Erase when system reset */
@@ -375,6 +377,17 @@ typedef struct
   */
 #define OB_DBANK_128_BITS         0x00000000U              /*!< Single-bank with 128-bits data */
 #define OB_DBANK_64_BITS          FLASH_OPTR_DBANK         /*!< Dual-bank with 64-bits data */
+/**
+  * @}
+  */
+#endif
+
+#if defined (FLASH_OPTR_PB4_PUPEN)
+/** @defgroup FLASH_OB_USER_PB4_PUPEN FLASH Option Bytes User PB4 PUPEN bit
+  * @{
+  */
+#define OB_PB4_PUPEN_DISABLE      0x00000000U              /*!< USB power delivery dead-battery enabled/ TDI pull-up deactivated */
+#define OB_PB4_PUPEN_ENABLE       FLASH_OPTR_PB4_PUPEN     /*!< USB power delivery dead-battery disabled/ TDI pull-up activated */
 /**
   * @}
   */
@@ -866,7 +879,8 @@ HAL_StatusTypeDef  FLASH_WaitForLastOperation(uint32_t Timeout);
 #define FLASH_SIZE                      ((((*((uint16_t *)FLASH_SIZE_DATA_REGISTER)) == 0xFFFFU)) ? (0x80UL << 10U) : \
                                         (((*((uint32_t *)FLASH_SIZE_DATA_REGISTER)) & 0xFFFFUL) << 10U))
 #define FLASH_BANK_SIZE                 (FLASH_SIZE)
-#define FLASH_PAGE_NB                   ((FLASH_SIZE == 0x00080000U) ? 256U : 64U)
+#define FLASH_PAGE_NB                   ((FLASH_SIZE == 0x00080000U) ? 256U : \
+                                        ((FLASH_SIZE == 0x00040000U) ? 128U : 64U))
 #endif
 
 #define FLASH_PAGE_SIZE                 0x800U  /* 2 KB */
@@ -952,6 +966,10 @@ HAL_StatusTypeDef  FLASH_WaitForLastOperation(uint32_t Timeout);
 #define IS_OB_USER_DBANK(VALUE)            (((VALUE) == OB_DBANK_128_BITS) || ((VALUE) == OB_DBANK_64_BITS))
 #endif
 
+#if defined (FLASH_OPTR_PB4_PUPEN)
+#define IS_OB_USER_PB4_PUPEN(VALUE)        (((VALUE) == OB_PB4_PUPEN_DISABLE) || ((VALUE) == OB_PB4_PUPEN_ENABLE))
+#endif
+
 #define IS_OB_USER_BOOT1(VALUE)            (((VALUE) == OB_BOOT1_SRAM) || ((VALUE) == OB_BOOT1_SYSTEM))
 
 #define IS_OB_USER_SRAM_PARITY(VALUE)      (((VALUE) == OB_SRAM_PARITY_ENABLE) || ((VALUE) == OB_SRAM_PARITY_DISABLE))
@@ -997,4 +1015,3 @@ HAL_StatusTypeDef  FLASH_WaitForLastOperation(uint32_t Timeout);
 
 #endif /* STM32G4xx_HAL_FLASH_H */
 
-/************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/
