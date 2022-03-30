@@ -41,8 +41,8 @@ uint8_t state_w_hook_before(uint16_t sub_offset, uint8_t len, uint8_t *dat)
 
         d_debug("drv 03: %04x\n", drv_read_reg(0x03)); // default 0x03ff
         d_debug("drv 04: %04x\n", drv_read_reg(0x04)); // default 0x07ff
-        drv_write_reg(0x03, 0x03bb); // HS: 700mA, 1400mA
-        drv_write_reg(0x04, 0x07bb); // LS: 700mA, 1400mA
+        drv_write_reg(0x03, 0x0300); // 10mA, 20mA
+        drv_write_reg(0x04, 0x0700); // 10mA, 20mA
         d_debug("drv 03: %04x\n", drv_read_reg(0x03));
         d_debug("drv 04: %04x\n", drv_read_reg(0x04));
 
@@ -311,6 +311,7 @@ static int8_t hist_err = -2;
 void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
 {
     gpio_set_value(&dbg_out1, 1);
+    gpio_set_value(&s_cs, 1);
 
     float sin_sen_angle_elec, cos_sen_angle_elec; // reduce the amount of calculations
     int16_t out_pwm_u = 0, out_pwm_v = 0, out_pwm_w = 0;
@@ -579,5 +580,6 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
     if (enc_check != csa.ori_encoder)
         d_warn("encoder dat late\n");
 
+    encoder_isr_prepare();
     gpio_set_value(&dbg_out1, 0);
 }

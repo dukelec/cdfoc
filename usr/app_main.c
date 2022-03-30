@@ -9,6 +9,7 @@
 
 #include "math.h"
 #include "app_main.h"
+#define SEN_ICMU
 
 extern SPI_HandleTypeDef hspi1;
 extern SPI_HandleTypeDef hspi2;
@@ -26,7 +27,7 @@ static i2c_t temperature_motor = { .hi2c = &hi2c1, .dev_addr = 0x92 };
 gpio_t drv_en = { .group = DRV_EN_GPIO_Port, .num = DRV_EN_Pin };
 static gpio_t drv_fault = { .group = DRV_FAULT_GPIO_Port, .num = DRV_FAULT_Pin };
 static gpio_t drv_cs = { .group = DRV_CS_GPIO_Port, .num = DRV_CS_Pin };
-//static gpio_t s_cs = { .group = SEN_CS_GPIO_Port, .num = SEN_CS_Pin };
+gpio_t s_cs = { .group = SEN_CS_GPIO_Port, .num = SEN_CS_Pin };
 //static spi_t s_spi = { .hspi = &hspi1, .ns_pin = &s_cs };
 
 uart_t debug_uart = { .huart = &huart3 };
@@ -113,24 +114,7 @@ static void stack_check(void)
     }
 }
 
-#if 1
-
-static volatile uint16_t sen_rx_val = 0;
-
-// MA73x: SPI_POLARITY_LOW, SPI_PHASE_1EDGE, 16BIT, hw-cs
-uint16_t encoder_read(void)
-{
-    return sen_rx_val;
-#if 0
-    uint16_t buf_tx[1] = { 0 };
-    uint16_t buf_rx[1];
-
-    HAL_SPI_TransmitReceive(&hspi1, (uint8_t *)buf_tx, (uint8_t *)buf_rx, 1, HAL_MAX_DELAY);
-    //d_debug("%04x %04x\n", buf[0], buf[1]);
-    return buf_rx[0];
-#endif
-}
-
+#if SEN_MA73X
 uint16_t encoder_reg_r(uint8_t addr)
 {
     uint16_t buf_tx[1];
@@ -158,26 +142,7 @@ void encoder_reg_w(uint8_t addr, uint16_t val)
     return;
 }
 
-#elif 1
-// TLE5012B: SPI_POLARITY_LOW, SPI_PHASE_2EDGE, 16BIT
-uint16_t encoder_read(void)
-{
-    uint16_t buf[2];
-    buf[0] = 0x8021;
-
-    gpio_set_value(&s_cs, 0);
-    HAL_SPI_Transmit(&hspi1, (uint8_t *)buf, 1, HAL_MAX_DELAY);
-
-    GPIOB->MODER &= ~(1 << (5 * 2 + 1)); // PB5
-    HAL_SPI_Receive(&hspi1, (uint8_t *)buf, 2, HAL_MAX_DELAY);
-    gpio_set_value(&s_cs, 1);
-    GPIOB->MODER |= 1 << (5 * 2 + 1);
-
-    //d_debug("%04x %04x\n", buf[0], buf[1]);
-
-    return 0xffff - (buf[0] << 1);
-}
-
+#elif SEN_TLE5012B
 uint16_t encoder_reg_r(uint8_t addr)
 {
     uint16_t buf[2];
@@ -205,18 +170,50 @@ void encoder_reg_w(uint8_t addr, uint16_t val)
     gpio_set_value(&s_cs, 1);
 }
 
-#else
-// ic-MU: SPI_POLARITY_LOW, SPI_PHASE_1EDGE, 8BIT
+#endif
+
+
+#if defined(SEN_MA73X) // MA73x: SPI_POLARITY_LOW, SPI_PHASE_1EDGE, 16BIT
+#define SEN_CNT 1
+static volatile uint16_t sen_rx_val[1] = {0};
+static uint16_t sen_tx_val[1] = {0};
 uint16_t encoder_read(void)
 {
-    uint8_t buf[4];
-    spi_mem_read(&s_spi, 0xa6, buf, 2); // 4
-    //uint32_t ret_val = buf[0] << 16 | buf[1] << 8 | buf[2] << 0;// | buf[3];
-    uint16_t ret_val = buf[0] << 8 | buf[1]; // | buf[2] << 0;// | buf[3];
-    //d_debug("= %08x\n", ret_val);
-    return ret_val;
+    return sen_rx_val[0];
+}
+
+#elif defined(SEN_ICMU) // ic-MU: SPI_POLARITY_LOW, SPI_PHASE_1EDGE, 8BIT
+#define SEN_CNT 3
+static volatile uint8_t sen_rx_val[3] = {0};
+static uint8_t sen_tx_val[3] = {0xa6, 0, 0};
+uint16_t encoder_read(void)
+{
+    return (sen_rx_val[1] << 8) | sen_rx_val[2];
+}
+
+#elif defined(SEN_TLE5012B) // TLE5012B: SPI_POLARITY_LOW, SPI_PHASE_2EDGE, 16BIT
+#define SEN_CNT 2           // TODO: transfer twice, change io direction in the middle (enable dma end isr)
+static volatile uint16_t sen_rx_val[2] = {0};
+static uint16_t sen_tx_val[2] = {0x8021, 0};
+uint16_t encoder_read(void)
+{
+    return 0xffff - (sen_rx_val[1] << 1);
 }
 #endif
+
+void encoder_isr_prepare(void)
+{
+    __HAL_DMA_DISABLE(hspi1.hdmarx);
+    hspi1.hdmarx->Instance->CNDTR = SEN_CNT;
+    hspi1.hdmarx->Instance->CPAR = (uint32_t)&hspi1.Instance->DR;
+    hspi1.hdmarx->Instance->CMAR = (uint32_t)sen_rx_val;
+    __HAL_DMA_ENABLE(hspi1.hdmarx);
+
+    __HAL_DMA_DISABLE(hspi1.hdmatx);
+    hspi1.hdmatx->Instance->CNDTR = SEN_CNT;
+    hspi1.hdmatx->Instance->CPAR = (uint32_t)&hspi1.Instance->DR;
+    hspi1.hdmatx->Instance->CMAR = (uint32_t)sen_tx_val;
+}
 
 uint16_t drv_read_reg(uint8_t reg)
 {
@@ -335,15 +332,6 @@ void cali_elec_angle(void)
 }
 
 
-
-void mySPI_DMAReceiveCplt(struct __DMA_HandleTypeDef *hdma)
-{
-    //gpio_set_value(&dbg_out2, 1);
-    //gpio_set_value(&dbg_out2, 0);
-}
-
-
-
 void app_main(void)
 {
     printf("\nstart app_main (mdrv)...\n");
@@ -357,6 +345,7 @@ void app_main(void)
     csa_list_show();
 
     delay_systick(50);
+#if defined(SEN_MA73X)
     d_debug("sen reg  RD: %04x\n", encoder_reg_r(0x9));
     d_debug("sen reg  FW: %04x\n", encoder_reg_r(0xe));
     d_debug("sen reg HYS: %04x\n", encoder_reg_r(0x10));
@@ -365,17 +354,14 @@ void app_main(void)
         d_debug("sen set FW to 0x33 (51)\n");
         encoder_reg_w(0xe, 0x33);
     }
-    /*
-    if (encoder_reg_r(0x9) != 0) {
-        d_debug("sen set RD to 0\n");
-        encoder_reg_w(0x9, 0);
-    }*/
-
-#if 0
-    d_debug("sen reg1: %x\n", encoder_reg_r(1));
-    //encoder_reg_w(1, encoder_reg_r(1) & ~0xe4);
-    encoder_reg_w(1, encoder_reg_r(1) & ~0xee);
-    d_debug("sen reg1: %x\n", encoder_reg_r(1));
+    //if (encoder_reg_r(0x9) != 0) {
+    //    d_debug("sen set RD (rotation direction) to 0\n");
+    //    encoder_reg_w(0x9, 0);
+    //}
+#elif defined(SEN_TLE5012B)
+    //d_debug("sen reg1: %x\n", encoder_reg_r(1));
+    //encoder_reg_w(1, encoder_reg_r(1) & ~0xee); // ~0xe4
+    //d_debug("sen reg1: %x\n", encoder_reg_r(1));
 #endif
 
     uint16_t temp_drv_id = 0;
@@ -398,14 +384,18 @@ void app_main(void)
     HAL_ADCEx_InjectedStart_IT(&hadc2);
     HAL_ADCEx_InjectedStart_IT(&hadc1);
 
-    static uint16_t sen_tx_val = 0;
-    HAL_DMA_Start(htim1.hdma[TIM_DMA_ID_CC4], (uint32_t)&sen_tx_val, (uint32_t)&hspi1.Instance->DR, 1);
+    static uint16_t gpo_tx_val = SEN_CS_Pin;
+    HAL_DMA_Start(htim1.hdma[TIM_DMA_ID_CC4], (uint32_t)&gpo_tx_val, (uint32_t)&SEN_CS_GPIO_Port->BRR, 1);
     __HAL_TIM_ENABLE_DMA(&htim1, TIM_DMA_CC4);
 
-    hspi1.hdmarx->XferCpltCallback = mySPI_DMAReceiveCplt;
-    SET_BIT(hspi1.Instance->CR2, SPI_RXFIFO_THRESHOLD);
-    HAL_DMA_Start_IT(hspi1.hdmarx, (uint32_t)&hspi1.Instance->DR, (uint32_t)&sen_rx_val, 1);
+#ifdef SEN_ICMU
+    SET_BIT(hspi1.Instance->CR2, SPI_RXFIFO_THRESHOLD); // 8bit
+#else
+    CLEAR_BIT(hspi1.Instance->CR2, SPI_RXFIFO_THRESHOLD); // 16bit
+#endif
     SET_BIT(hspi1.Instance->CR2, SPI_CR2_RXDMAEN);
+    SET_BIT(hspi1.Instance->CR2, SPI_CR2_TXDMAEN);
+    encoder_isr_prepare();
     __HAL_SPI_ENABLE(&hspi1);
 
     d_info("start pwm...\n");
@@ -420,7 +410,7 @@ void app_main(void)
     HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_2);
     HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_3);
     HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_4);
-    //__HAL_TIM_ENABLE_IT(&htim1, TIM_IT_CC4);
+    __HAL_TIM_ENABLE_IT(&htim1, TIM_IT_CC4);
 
     d_info("pwm on.\n");
     set_led_state(LED_POWERON);

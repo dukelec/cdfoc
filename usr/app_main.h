@@ -200,7 +200,9 @@ void app_motor_routine(void);
 void selection_sort(int32_t arr[], int len, int32_t order[]);
 
 uint16_t encoder_read(void);
+void encoder_isr_prepare(void);
 
+extern SPI_HandleTypeDef hspi1;
 extern ADC_HandleTypeDef hadc1;
 extern ADC_HandleTypeDef hadc2;
 extern TIM_HandleTypeDef htim1;
@@ -208,10 +210,17 @@ extern TIM_HandleTypeDef htim1;
 extern gpio_t drv_en;
 extern gpio_t led_r;
 extern gpio_t led_g;
+extern gpio_t s_cs;
 extern gpio_t dbg_out1;
 //extern gpio_t dbg_out2;
 extern gpio_t sen_int;
 extern cdn_ns_t dft_ns;
 extern list_head_t frame_free_head;
+
+
+inline void encoder_isr(void)
+{
+    __HAL_DMA_ENABLE(hspi1.hdmatx);
+}
 
 #endif
