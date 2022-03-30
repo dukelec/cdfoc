@@ -277,7 +277,6 @@ static inline void speed_loop_compute(void)
 
     if (++s_filt_cnt == 5) {
         csa.sen_speed = s_avg / 5.0f;
-        csa.sen_speed_rpm = lroundf(csa.sen_speed / 65536 * 60);
         s_avg = 0;
         s_filt_cnt = 0;
 
@@ -301,8 +300,6 @@ static inline void speed_loop_compute(void)
     }
 }
 
-
-// TODO: read sensor at same time of adc sampling
 
 #define HIST_LEN 2
 static uint16_t hist[HIST_LEN] = { 0 };
@@ -571,8 +568,7 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
 #endif
 
         LL_ADC_REG_StartConversion(hadc1.Instance);
-//          delay_systick(10);
-
+        //delay_systick(10);
     }
 #endif
 

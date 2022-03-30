@@ -341,9 +341,6 @@ void csa_list_show(void)
     CSA_SHOW(0, sen_angle_elec, "Get electric angle from sen_encoder");
     d_info("\n"); debug_flush(true);
 
-    CSA_SHOW(0, sen_speed_rpm, "RPM of sen_speed");
-    CSA_SHOW(0, vib_angle, "Vibration angle");
-    CSA_SHOW(0, vib_magnitude, "Vibration magnitude");
     CSA_SHOW(0, loop_cnt, "Increase at current loop, for raw dbg");
     d_info("\n"); debug_flush(true);
 

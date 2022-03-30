@@ -45,8 +45,6 @@ static cdn_pkt_t packet_alloc[PACKET_MAX];
 static cdctl_dev_t r_dev = {0};    // CDBUS
 cdn_ns_t dft_ns = {0};             // CDNET
 
-static cdn_sock_t sock_vib_rx = { .port = 0xb, .ns = &dft_ns };
-
 
 static void device_init(void)
 {
@@ -416,23 +414,10 @@ void app_main(void)
     set_led_state(LED_POWERON);
 
     uint32_t last_fault_val = 0xffffffff;
-    cdn_sock_bind(&sock_vib_rx);
-    uint32_t t_vib = 0;
 
     while (true) {
         //encoder_read();
         //d_debug("drv: %08x\n", drv_read_reg(0x01) << 16 | drv_read_reg(0x00));
-
-        cdn_pkt_t *pkt = cdn_sock_recvfrom(&sock_vib_rx);
-        if (pkt) {
-            csa.vib_angle = *(int16_t *)(pkt->dat + 1);
-            csa.vib_magnitude = *(int16_t *)(pkt->dat + 3);
-            list_put(&dft_ns.free_pkts, &pkt->node);
-            if (get_systick() - t_vib > 1000) {
-                t_vib = get_systick();
-                d_debug("vib rx: %d (%d)\n", csa.vib_angle, csa.vib_magnitude);
-            }
-        }
 
         if (!gpio_get_value(&drv_fault)) {
             uint32_t cur_fault_val = (drv_read_reg(0x00) << 16) | drv_read_reg(0x01);
