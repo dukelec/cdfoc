@@ -87,8 +87,6 @@ void app_motor_init(void)
     pid_f_init(&csa.pid_i_sd, true);
     pid_f_init(&csa.pid_speed, true);
     pid_i_init(&csa.pid_pos, true);
-
-    csa.sen_encoder = encoder_read(); // init last value
     cdn_sock_bind(&sock_raw_dbg);
 }
 
@@ -198,33 +196,25 @@ static inline void t_curve_compute(void)
     }
 
     if (csa.tc_state) {
-        if (csa.tc_pos != csa.cal_pos && (csa.tc_pos - csa.cal_pos >= 0) != (csa.tc_vc >= 0.0f)) { // different direction
-            csa.tc_ac = sign(csa.tc_pos - csa.cal_pos) * min((float)csa.tc_accel, fabsf(csa.tc_vc));
-            csa.tc_state = 1;
-        } else {
-            if (csa.tc_pos != csa.cal_pos) {
-                csa.tc_ac = ((/* tc_ve + */ csa.tc_vc) / 2.0f) * (/* tc_ve */ - csa.tc_vc) / (csa.tc_pos - csa.cal_pos);
-                csa.tc_ac = sign(csa.tc_ac) * min(fabsf(csa.tc_ac), (float)csa.tc_accel);
-            } else {
-                csa.tc_ac = -sign(csa.tc_vc) * (float)csa.tc_accel;
-            }
-        }
-
-        if (fabsf(csa.tc_ac) * 1.1f < csa.tc_accel) {
-            if (csa.tc_state == 1) {
-                csa.tc_vc += sign(csa.tc_pos - csa.cal_pos) * ((float)csa.tc_accel / (CURRENT_LOOP_FREQ / 25.0f));
-                csa.tc_vc = clip(csa.tc_vc, -(float)csa.tc_speed, (float)csa.tc_speed);
-            }
-        } else {
-            csa.tc_state = 2;
-            // Slightly more than allowed, such as 1.1 times.
-            csa.tc_vc += csa.tc_ac * 1.1f / (CURRENT_LOOP_FREQ / 25.0f);
-        }
-
         float v_step = (float)csa.tc_accel / (CURRENT_LOOP_FREQ / 25.0f);
+
+        if (csa.tc_pos != csa.cal_pos) {
+            // t = (v1 - v2) / a; s = ((v1 + v2) / 2) * t; a =>
+            csa.tc_ac = ((/* tc_ve + */ csa.tc_vc) / 2.0f) * (/* tc_ve */ - csa.tc_vc) / (csa.tc_pos - csa.cal_pos);
+            csa.tc_ac = min(fabsf(csa.tc_ac), csa.tc_accel * 1.2f);
+        } else {
+            csa.tc_ac = csa.tc_accel * 1.2f;
+        }
+
+        if (csa.tc_ac >= csa.tc_accel) {
+            float delta_v = csa.tc_ac / (CURRENT_LOOP_FREQ / 25.0f);
+            csa.tc_vc += -sign(csa.tc_vc) * delta_v;
+        } else {
+            csa.tc_vc += ((csa.tc_pos >= csa.cal_pos) ? 1 : -1) * v_step;
+            csa.tc_vc = clip(csa.tc_vc, -(float)csa.tc_speed, (float)csa.tc_speed);
+        }
+
         float dt_pos = csa.tc_vc / (CURRENT_LOOP_FREQ / 25.0f);
-        if (fabsf(dt_pos) < min(v_step, 1.0f))
-            dt_pos = sign(csa.tc_pos - csa.cal_pos) * min(v_step, 1.0f);
         p64f += (double)dt_pos;
         int32_t p32i = lround(p64f);
 
@@ -234,6 +224,7 @@ static inline void t_curve_compute(void)
                 csa.tc_state = 0;
                 csa.tc_vc = 0;
                 csa.tc_ac = 0;
+                p64f = csa.cal_pos;
             }
         } else {
             csa.cal_pos = p32i;
@@ -447,10 +438,11 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
     // current --> pwm
     if (csa.state != ST_STOP) {
         float i_alpha, i_beta;
-        static bool near_limit = false;
 
         // calculate angle
         if (csa.state != ST_CALI) {
+#if defined(CAL_CURRENT_SMOOTH)
+            static bool near_limit = false;
             if (!near_limit) {
                 if (fabsf(csa.pid_i_sq.target - csa.cal_current) <= 0.01f)
                     pid_f_set_target(&csa.pid_i_sq, csa.cal_current);
@@ -459,6 +451,9 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
             } else {
                 csa.pid_i_sq.target -= sign(csa.pid_i_sq.target) * 0.005f;
             }
+#else
+            pid_f_set_target(&csa.pid_i_sq, csa.cal_current);
+#endif
             csa.cal_i_sq = pid_f_compute_no_d(&csa.pid_i_sq, csa.sen_i_sq);
             csa.cal_i_sd = pid_f_compute_no_d(&csa.pid_i_sd, csa.sen_i_sd); // target default 0
             // rotate 2d vector, origin: (sd, sq), after: (alpha, beta)
@@ -472,7 +467,9 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
                 i_beta *= limit / norm;
                 vector_over_limit = norm; // for debug
             }
+#if defined(CAL_CURRENT_SMOOTH)
             near_limit = norm > (limit * 0.97f); // 0.96
+#endif
         } else {
             csa.cali_angle_elec += csa.cali_angle_step;
             if (csa.cali_angle_elec >= (float)M_PI*2)

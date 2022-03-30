@@ -298,6 +298,8 @@ void cali_elec_angle(void)
             d_info("cali:  cw: %02x\n", (amount_f / csa.motor_poles) & 0xffff);
             d_info("cali: ccw: %02x\n", (amount_r / csa.motor_poles) & 0xffff);
             d_info("cali: avg: %02x\n", ((amount_f + amount_r) / csa.motor_poles / 2) & 0xffff);
+            uint8_t dat = ST_STOP;
+            state_w_hook_before(0, 1, &dat);
             csa.state = ST_STOP;
             csa.cali_run = false;
             pole_cnt = -1;
