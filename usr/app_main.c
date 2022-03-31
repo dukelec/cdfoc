@@ -10,6 +10,7 @@
 #include "math.h"
 #include "app_main.h"
 #define SEN_ICMU
+//#define SEN_MA73X
 
 extern SPI_HandleTypeDef hspi1;
 extern SPI_HandleTypeDef hspi2;
@@ -112,15 +113,20 @@ static void stack_check(void)
     }
 }
 
-#if SEN_MA73X
+#if defined(SEN_MA73X)
 uint16_t encoder_reg_r(uint8_t addr)
 {
     uint16_t buf_tx[1];
     uint16_t buf_rx[1];
     buf_tx[0] = (0x40 | addr) << 8;
+    gpio_set_value(&s_cs, 0);
     HAL_SPI_TransmitReceive(&hspi1, (uint8_t *)buf_tx, (uint8_t *)buf_rx, 1, HAL_MAX_DELAY);
+    gpio_set_value(&s_cs, 1);
+    delay_systick(2000 / SYSTICK_US_DIV); // >= 40us
     buf_tx[0] = 0;
+    gpio_set_value(&s_cs, 0);
     HAL_SPI_TransmitReceive(&hspi1, (uint8_t *)buf_tx, (uint8_t *)buf_rx, 1, HAL_MAX_DELAY);
+    gpio_set_value(&s_cs, 1);
     if ((buf_rx[0] & 0xff) != 0)
         d_error("enc reg r, err ret: %04x\n", buf_rx[0]);
     return buf_rx[0] >> 8;
@@ -131,16 +137,20 @@ void encoder_reg_w(uint8_t addr, uint16_t val)
     uint16_t buf_tx[1];
     uint16_t buf_rx[1];
     buf_tx[0] = ((0x80 | addr) << 8) | val;
+    gpio_set_value(&s_cs, 0);
     HAL_SPI_TransmitReceive(&hspi1, (uint8_t *)buf_tx, (uint8_t *)buf_rx, 1, HAL_MAX_DELAY);
-    delay_systick(50000 / SYSTICK_US_DIV);
+    gpio_set_value(&s_cs, 1);
+    delay_systick(50000 / SYSTICK_US_DIV); // >= 20ms
     buf_tx[0] = 0;
+    gpio_set_value(&s_cs, 0);
     HAL_SPI_TransmitReceive(&hspi1, (uint8_t *)buf_tx, (uint8_t *)buf_rx, 1, HAL_MAX_DELAY);
+    gpio_set_value(&s_cs, 1);
     if (((buf_rx[0] & 0xff) != 0) || (buf_rx[0] >> 8) != val)
         d_error("enc reg w, err ret: %04x\n", buf_rx[0]);
     return;
 }
 
-#elif SEN_TLE5012B
+#elif defined(SEN_TLE5012B)
 uint16_t encoder_reg_r(uint8_t addr)
 {
     uint16_t buf[2];
@@ -171,7 +181,7 @@ void encoder_reg_w(uint8_t addr, uint16_t val)
 #endif
 
 
-#if defined(SEN_MA73X) // MA73x: SPI_POLARITY_LOW, SPI_PHASE_1EDGE, 16BIT
+#if defined(SEN_MA73X) // MA73x: SPI_POLARITY_LOW, SPI_PHASE_1EDGE, 16BIT ( = DMA data width)
 #define SEN_CNT 1
 static volatile uint16_t sen_rx_val[1] = {0};
 static uint16_t sen_tx_val[1] = {0};
@@ -364,12 +374,14 @@ void app_main(void)
     //d_debug("sen reg1: %x\n", encoder_reg_r(1));
 #endif
 
+#if 0
     uint16_t temp_drv_id = 0;
     uint16_t temp_motor_id = 0;
     int temp_drv_ret = i2c_mem_read(&temperature_drv, 0x0f, (uint8_t *)&temp_drv_id, 2);
     int temp_motor_ret = i2c_mem_read(&temperature_motor, 0x0f, (uint8_t *)&temp_motor_id, 2);
     d_debug("temperature id: drv %d: %x, motor %d: %x\n",
             temp_drv_ret, temp_drv_id, temp_motor_ret, temp_motor_id);
+#endif
 
     app_motor_init();
     LL_ADC_SetChannelSamplingTime(hadc1.Instance, LL_ADC_CHANNEL_1, LL_ADC_SAMPLINGTIME_6CYCLES_5);
@@ -388,11 +400,7 @@ void app_main(void)
     HAL_DMA_Start(htim1.hdma[TIM_DMA_ID_CC4], (uint32_t)&gpo_tx_val, (uint32_t)&SEN_CS_GPIO_Port->BRR, 1);
     __HAL_TIM_ENABLE_DMA(&htim1, TIM_DMA_CC4);
 
-#ifdef SEN_ICMU
-    SET_BIT(hspi1.Instance->CR2, SPI_RXFIFO_THRESHOLD); // 8bit
-#else
-    CLEAR_BIT(hspi1.Instance->CR2, SPI_RXFIFO_THRESHOLD); // 16bit
-#endif
+
     SET_BIT(hspi1.Instance->CR2, SPI_CR2_RXDMAEN);
     SET_BIT(hspi1.Instance->CR2, SPI_CR2_TXDMAEN);
     encoder_isr_prepare();

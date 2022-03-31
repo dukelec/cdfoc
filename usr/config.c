@@ -92,7 +92,8 @@ const csa_t csa_dft = {
                         { .offset = offsetof(csa_t, pid_i_sq) + offsetof(pid_f_t, target), .size = 4 * 3 },
                         // i_term, last_input
                         { .offset = offsetof(csa_t, pid_i_sd) + offsetof(pid_f_t, i_term), .size = 4 * 2 },
-                        { .offset = offsetof(csa_t, sen_encoder), .size = 2 }
+                        { .offset = offsetof(csa_t, sen_encoder), .size = 2 },
+                        { .offset = offsetof(csa_t, cal_i_sq), .size = 4 * 2 }
                         //{ .offset = offsetof(csa_t, noc_encoder), .size = 2 }
                 }, { // speed
                         { .offset = offsetof(csa_t, pid_speed) + offsetof(pid_f_t, target), .size = 4 * 3 },
