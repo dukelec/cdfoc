@@ -200,7 +200,7 @@ uint16_t encoder_read(void)
 }
 
 #elif defined(SEN_TLE5012B) // TLE5012B: SPI_POLARITY_LOW, SPI_PHASE_2EDGE, 16BIT
-#define SEN_CNT 2           // TODO: transfer twice, change io direction in the middle (enable dma end isr)
+#define SEN_CNT 2           // connection: MCU_MOSI -- resistor -- MCU_MISO -- TLE5012B_DATA
 static volatile uint16_t sen_rx_val[2] = {0};
 static uint16_t sen_tx_val[2] = {0x8021, 0};
 uint16_t encoder_read(void)

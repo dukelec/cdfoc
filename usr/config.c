@@ -46,14 +46,14 @@ const csa_t csa_dft = {
         .dbg_en = false,
         .dbg_dst = { .addr = {0x80, 0x00, 0x00}, .port = 9 },
 
-        .pid_pos = {
-                .kp = 15, .ki = 200, .kd = 0.02,
+        .pid_pos = { // motor must have enough power to follow the target position
+                .kp = 50, .ki = 12000, .kd = 0.02,
                 .out_min = -65536*100,
                 .out_max = 65536*100, // limit output speed
                 .period = 25.0 / CURRENT_LOOP_FREQ
         },
         .pid_speed = {
-                .kp = 0.002, .ki = 1.2,
+                .kp = 0.01, .ki = 0.8,
                 .out_min = -3000,
                 .out_max = 3000, // limit output current
                 .period = 5.0 / CURRENT_LOOP_FREQ
