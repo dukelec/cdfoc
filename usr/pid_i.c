@@ -63,6 +63,8 @@ void pid_i_reset(pid_i_t *pid, int input, float output)
 {
     pid->last_input = input;
     pid->i_term = clip(output, pid->out_min, pid->out_max);
+    for (int i = 0; i < HIST_LEN; i++)
+        hist[i] = 0;
 }
 
 void pid_i_init(pid_i_t *pid, bool reset)
