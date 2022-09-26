@@ -9,8 +9,9 @@
 
 #include "math.h"
 #include "app_main.h"
-#define SEN_ICMU
+//#define SEN_ICMU
 //#define SEN_MA73X
+#define SEN_TLE5012B
 
 extern SPI_HandleTypeDef hspi1;
 extern SPI_HandleTypeDef hspi2;
@@ -158,11 +159,8 @@ uint16_t encoder_reg_r(uint8_t addr)
 
     gpio_set_value(&s_cs, 0);
     HAL_SPI_Transmit(&hspi1, (uint8_t *)buf, 1, HAL_MAX_DELAY);
-
-    GPIOB->MODER &= ~(1 << (5 * 2 + 1)); // PB5
     HAL_SPI_Receive(&hspi1, (uint8_t *)buf, 1, HAL_MAX_DELAY);
     gpio_set_value(&s_cs, 1);
-    GPIOB->MODER |= 1 << (5 * 2 + 1);
 
     return buf[0];
 }
@@ -182,6 +180,7 @@ void encoder_reg_w(uint8_t addr, uint16_t val)
 
 
 #if defined(SEN_MA73X) // MA73x: SPI_POLARITY_LOW, SPI_PHASE_1EDGE, 16BIT ( = DMA data width)
+
 #define SEN_CNT 1
 static volatile uint16_t sen_rx_val[1] = {0};
 static uint16_t sen_tx_val[1] = {0};
@@ -191,6 +190,7 @@ uint16_t encoder_read(void)
 }
 
 #elif defined(SEN_ICMU) // ic-MU: SPI_POLARITY_LOW, SPI_PHASE_1EDGE, 8BIT
+
 #define SEN_CNT 3
 static volatile uint8_t sen_rx_val[3] = {0};
 static uint8_t sen_tx_val[3] = {0xa6, 0, 0};
@@ -200,6 +200,7 @@ uint16_t encoder_read(void)
 }
 
 #elif defined(SEN_TLE5012B) // TLE5012B: SPI_POLARITY_LOW, SPI_PHASE_2EDGE, 16BIT
+
 #define SEN_CNT 2           // connection: MCU_MOSI -- resistor -- MCU_MISO -- TLE5012B_DATA
 static volatile uint16_t sen_rx_val[2] = {0};
 static uint16_t sen_tx_val[2] = {0x8021, 0};
@@ -207,6 +208,7 @@ uint16_t encoder_read(void)
 {
     return 0xffff - (sen_rx_val[1] << 1);
 }
+
 #endif
 
 void encoder_isr_prepare(void)
