@@ -210,8 +210,9 @@ static inline void t_curve_compute(void)
             float delta_v = csa.tc_ac / (CURRENT_LOOP_FREQ / 25.0f);
             csa.tc_vc += -sign(csa.tc_vc) * delta_v;
         } else {
-            csa.tc_vc += ((csa.tc_pos >= csa.cal_pos) ? 1 : -1) * v_step;
-            csa.tc_vc = clip(csa.tc_vc, -(float)csa.tc_speed, (float)csa.tc_speed);
+            float target_v = ((csa.tc_pos >= csa.cal_pos) ? 1 : -1) * (float)csa.tc_speed;
+            float delta_v = ((target_v >= csa.tc_vc) ? 1 : -1) * min(v_step, fabsf(target_v - csa.tc_vc));
+            csa.tc_vc += delta_v;
         }
 
         float dt_pos = csa.tc_vc / (CURRENT_LOOP_FREQ / 25.0f);
