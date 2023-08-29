@@ -36,8 +36,8 @@
 typedef enum {
     ST_STOP = 0,
     ST_CALI,
-    ST_CONST_CURRENT,
-    ST_CONST_SPEED,
+    ST_CURRENT,
+    ST_SPEED,
     ST_POSITION,
     ST_POS_TC
 } state_t;

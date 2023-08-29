@@ -278,13 +278,20 @@ static inline void speed_loop_compute(void)
             raw_dbg(2);
         }
 
-        if (csa.state < ST_CONST_SPEED) {
+        if (csa.state < ST_SPEED) {
             pid_f_reset(&csa.pid_speed, 0, 0);
             pid_f_set_target(&csa.pid_speed, 0);
             if (csa.state == ST_STOP)
                 csa.cal_current = 0;
         } else {
-            pid_f_set_target(&csa.pid_speed, csa.cal_speed); // TODO: only set once after modified
+            if (csa.state == ST_SPEED) {
+                float v_step = (float)csa.tc_accel / (CURRENT_LOOP_FREQ / 25.0f);
+                float speed = csa.pid_speed.target <= csa.cal_speed ?
+                        min(csa.pid_speed.target + v_step, csa.cal_speed) : max(csa.pid_speed.target - v_step, csa.cal_speed);
+                pid_f_set_target(&csa.pid_speed, speed);
+            } else {
+                pid_f_set_target(&csa.pid_speed, csa.cal_speed); // TODO: only set once after modified
+            }
             csa.cal_current = lroundf(pid_f_compute_no_d(&csa.pid_speed, csa.sen_speed));
         }
 
