@@ -1,0 +1,8 @@
+[submodule "cdnet_bl"]
+	path = mdrv_bl/cdnet
+	url = ../cdnet
+
+[submodule "cdnet_fw"]
+	path = mdrv_fw/cdnet
+	url = ../cdnet
+
