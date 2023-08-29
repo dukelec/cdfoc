@@ -1,5 +1,5 @@
 /*
- * Software License Agreement (BSD License)
+ * Software License Agreement (MIT License)
  *
  * Copyright (c) 2017, DUKELEC, Inc.
  * All rights reserved.
@@ -86,7 +86,7 @@ static void p1_service_routine(void)
     }
 
     d_debug("p1 ser: ignore\n");
-    list_put(&dft_ns.free_pkts, &pkt->node);
+    list_put(dft_ns.free_pkts, &pkt->node);
 }
 
 
@@ -136,7 +136,7 @@ static void p8_service_routine(void)
 #endif
     } else {
         d_warn("nvm: wrong cmd, len: %d\n", pkt->len);
-        list_put(&dft_ns.free_pkts, &pkt->node);
+        list_put(dft_ns.free_pkts, &pkt->node);
         return;
     }
 
@@ -179,7 +179,7 @@ static void p5_service_routine(void)
         return;
     if (csa.conf_from & 0x80) {
         d_warn("csa: avoid cmd, len: %d\n", pkt->len);
-        list_put(&dft_ns.free_pkts, &pkt->node);
+        list_put(dft_ns.free_pkts, &pkt->node);
         return;
     }
 
@@ -242,7 +242,7 @@ static void p5_service_routine(void)
 
     } else {
         d_warn("csa: wrong cmd, len: %d\n", pkt->len);
-        list_put(&dft_ns.free_pkts, &pkt->node);
+        list_put(dft_ns.free_pkts, &pkt->node);
         return;
     }
 
@@ -331,7 +331,7 @@ static void p6_service_routine(void)
 
     } else {
         d_warn("qxchg: wrong cmd, len: %d\n", pkt->len);
-        list_put(&dft_ns.free_pkts, &pkt->node);
+        list_put(dft_ns.free_pkts, &pkt->node);
         return;
     }
 

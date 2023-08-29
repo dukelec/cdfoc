@@ -1,10 +1,10 @@
 /*
- * Software License Agreement (BSD License)
+ * Software License Agreement (MIT License)
  *
  * Copyright (c) 2017, DUKELEC, Inc.
  * All rights reserved.
  *
- * Author: Duke Fong <duke@dukelec.com>
+ * Author: Duke Fong <d@d-l.io>
  */
 
 #include "app_main.h"
@@ -23,6 +23,7 @@ static cd_frame_t frame_alloc[FRAME_MAX];
 list_head_t frame_free_head = {0};
 
 static cdn_pkt_t packet_alloc[PACKET_MAX];
+list_head_t packet_free_head = {0};
 
 static cdctl_dev_t r_dev = {0};    // CDBUS
 cdn_ns_t dft_ns = {0};             // CDNET
@@ -31,12 +32,12 @@ cdn_ns_t dft_ns = {0};             // CDNET
 static void device_init(void)
 {
     int i;
-    cdn_init_ns(&dft_ns);
+    cdn_init_ns(&dft_ns, &packet_free_head);
 
     for (i = 0; i < FRAME_MAX; i++)
         list_put(&frame_free_head, &frame_alloc[i].node);
     for (i = 0; i < PACKET_MAX; i++)
-        list_put(&dft_ns.free_pkts, &packet_alloc[i].node);
+        list_put(&packet_free_head, &packet_alloc[i].node);
 
     cdctl_cfg_t cfg = csa.bus_cfg;
     cfg.baud_l = cfg.baud_h = 115200;

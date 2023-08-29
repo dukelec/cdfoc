@@ -1,5 +1,5 @@
 /*
- * Software License Agreement (BSD License)
+ * Software License Agreement (MIT License)
  *
  * Copyright (c) 2017, DUKELEC, Inc.
  * All rights reserved.
@@ -244,7 +244,7 @@ void csa_list_show(void)
     CSA_SHOW_SUB(1, bus_cfg, cdctl_cfg_t, mac, "RS-485 port id, range: 0~254");
     CSA_SHOW_SUB(0, bus_cfg, cdctl_cfg_t, baud_l, "RS-485 baud rate for first byte");
     CSA_SHOW_SUB(0, bus_cfg, cdctl_cfg_t, baud_h, "RS-485 baud rate for follow bytes");
-    CSA_SHOW_SUB(1, bus_cfg, cdctl_cfg_t, filter, "Multicast address");
+    CSA_SHOW_SUB(1, bus_cfg, cdctl_cfg_t, filter_m, "Multicast address");
     CSA_SHOW_SUB(0, bus_cfg, cdctl_cfg_t, mode, "0: Arbitration, 1: Break Sync");
     CSA_SHOW_SUB(0, bus_cfg, cdctl_cfg_t, tx_permit_len, "Allow send wait time");
     CSA_SHOW_SUB(0, bus_cfg, cdctl_cfg_t, max_idle_len, "Max idle wait time for BS mode");

@@ -5,7 +5,9 @@
  * All rights reserved.
  *
  * Author: http://brettbeauregard.com/blog/2011/04/improving-the-beginners-pid-introduction/
- * Modified by: Duke Fong <duke@dukelec.com>
+ * Modified by: Duke Fong <d@d-l.io>
+ *
+ * Notes: _i is integer version
  */
 
 #include "cd_utils.h"
