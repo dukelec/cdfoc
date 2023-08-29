@@ -47,10 +47,10 @@ const csa_t csa_dft = {
         .dbg_dst = { .addr = {0x80, 0x00, 0x00}, .port = 9 },
 
         .pid_pos = { // motor must have enough power to follow the target position
-                .kp = 50, .ki = 12000, .kd = 0.02,
-                .out_min = -65536*100,
-                .out_max = 65536*100, // limit output speed
-                .period = 25.0 / CURRENT_LOOP_FREQ
+                .kp = 0.023, .ki = 5.5, .kd = 0.00001,
+                .out_min = -3000,
+                .out_max = 3000, // limit output current
+                .period = 5.0 / CURRENT_LOOP_FREQ
         },
         .pid_speed = {
                 .kp = 0.01, .ki = 0.8,
@@ -101,8 +101,7 @@ const csa_t csa_dft = {
                         { .offset = offsetof(csa_t, sen_encoder), .size = 2 },
                         { .offset = offsetof(csa_t, delta_encoder), .size = 4 }
                 }, { // pos
-                        { .offset = offsetof(csa_t, pid_pos) + offsetof(pid_i_t, target), .size = 4 * 3 },
-                        { .offset = offsetof(csa_t, cal_speed), .size = 4 },
+                        { .offset = offsetof(csa_t, pid_pos) + offsetof(pid_i_t, target), .size = 4 * 3 }
                 }, { // t_curve
                         { .offset = offsetof(csa_t, tc_state), .size = 1 },
                         { .offset = offsetof(csa_t, tc_pos), .size = 4 },

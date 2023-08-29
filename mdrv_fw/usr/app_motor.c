@@ -196,7 +196,7 @@ static inline void t_curve_compute(void)
     }
 
     if (csa.tc_state) {
-        float v_step = (float)csa.tc_accel / (CURRENT_LOOP_FREQ / 25.0f);
+        float v_step = (float)csa.tc_accel / (CURRENT_LOOP_FREQ / 5.0f);
 
         if (csa.tc_pos != csa.cal_pos) {
             // t = (v1 - v2) / a; s = ((v1 + v2) / 2) * t; a =>
@@ -207,7 +207,7 @@ static inline void t_curve_compute(void)
         }
 
         if (csa.tc_ac >= csa.tc_accel) {
-            float delta_v = csa.tc_ac / (CURRENT_LOOP_FREQ / 25.0f);
+            float delta_v = csa.tc_ac / (CURRENT_LOOP_FREQ / 5.0f);
             csa.tc_vc += -sign(csa.tc_vc) * delta_v;
         } else {
             float target_v = ((csa.tc_pos >= csa.cal_pos) ? 1 : -1) * (float)csa.tc_speed;
@@ -215,7 +215,7 @@ static inline void t_curve_compute(void)
             csa.tc_vc += delta_v;
         }
 
-        float dt_pos = csa.tc_vc / (CURRENT_LOOP_FREQ / 25.0f);
+        float dt_pos = csa.tc_vc / (CURRENT_LOOP_FREQ / 5.0f);
         p64f += (double)dt_pos;
         int32_t p32i = lround(p64f);
 
@@ -237,66 +237,66 @@ static inline void t_curve_compute(void)
     }
 }
 
+
 static inline void position_loop_compute(void)
 {
+    static int s_cnt = 0;
+    
+    if (++s_cnt == 5)
+        s_cnt = 0;
+    else
+        return;
+
     if (csa.state < ST_POSITION) {
         pid_i_reset(&csa.pid_pos, csa.sen_pos, 0);
         pid_i_set_target(&csa.pid_pos, csa.sen_pos);
         csa.cal_pos = csa.sen_pos;
         if (csa.state == ST_STOP)
-            csa.cal_speed = 0;
+            csa.cal_current = 0;
         t_curve_compute(); // reset t_curve
         return;
     }
 
     t_curve_compute();
     pid_i_set_target(&csa.pid_pos, csa.cal_pos);
-    csa.cal_speed = pid_i_compute(&csa.pid_pos, csa.sen_pos);
+    csa.cal_current = lroundf(pid_i_compute(&csa.pid_pos, csa.sen_pos));
 
+    raw_dbg(2);
     raw_dbg(3);
 }
 
 
-#define S_HIST_LEN 5
-
 static inline void speed_loop_compute(void)
 {
-    static int sub_cnt = 0;
     static float s_avg = 0;
-    static int s_filt_cnt = 0;
+    static int s_cnt = 0;
 
     s_avg += csa.delta_encoder * (float)CURRENT_LOOP_FREQ; // encoder steps per sec
 
-    if (++s_filt_cnt == 5) {
-        csa.sen_speed = s_avg / 5.0f;
-        s_avg = 0;
-        s_filt_cnt = 0;
+    if (++s_cnt == 5)
+        s_cnt = 0;
+    else
+        return;
 
-        if (++sub_cnt == 5) {
-            sub_cnt = 0;
-            position_loop_compute();
-            raw_dbg(2);
+    csa.sen_speed = s_avg / 5.0f;
+    s_avg = 0;
+
+    if (csa.state < ST_SPEED) {
+        pid_f_reset(&csa.pid_speed, 0, 0);
+        pid_f_set_target(&csa.pid_speed, 0);
+        if (csa.state == ST_STOP) {
+            csa.cal_current = 0;
+            csa.cal_speed = 0;
         }
-
-        if (csa.state < ST_SPEED) {
-            pid_f_reset(&csa.pid_speed, 0, 0);
-            pid_f_set_target(&csa.pid_speed, 0);
-            if (csa.state == ST_STOP)
-                csa.cal_current = 0;
-        } else {
-            if (csa.state == ST_SPEED) {
-                float v_step = (float)csa.tc_accel / (CURRENT_LOOP_FREQ / 25.0f);
-                float speed = csa.pid_speed.target <= csa.cal_speed ?
-                        min(csa.pid_speed.target + v_step, csa.cal_speed) : max(csa.pid_speed.target - v_step, csa.cal_speed);
-                pid_f_set_target(&csa.pid_speed, speed);
-            } else {
-                pid_f_set_target(&csa.pid_speed, csa.cal_speed); // TODO: only set once after modified
-            }
-            csa.cal_current = lroundf(pid_f_compute_no_d(&csa.pid_speed, csa.sen_speed));
-        }
-
-        raw_dbg(1);
+    } else if (csa.state == ST_SPEED) {
+        float v_step = (float)csa.tc_accel / (CURRENT_LOOP_FREQ / 25.0f);
+        float speed = csa.pid_speed.target <= csa.cal_speed ?
+                min(csa.pid_speed.target + v_step, csa.cal_speed) : max(csa.pid_speed.target - v_step, csa.cal_speed);
+        pid_f_set_target(&csa.pid_speed, speed);
+        csa.cal_current = lroundf(pid_f_compute_no_d(&csa.pid_speed, csa.sen_speed));
     }
+
+    raw_dbg(1);
 }
 
 
@@ -320,6 +320,7 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
 
     //gpio_set_value(&dbg_out2, 1);
 
+    // filter out disturbed error position values
 #if 1
     if (hist_err < 0 || abs(hist[1] - hist[0]) > 500) {
         csa.sen_encoder = csa.noc_encoder;
@@ -552,6 +553,7 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
     __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, DRV_PWM_HALF - out_pwm_w); // TIM1_CH1: C
 
     speed_loop_compute();
+    position_loop_compute();
     raw_dbg(0);
     csa.loop_cnt++;
 
