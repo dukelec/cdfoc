@@ -67,15 +67,13 @@ void Error_Handler(void);
 #define LED_R_GPIO_Port GPIOB
 #define DBG_OUT2_Pin GPIO_PIN_2
 #define DBG_OUT2_GPIO_Port GPIOB
-#define CD_RST_Pin GPIO_PIN_11
-#define CD_RST_GPIO_Port GPIOB
+#define DBG_OUT1_Pin GPIO_PIN_11
+#define DBG_OUT1_GPIO_Port GPIOB
 #define CD_CS_Pin GPIO_PIN_12
 #define CD_CS_GPIO_Port GPIOB
 #define CD_INT_Pin GPIO_PIN_6
 #define CD_INT_GPIO_Port GPIOC
 #define CD_INT_EXTI_IRQn EXTI9_5_IRQn
-#define DBG_OUT1_Pin GPIO_PIN_12
-#define DBG_OUT1_GPIO_Port GPIOA
 #define DRV_EN_Pin GPIO_PIN_15
 #define DRV_EN_GPIO_Port GPIOA
 #define DRV_CS_Pin GPIO_PIN_11

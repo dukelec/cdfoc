@@ -34,7 +34,6 @@ gpio_t s_cs = { .group = SEN_CS_GPIO_Port, .num = SEN_CS_Pin };
 
 uart_t debug_uart = { .huart = &huart3 };
 
-static gpio_t r_rst = { .group = CD_RST_GPIO_Port, .num = CD_RST_Pin };
 static gpio_t r_int = { .group = CD_INT_GPIO_Port, .num = CD_INT_Pin };
 static gpio_t r_cs = { .group = CD_CS_GPIO_Port, .num = CD_CS_Pin };
 static spi_t r_spi = { .hspi = &hspi2, .ns_pin = &r_cs };
@@ -59,7 +58,21 @@ static void device_init(void)
     for (i = 0; i < PACKET_MAX; i++)
         list_put(&packet_free_head, &packet_alloc[i].node);
 
-    cdctl_dev_init(&r_dev, &frame_free_head, &csa.bus_cfg, &r_spi, &r_rst, &r_int);
+    cdctl_dev_init(&r_dev, &frame_free_head, &csa.bus_cfg, &r_spi, NULL, &r_int);
+
+    // 12MHz / (0 + 2) * (48 + 2) / 2^1 = 150MHz
+    d_info("pll_n: %02x\n", cdctl_read_reg(&r_dev, REG_PLL_N));
+    cdctl_write_reg(&r_dev, REG_PLL_ML, 0x30); // 0x30: 48
+    d_info("pll_ml: %02x\n", cdctl_read_reg(&r_dev, REG_PLL_ML));
+
+    d_info("pll_ctrl: %02x\n", cdctl_read_reg(&r_dev, REG_PLL_CTRL));
+    cdctl_write_reg(&r_dev, REG_PLL_CTRL, 0x10); // enable pll
+    d_info("clk_status: %02x\n", cdctl_read_reg(&r_dev, REG_CLK_STATUS));
+    cdctl_write_reg(&r_dev, REG_CLK_CTRL, 0x01); // select pll
+
+    d_info("clk_status after select pll: %02x\n", cdctl_read_reg(&r_dev, REG_CLK_STATUS));
+    d_info("version after select pll: %02x\n", cdctl_read_reg(&r_dev, REG_VERSION));
+
     cdn_add_intf(&dft_ns, &r_dev.cd_dev, csa.bus_net, csa.bus_cfg.mac);
 }
 
