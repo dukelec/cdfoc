@@ -59,8 +59,6 @@ void Error_Handler(void);
 /* Private defines -----------------------------------------------------------*/
 #define LED_G_Pin GPIO_PIN_0
 #define LED_G_GPIO_Port GPIOB
-#define CD_RST_Pin GPIO_PIN_11
-#define CD_RST_GPIO_Port GPIOB
 #define CD_CS_Pin GPIO_PIN_12
 #define CD_CS_GPIO_Port GPIOB
 
