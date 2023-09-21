@@ -44,8 +44,8 @@ list_head_t frame_free_head = {0};
 static cdn_pkt_t packet_alloc[PACKET_MAX];
 list_head_t packet_free_head = {0};
 
-static cdctl_dev_t r_dev = {0};    // CDBUS
-cdn_ns_t dft_ns = {0};             // CDNET
+cdctl_dev_t r_dev = {0};    // CDBUS
+cdn_ns_t dft_ns = {0};      // CDNET
 
 
 static void device_init(void)
@@ -127,6 +127,24 @@ static void stack_check(void)
         }
     }
 }
+
+#if 0
+static void dump_hw_status(void)
+{
+    static int t_l = 0;
+    if (get_systick() - t_l > 8000) {
+        t_l = get_systick();
+        printf("ctl: state %d, t_len %d, r_len %d, irq %d\n",
+                r_dev.state, r_dev.tx_head.len, r_dev.rx_head.len,
+                !gpio_get_value(r_dev.int_n));
+        printf("  r_cnt %d (lost %d, err %d, no-free %d), t_cnt %d (cd %d, err %d)\n",
+                r_dev.rx_cnt, r_dev.rx_lost_cnt, r_dev.rx_error_cnt,
+                r_dev.rx_no_free_node_cnt,
+                r_dev.tx_cnt, r_dev.tx_cd_cnt, r_dev.tx_error_cnt);
+    }
+}
+#endif
+
 
 #if defined(SEN_MA73X)
 uint16_t encoder_reg_r(uint8_t addr)
@@ -445,7 +463,7 @@ void app_main(void)
         //encoder_read();
         //d_debug("drv: %08x\n", drv_read_reg(0x01) << 16 | drv_read_reg(0x00));
 
-        if (!gpio_get_value(&drv_fault)) {
+        if (csa.state != ST_STOP && !gpio_get_value(&drv_fault)) {
             uint32_t cur_fault_val = (drv_read_reg(0x00) << 16) | drv_read_reg(0x01);
             gpio_set_value(&led_r, 1);
             csa.cali_run = false;
@@ -460,6 +478,7 @@ void app_main(void)
         cdn_routine(&dft_ns); // handle cdnet
         common_service_routine();
         cali_elec_angle();
+        //dump_hw_status();
         debug_flush(false);
     }
 }

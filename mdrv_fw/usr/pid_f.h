@@ -24,6 +24,9 @@ typedef struct {
     // runtime and internal
     float i_term, last_input;
     float _ki, _kd;
+    
+    int filter_len;
+    float filter_hist[5];
 } pid_f_t;
 
 float pid_f_compute(pid_f_t *pid, float input);

@@ -25,6 +25,9 @@ typedef struct {
     float i_term;
     int last_input;
     float _ki, _kd;
+    
+    int filter_len;
+    int filter_hist[5];
 } pid_i_t;
 
 float pid_i_compute(pid_i_t *pid, int input);

@@ -18,14 +18,22 @@ float pid_f_compute(pid_f_t *pid, float input)
     float error, delta_input, output;
 
     error = pid->target - input;
-
     pid->i_term += pid->_ki * error;
     pid->i_term = clip(pid->i_term, pid->out_min, pid->out_max);
 
     delta_input = input - pid->last_input; // delta_input = -delta_error
     pid->last_input = input;
 
-    output = pid->kp * error + pid->i_term - pid->_kd * delta_input;
+    for (int i = 0; i < pid->filter_len - 1; i++)
+        pid->filter_hist[i] = pid->filter_hist[i + 1];
+    pid->filter_hist[pid->filter_len - 1] = delta_input;
+
+    float di_avg = 0;
+    for (int i = 0; i < pid->filter_len; i++)
+        di_avg += pid->filter_hist[i];
+    di_avg = di_avg / (float)pid->filter_len;
+
+    output = pid->kp * error + pid->i_term - pid->_kd * di_avg;
     output = clip(output, pid->out_min, pid->out_max);
     return output;
 }
@@ -50,6 +58,10 @@ void pid_f_reset(pid_f_t *pid, float input, float output)
 {
     pid->last_input = input;
     pid->i_term = clip(output, pid->out_min, pid->out_max);
+    if (pid->filter_len < 1)
+        pid->filter_len = 1;
+    for (int i = 0; i < pid->filter_len; i++)
+        pid->filter_hist[i] = 0;
 }
 
 void pid_f_init(pid_f_t *pid, bool reset)

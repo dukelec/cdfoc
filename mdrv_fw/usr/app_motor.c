@@ -293,7 +293,7 @@ static inline void speed_loop_compute(void)
         float speed = csa.pid_speed.target <= csa.cal_speed ?
                 min(csa.pid_speed.target + v_step, csa.cal_speed) : max(csa.pid_speed.target - v_step, csa.cal_speed);
         pid_f_set_target(&csa.pid_speed, speed);
-        csa.cal_current = lroundf(pid_f_compute_no_d(&csa.pid_speed, csa.sen_speed));
+        csa.cal_current = lroundf(pid_f_compute(&csa.pid_speed, csa.sen_speed));
     }
 
     raw_dbg(1);

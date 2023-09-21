@@ -14,8 +14,6 @@
 #include "pid_i.h"
 #include "app_main.h"
 
-#define HIST_LEN 3
-static int32_t hist[HIST_LEN] = { 0 };
 
 float pid_i_compute(pid_i_t *pid, int input)
 {
@@ -25,21 +23,20 @@ float pid_i_compute(pid_i_t *pid, int input)
     error = pid->target - input;
     pid->i_term += pid->_ki * error;
     pid->i_term = clip(pid->i_term, pid->out_min, pid->out_max);
-    float kp_term = pid->kp * error;
 
     delta_input = input - pid->last_input; // delta_input = -delta_error
     pid->last_input = input;
 
-    for (int i = 0; i < HIST_LEN - 1; i++)
-        hist[i] = hist[i + 1];
-    hist[HIST_LEN - 1] = delta_input;
+    for (int i = 0; i < pid->filter_len - 1; i++)
+        pid->filter_hist[i] = pid->filter_hist[i + 1];
+    pid->filter_hist[pid->filter_len - 1] = delta_input;
 
     float di_avg = 0;
-    for (int i = 0; i < HIST_LEN; i++)
-        di_avg += hist[i];
-    di_avg = di_avg / (float)HIST_LEN;
+    for (int i = 0; i < pid->filter_len; i++)
+        di_avg += pid->filter_hist[i];
+    di_avg = di_avg / (float)pid->filter_len;
 
-    output = kp_term + pid->i_term - pid->_kd * di_avg;
+    output = pid->kp * error + pid->i_term - pid->_kd * di_avg;
     output = clip(output, pid->out_min, pid->out_max);
     return output;
 }
@@ -65,8 +62,10 @@ void pid_i_reset(pid_i_t *pid, int input, float output)
 {
     pid->last_input = input;
     pid->i_term = clip(output, pid->out_min, pid->out_max);
-    for (int i = 0; i < HIST_LEN; i++)
-        hist[i] = 0;
+    if (pid->filter_len < 1)
+        pid->filter_len = 1;
+    for (int i = 0; i < pid->filter_len; i++)
+        pid->filter_hist[i] = 0;
 }
 
 void pid_i_init(pid_i_t *pid, bool reset)

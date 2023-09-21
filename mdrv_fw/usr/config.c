@@ -47,16 +47,18 @@ const csa_t csa_dft = {
         .dbg_dst = { .addr = {0x80, 0x00, 0x00}, .port = 9 },
 
         .pid_pos = { // motor must have enough power to follow the target position
-                .kp = 0.023, .ki = 5.5, .kd = 0.00001,
+                .kp = 0.3, .ki = 50.0, .kd = 0.008,
                 .out_min = -3000,
                 .out_max = 3000, // limit output current
-                .period = 5.0 / CURRENT_LOOP_FREQ
+                .period = 5.0 / CURRENT_LOOP_FREQ,
+                .filter_len = 3
         },
         .pid_speed = {
-                .kp = 0.01, .ki = 0.8,
+                .kp = 0.006, .ki = 2.0, .kd = 0.000008,
                 .out_min = -3000,
                 .out_max = 3000, // limit output current
-                .period = 5.0 / CURRENT_LOOP_FREQ
+                .period = 5.0 / CURRENT_LOOP_FREQ,
+                .filter_len = 3
         },
         .pid_i_sq =  {
                 .kp = 0.12, .ki = 450,
@@ -72,7 +74,7 @@ const csa_t csa_dft = {
         },
 
         .motor_poles = 7,
-        .bias_encoder = 0xa890,
+        .bias_encoder = 0x06ad,
 
         .qxchg_set = {
                 { .offset = offsetof(csa_t, tc_pos), .size = 4 * 3 }
@@ -113,8 +115,8 @@ const csa_t csa_dft = {
                 }
         },
 
-        .tc_speed = 65536*20,//*1
-        .tc_accel = 65536*5,//*20,
+        .tc_speed = 65536*20,
+        .tc_accel = 65536*5,
 
         .tc_rpt_end = false,
         .tc_rpt_dst = { .addr = {0x80, 0x00, 0x00}, .port = 0x10 },
@@ -264,6 +266,7 @@ void csa_list_show(void)
 
     CSA_SHOW_SUB(0, pid_speed, pid_f_t, kp, "");
     CSA_SHOW_SUB(0, pid_speed, pid_f_t, ki, "");
+    CSA_SHOW_SUB(0, pid_speed, pid_f_t, kd, "");
     CSA_SHOW_SUB(0, pid_speed, pid_f_t, out_min, "");
     CSA_SHOW_SUB(0, pid_speed, pid_f_t, out_max, "");
     d_info("\n"); debug_flush(true);
