@@ -292,7 +292,7 @@ static inline void speed_loop_compute(void)
         }
     } else {
         if (csa.state == ST_SPEED) {
-            float v_step = (float)csa.tc_accel / (CURRENT_LOOP_FREQ / 25.0f);
+            float v_step = (float)csa.tc_accel / (CURRENT_LOOP_FREQ / 5.0f);
             float speed = csa.pid_speed.target <= csa.cal_speed ?
                     min(csa.pid_speed.target + v_step, csa.cal_speed) : max(csa.pid_speed.target - v_step, csa.cal_speed);
             pid_f_set_target(&csa.pid_speed, speed);
