@@ -124,10 +124,10 @@ The complete command containing the CRC is (host address defaults to `0`, motor 
 
 The complete response package is:
 ```
-fe 00 01  60  crc_l crc_h
+fe 00 01  40  crc_l crc_h
 ```
 
-Where `0x60` means no error, for more information please refer to the description of CDSTEP and CDNET.
+Where `0x40` means no error, for more information please refer to the description of CDSTEP and CDNET.
 
 
 ### Quick Exchange Commands
@@ -156,10 +156,10 @@ Rotates to the 5th revolution position and sends the speed value (0x00140000 or 
 
 Demonstration of return data for the above three commands:
 ```
-fe 00 0b  60  xx xx xx xx yy yy yy yy  crc_l crc_h
+fe 00 0b  40  xx xx xx xx yy yy yy yy  crc_l crc_h
 ```
 
-where `0x60` means no error, `xx` and `yy` are defined by `qxchg_ret` to return 8 bytes of data such as `cal_pos`.
+where `0x40` means no error, `xx` and `yy` are defined by `qxchg_ret` to return 8 bytes of data such as `cal_pos`.
 
 
 
