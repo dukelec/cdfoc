@@ -287,6 +287,9 @@ void csa_list_show(void)
     CSA_SHOW(0, motor_poles, "Motor poles");
     CSA_SHOW(1, bias_encoder, "Offset for encoder value");
     CSA_SHOW(0, bias_pos, "Offset for pos value");
+    d_info("\n"); debug_flush(true);
+    
+    CSA_SHOW(1, qxchg_mcast, "Offset and size for quick-exchange multicast");
     CSA_SHOW(1, qxchg_set, "Config the write data components for quick-exchange channel");
     CSA_SHOW(1, qxchg_ret, "Config the return data components for quick-exchange channel");
     CSA_SHOW(1, qxchg_ro, "Config the return data components for the read only quick-exchange channel");

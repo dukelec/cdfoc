@@ -402,8 +402,8 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
         d_debug_c(" a %d.%.2d %d.%.2d %d.%.2d", P_2F(angle_mech), P_2F(csa.sen_angle_elec), P_2F(csa.cali_angle_elec));
 
     {
-        int32_t adc1_val = HAL_ADCEx_InjectedGetValue(&hadc1, 1); // change ADC_SMPR1 sample time register
-        int32_t adc2_val = HAL_ADCEx_InjectedGetValue(&hadc2, 1);
+        int32_t adc1_val = HAL_ADCEx_InjectedGetValue(&hadc1, ADC_INJECTED_RANK_1); // change ADC_SMPR1 sample time register
+        int32_t adc2_val = HAL_ADCEx_InjectedGetValue(&hadc2, ADC_INJECTED_RANK_1);
         int32_t ia, ib, ic;
 
         if (csa.adc_sel == 0) {
@@ -476,7 +476,7 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
             i_beta =  csa.cal_i_sd * sin_sen_angle_elec + csa.cal_i_sq * cos_sen_angle_elec;
             // limit vector magnitude
             float norm = sqrtf(i_alpha * i_alpha + i_beta * i_beta);
-            float limit = 2020; // 2047; // limit pwm to [1, 4095]
+            float limit = 2047 * 1.15f; // deliver 15% more power by svpwm
             if (norm > limit) {
                 i_alpha *= limit / norm;
                 i_beta *= limit / norm;
@@ -499,9 +499,12 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
         out_pwm_v = lroundf(-i_alpha / 2 + i_beta * 0.866025404f); // (√3÷2)
         out_pwm_w = -out_pwm_u - out_pwm_v;
         // avoid over range again
-        out_pwm_u = clip(out_pwm_u, -2047, 2047);
-        out_pwm_v = clip(out_pwm_v, -2047, 2047);
-        out_pwm_w = clip(out_pwm_w, -2047, 2047);
+        int16_t out_min = min(out_pwm_u, min(out_pwm_v, out_pwm_w));
+        int16_t out_max = max(out_pwm_u, max(out_pwm_v, out_pwm_w));
+        int16_t out_mid = (out_max + out_min) / 2;
+        out_pwm_u = clip(out_pwm_u - out_mid, -2047, 2047);
+        out_pwm_v = clip(out_pwm_v - out_mid, -2047, 2047);
+        out_pwm_w = clip(out_pwm_w - out_mid, -2047, 2047);
 
         /*
         append_dprintf(DBG_CURRENT, "u:%.2f %.2f %d ", pid_cur_u.target, pid_cur_u.i_term, out_pwm_u);
@@ -554,6 +557,7 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
     csa.dbg_v = out_pwm_v;
 
     // write 4095 to all pwm channel for brake (set A, B, C to zero)
+    // pwm range: [1, 4095]
     __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_3, DRV_PWM_HALF - out_pwm_u); // TIM1_CH3: A
     __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_2, DRV_PWM_HALF - out_pwm_v); // TIM1_CH2: B
     __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, DRV_PWM_HALF - out_pwm_w); // TIM1_CH1: C
