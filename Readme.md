@@ -13,6 +13,11 @@ git clone --recurse-submodules https://github.com/dukelec/cdfoc
 <img src="doc/cdfoc_motor.avif">
 
 
+## Block Diagram
+
+<img src="doc/block_diagram.svg">
+
+
 ## GUI Tool
 
 CDBUS GUI Tool: https://github.com/dukelec/cdbus_gui
