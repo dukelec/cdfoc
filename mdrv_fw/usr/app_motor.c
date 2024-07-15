@@ -282,6 +282,8 @@ static inline void speed_loop_compute(void)
 
     csa.sen_speed = s_avg / 5.0f;
     s_avg = 0;
+    csa.sen_speed_avg += (csa.sen_speed - csa.sen_speed_avg) * 0.005f;
+    csa.sen_rpm_avg = csa.sen_speed_avg / 0x10000 * 60;
 
     if (csa.state < ST_SPEED) {
         pid_f_reset(&csa.pid_speed, 0, 0);
@@ -451,6 +453,13 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
         csa.sen_i_sq = -i_alpha * sin_tmp_angle_elec + i_beta * cos_tmp_angle_elec;
         csa.sen_i_sd = i_alpha * cos_tmp_angle_elec + i_beta * sin_tmp_angle_elec;
 
+        if (csa.anticogging_en) {
+            int8_t *p = (int8_t *)ANTICOGGING_TBL + (csa.sen_encoder >> 4) * 2;
+            csa.sen_i_sq -= csa.anticogging_max_val[0] * (*p) / 100.0f;
+        }
+        float err_i_sq = csa.sen_i_sq - csa.sen_i_sq_avg;
+        csa.sen_i_sq_avg += err_i_sq * 0.001f;
+
         if (dbg_str)
             //d_debug_c(", i %5d %5d %5d", ia, ib, ic);
             d_debug_c(", i %5d %5d", adc1_val, adc2_val);
@@ -478,6 +487,14 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
 #endif
         csa.cal_v_sq = pid_f_compute_no_d(&csa.pid_i_sq, csa.sen_i_sq);
         csa.cal_v_sd = pid_f_compute_no_d(&csa.pid_i_sd, csa.sen_i_sd); // target default 0
+
+        if (csa.anticogging_en) {
+            int8_t *p = (int8_t *)ANTICOGGING_TBL + (csa.sen_encoder >> 4) * 2;
+            csa.cal_v_sq += csa.anticogging_max_val[1] * (*(p+1)) / 100.0f;
+        }
+        float err_v_sq = csa.cal_v_sq - csa.cal_v_sq_avg;
+        csa.cal_v_sq_avg += err_v_sq * 0.001f;
+
         if (csa.state == ST_CALI)
             csa.cal_v_sd = 0;
 

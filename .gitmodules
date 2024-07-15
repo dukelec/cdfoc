@@ -6,3 +6,7 @@
 	path = mdrv_fw/cdnet
 	url = ../cdnet
 
+[submodule "pycdnet"]
+	path = tools/pycdnet
+	url = ../pycdnet
+

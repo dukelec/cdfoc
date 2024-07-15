@@ -23,8 +23,10 @@
 #define P_3F(x) (int)(x), abs(((x)-(int)(x))*1000) // "%d.%.3d"
 
 
+#define CALI_ENCODER_TBL    0x0801b800 // 8k, 2bytes x 4096
+#define ANTICOGGING_TBL     0x0801d800 // 8k, 2bytes x 4096
 #define APP_CONF_ADDR       0x0801f800 // page 63, the last page
-#define APP_CONF_VER        0x0105
+#define APP_CONF_VER        0x0106
 
 #define CURRENT_LOOP_FREQ   (170000000 / 4096 / 2)
 #define DRV_PWM_HALF        2048
@@ -105,6 +107,12 @@ typedef struct {
     float           cali_angle_step; // increase cali_angle_elec
     bool            cali_run;
 
+    bool            cali_encoder_en;
+    bool            anticogging_en;
+    float           anticogging_max_val[2];
+
+    uint8_t         _reserved[28];
+
     // end of flash
     #define         _end_save state
 
@@ -143,6 +151,12 @@ typedef struct {
     int16_t         dbg_ib;
     int16_t         dbg_u;
     int16_t         dbg_v;
+
+    float           sen_i_sq_avg;
+    float           cal_v_sq_avg;
+    uint8_t         _reserved2[8];
+    float           sen_speed_avg;
+    float           sen_rpm_avg;
 
 } csa_t; // config status area
 

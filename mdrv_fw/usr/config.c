@@ -219,6 +219,7 @@ int flash_write(uint32_t addr, uint32_t len, const uint8_t *buf)
                 uint8_t *: "[B]", \
                 int16_t *: "[h]", \
                 uint32_t *: "[I]", \
+                float *: "[f]", \
                 regr_t: "H,H", \
                 regr_t *: "{H,H}", \
                 default: "-"))
@@ -323,6 +324,11 @@ void csa_list_show(void)
     CSA_SHOW(0, cali_run, "0: stopped, write 1 start calibration");
     d_info("\n"); debug_flush(true);
 
+    CSA_SHOW(0, cali_encoder_en, "");
+    CSA_SHOW(0, anticogging_en, "");
+    CSA_SHOW(0, anticogging_max_val, "");
+    d_info("\n"); debug_flush(true);
+
     CSA_SHOW(0, state, "0: stop, 1: calibrate, 2: cur loop, 3: speed loop, 4: pos loop, 5: t_curve");
     //CSA_SHOW(0, err_flag, "not used");
     d_info("\n"); debug_flush(true);
@@ -362,6 +368,12 @@ void csa_list_show(void)
     CSA_SHOW(0, dbg_ib, "");
     CSA_SHOW(0, dbg_u, "");
     CSA_SHOW(0, dbg_v, "");
+    d_info("\n"); debug_flush(true);
+
+    CSA_SHOW(0, sen_i_sq_avg, "");
+    CSA_SHOW(0, cal_v_sq_avg, "");
+    CSA_SHOW(0, sen_speed_avg, "");
+    CSA_SHOW(0, sen_rpm_avg, "");
     d_info("\n"); debug_flush(true);
 
     d_info("\x1b[92mColor Test...\x1b[0m\n");
