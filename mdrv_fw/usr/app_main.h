@@ -114,8 +114,8 @@ typedef struct {
     int32_t         cal_pos;
     float           cal_speed;
     int32_t         cal_current;
-    float           cal_i_sq;
-    float           cal_i_sd;
+    float           cal_v_sq;
+    float           cal_v_sd;
 
     uint16_t        ori_encoder;
     int32_t         ori_pos;

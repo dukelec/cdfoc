@@ -17,7 +17,7 @@ regr_t csa_w_allow[] = {
         { .offset = offsetof(csa_t, pid_i_sq), .size = offsetof(pid_f_t, target) },
         { .offset = offsetof(csa_t, pid_i_sd), .size = offsetof(pid_f_t, target) },
         { .offset = offsetof(csa_t, peak_cur_threshold),
-                .size = offsetof(csa_t, cal_i_sq) - offsetof(csa_t, peak_cur_threshold) }
+                .size = offsetof(csa_t, cal_v_sq) - offsetof(csa_t, peak_cur_threshold) }
 };
 
 csa_hook_t csa_w_hook[] = {
@@ -95,7 +95,7 @@ const csa_t csa_dft = {
                         // i_term, last_input
                         { .offset = offsetof(csa_t, pid_i_sd) + offsetof(pid_f_t, i_term), .size = 4 * 2 },
                         { .offset = offsetof(csa_t, sen_encoder), .size = 2 },
-                        { .offset = offsetof(csa_t, cal_i_sq), .size = 4 * 2 }
+                        { .offset = offsetof(csa_t, cal_v_sq), .size = 4 * 2 }
                         //{ .offset = offsetof(csa_t, noc_encoder), .size = 2 }
                 }, { // speed
                         { .offset = offsetof(csa_t, pid_speed) + offsetof(pid_f_t, target), .size = 4 * 3 },
@@ -330,8 +330,8 @@ void csa_list_show(void)
     CSA_SHOW(1, cal_pos, "pos loop target");
     CSA_SHOW(1, cal_speed, "speed loop target");
     CSA_SHOW(0, cal_current, "cur loop target");
-    CSA_SHOW(0, cal_i_sq, "i_sq info");
-    CSA_SHOW(0, cal_i_sd, "i_sd info");
+    CSA_SHOW(0, cal_v_sq, "v_sq info");
+    CSA_SHOW(0, cal_v_sd, "v_sd info");
     d_info("\n"); debug_flush(true);
 
     CSA_SHOW(1, ori_encoder, "noc_encoder before add offset");

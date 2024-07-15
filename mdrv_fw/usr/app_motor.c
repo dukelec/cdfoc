@@ -315,7 +315,7 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
     gpio_set_value(&dbg_out1, 1);
     gpio_set_value(&s_cs, 1);
 
-    float sin_sen_angle_elec, cos_sen_angle_elec; // reduce the amount of calculations
+    float sin_tmp_angle_elec, cos_tmp_angle_elec; // reduce the amount of calculations
     int16_t out_pwm_u = 0, out_pwm_v = 0, out_pwm_w = 0;
     bool dbg_str = csa.dbg_str_msk && (csa.loop_cnt % csa.dbg_str_skip) == 0;
 
@@ -395,8 +395,16 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
     float angle_mech = csa.sen_encoder*((float)M_PI*2/0x10000);
     uint16_t encoder_sub = csa.sen_encoder % lroundf((float)0x10000/csa.motor_poles);
     csa.sen_angle_elec = encoder_sub*((float)M_PI*2/((float)0x10000/csa.motor_poles));
-    sin_sen_angle_elec = sinf(csa.sen_angle_elec);
-    cos_sen_angle_elec = cosf(csa.sen_angle_elec);
+    if (csa.state == ST_CALI) {
+        csa.cali_angle_elec += csa.cali_angle_step;
+        if (csa.cali_angle_elec >= (float)M_PI*2)
+            csa.cali_angle_elec -= (float)M_PI*2;
+        sin_tmp_angle_elec = sinf(csa.cali_angle_elec);
+        cos_tmp_angle_elec = cosf(csa.cali_angle_elec);
+    } else {
+        sin_tmp_angle_elec = sinf(csa.sen_angle_elec);
+        cos_tmp_angle_elec = cosf(csa.sen_angle_elec);
+    }
 
     if (dbg_str)
         d_debug_c(" a %d.%.2d %d.%.2d %d.%.2d", P_2F(angle_mech), P_2F(csa.sen_angle_elec), P_2F(csa.cali_angle_elec));
@@ -440,8 +448,8 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
         float i_alpha = ia;
         float i_beta = (ia + ib * 2) / 1.732050808f; // √3
 
-        csa.sen_i_sq = -i_alpha * sin_sen_angle_elec + i_beta * cos_sen_angle_elec;
-        csa.sen_i_sd = i_alpha * cos_sen_angle_elec + i_beta * sin_sen_angle_elec;
+        csa.sen_i_sq = -i_alpha * sin_tmp_angle_elec + i_beta * cos_tmp_angle_elec;
+        csa.sen_i_sd = i_alpha * cos_tmp_angle_elec + i_beta * sin_tmp_angle_elec;
 
         if (dbg_str)
             //d_debug_c(", i %5d %5d %5d", ia, ib, ic);
@@ -452,51 +460,44 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
 
     // current --> pwm
     if (csa.state != ST_STOP) {
-        float i_alpha, i_beta;
-
-        // calculate angle
-        if (csa.state != ST_CALI) {
+        float v_alpha, v_beta;
+        // sign select direction for cali_current
+        int32_t target_current = (csa.state == ST_CALI) ? -csa.cali_current : csa.cal_current;
 #if defined(CAL_CURRENT_SMOOTH)
-            static bool near_limit = false;
-            if (!near_limit) {
-                if (fabsf(csa.pid_i_sq.target - csa.cal_current) <= 0.01f)
-                    pid_f_set_target(&csa.pid_i_sq, csa.cal_current);
-                else
-                    csa.pid_i_sq.target += sign(csa.cal_current - csa.pid_i_sq.target) * 0.01f;
-            } else {
-                csa.pid_i_sq.target -= sign(csa.pid_i_sq.target) * 0.005f;
-            }
-#else
-            pid_f_set_target(&csa.pid_i_sq, csa.cal_current);
-#endif
-            csa.cal_i_sq = pid_f_compute_no_d(&csa.pid_i_sq, csa.sen_i_sq);
-            csa.cal_i_sd = pid_f_compute_no_d(&csa.pid_i_sd, csa.sen_i_sd); // target default 0
-            // rotate 2d vector, origin: (sd, sq), after: (alpha, beta)
-            i_alpha = csa.cal_i_sd * cos_sen_angle_elec - csa.cal_i_sq * sin_sen_angle_elec;
-            i_beta =  csa.cal_i_sd * sin_sen_angle_elec + csa.cal_i_sq * cos_sen_angle_elec;
-            // limit vector magnitude
-            float norm = sqrtf(i_alpha * i_alpha + i_beta * i_beta);
-            float limit = 2047 * 1.15f; // deliver 15% more power by svpwm
-            if (norm > limit) {
-                i_alpha *= limit / norm;
-                i_beta *= limit / norm;
-                vector_over_limit = norm; // for debug
-            }
-#if defined(CAL_CURRENT_SMOOTH)
-            near_limit = norm > (limit * 0.97f); // 0.96
-#endif
+        static bool near_limit = false;
+        if (!near_limit) {
+            if (fabsf(csa.pid_i_sq.target - target_current) <= 0.01f)
+                pid_f_set_target(&csa.pid_i_sq, target_current);
+            else
+                csa.pid_i_sq.target += sign(target_current - csa.pid_i_sq.target) * 0.01f;
         } else {
-            csa.cali_angle_elec += csa.cali_angle_step;
-            if (csa.cali_angle_elec >= (float)M_PI*2)
-                csa.cali_angle_elec -= (float)M_PI*2;
-
-            csa.cal_i_sq = -csa.cali_current; // sign select direction
-            i_alpha = -csa.cal_i_sq * sinf(csa.cali_angle_elec);
-            i_beta =  csa.cal_i_sq * cosf(csa.cali_angle_elec);
+            csa.pid_i_sq.target -= sign(csa.pid_i_sq.target) * 0.005f;
         }
+#else
+        pid_f_set_target(&csa.pid_i_sq, target_current);
+#endif
+        csa.cal_v_sq = pid_f_compute_no_d(&csa.pid_i_sq, csa.sen_i_sq);
+        csa.cal_v_sd = pid_f_compute_no_d(&csa.pid_i_sd, csa.sen_i_sd); // target default 0
+        if (csa.state == ST_CALI)
+            csa.cal_v_sd = 0;
 
-        out_pwm_u = lroundf(i_alpha);
-        out_pwm_v = lroundf(-i_alpha / 2 + i_beta * 0.866025404f); // (√3÷2)
+        // rotate 2d vector, origin: (sd, sq), after: (alpha, beta)
+        v_alpha = csa.cal_v_sd * cos_tmp_angle_elec - csa.cal_v_sq * sin_tmp_angle_elec;
+        v_beta =  csa.cal_v_sd * sin_tmp_angle_elec + csa.cal_v_sq * cos_tmp_angle_elec;
+        // limit vector magnitude
+        float norm = sqrtf(v_alpha * v_alpha + v_beta * v_beta);
+        float limit = 2047 * 1.15f; // deliver 15% more power by svpwm
+        if (norm > limit) {
+            v_alpha *= limit / norm;
+            v_beta *= limit / norm;
+            vector_over_limit = norm; // for debug
+        }
+#if defined(CAL_CURRENT_SMOOTH)
+        near_limit = norm > (limit * 0.97f); // 0.96
+#endif
+
+        out_pwm_u = lroundf(v_alpha);
+        out_pwm_v = lroundf(-v_alpha / 2 + v_beta * 0.866025404f); // (√3÷2)
         out_pwm_w = -out_pwm_u - out_pwm_v;
         // avoid over range again
         int16_t out_min = min(out_pwm_u, min(out_pwm_v, out_pwm_w));
@@ -512,9 +513,9 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
         append_dprintf(DBG_CURRENT, "w:%d", out_pwm_w);
         */
         if (dbg_str)
-            d_debug_c(", o %5d.%.2d %5d %5d %5d\n", P_2F(csa.cal_i_sq), out_pwm_u, out_pwm_v, out_pwm_w);
+            d_debug_c(", o %5d.%.2d %5d %5d %5d\n", P_2F(csa.cal_v_sq), out_pwm_u, out_pwm_v, out_pwm_w);
     } else {
-        csa.cal_i_sq = 0;
+        csa.cal_v_sq = 0;
         pid_f_set_target(&csa.pid_i_sq, 0);
         pid_f_set_target(&csa.pid_i_sd, 0);
         pid_f_reset(&csa.pid_i_sq, 0, 0);
