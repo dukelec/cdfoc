@@ -88,6 +88,7 @@ void app_motor_init(void)
     pid_f_init(&csa.pid_speed, true);
     pid_i_init(&csa.pid_pos, true);
     cdn_sock_bind(&sock_raw_dbg);
+    csa.bus_voltage = csa.nominal_voltage;
 }
 
 void app_motor_routine(void)
@@ -584,27 +585,15 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
     raw_dbg(0);
     csa.loop_cnt++;
 
-#if 1
     if (!LL_ADC_REG_IsConversionOngoing(hadc1.Instance)) {
-
-        //HAL_ADC_PollForConversion(&hadc1, HAL_MAX_DELAY);
         int32_t adc_temperature = HAL_ADC_GetValue(&hadc1);
+        uint32_t adc_dc = HAL_ADC_GetValue(&hadc2);
 
-        //HAL_ADC_PollForConversion(&hadc2, HAL_MAX_DELAY);
-        int32_t adc_dc = HAL_ADC_GetValue(&hadc2);
-
-#if 0
-        static uint32_t t_last = 0;
-        if (get_systick() - t_last > 1000) {
-            t_last = get_systick();
-            d_info("temperature: %d, dc: %d\n", adc_temperature, adc_dc);
-        }
-#endif
+        float v_dc = (adc_dc / 4095.0f * 3.3f) / 4.7f * (4.7f + 75);
+        csa.bus_voltage += (v_dc - csa.bus_voltage) * 0.001f;
 
         LL_ADC_REG_StartConversion(hadc1.Instance);
-        //delay_systick(10);
     }
-#endif
 
     uint16_t enc_check = encoder_read();
     if (enc_check != csa.ori_encoder)

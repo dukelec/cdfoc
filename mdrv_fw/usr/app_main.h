@@ -111,7 +111,8 @@ typedef struct {
     bool            anticogging_en;
     float           anticogging_max_val[2];
 
-    uint8_t         _reserved[28];
+    float           nominal_voltage;
+    uint8_t         _reserved[24];
 
     // end of flash
     #define         _end_save state
@@ -157,6 +158,7 @@ typedef struct {
     uint8_t         _reserved2[8];
     float           sen_speed_avg;
     float           sen_rpm_avg;
+    float           bus_voltage;
 
 } csa_t; // config status area
 
