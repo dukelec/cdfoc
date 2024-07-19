@@ -312,11 +312,17 @@ static inline void speed_loop_compute(void)
 #define HIST_LEN 2
 static uint16_t hist[HIST_LEN] = { 0 };
 static int8_t hist_err = -2;
+static uint16_t sen_encoder_bk = 0;
 
 void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
 {
     gpio_set_value(&dbg_out1, 1);
     gpio_set_value(&s_cs, 1);
+
+    uint16_t tbl_idx = 0;
+    uint16_t tbl_idx_next = 0;
+    float tbl_percent = 0;
+    float voltage_ratio = csa.bus_voltage / csa.nominal_voltage;
 
     float sin_tmp_angle_elec, cos_tmp_angle_elec; // reduce the amount of calculations
     int16_t out_pwm_u = 0, out_pwm_v = 0, out_pwm_w = 0;
@@ -325,7 +331,6 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
     uint16_t noc_encoder_bk = csa.noc_encoder;
     csa.ori_encoder = encoder_read();
     csa.noc_encoder = csa.ori_encoder - csa.bias_encoder;
-    int16_t delta_enc = csa.noc_encoder - noc_encoder_bk;
 
     //gpio_set_value(&dbg_out2, 1);
 
@@ -333,7 +338,6 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
 #if 1
     if (hist_err < 0 || abs(hist[1] - hist[0]) > 500) {
         csa.sen_encoder = csa.noc_encoder;
-        csa.delta_encoder = delta_enc;
         if (hist_err < 0)
             hist_err++;
     } else {
@@ -357,12 +361,10 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
         uint32_t estimate = hist_raised[1] + hist_delta;
         if (abs(sen_raised - estimate) > 500) {
             csa.sen_encoder = estimate >= 0x10000 ? (estimate - 0x10000) : estimate;
-            csa.delta_encoder = hist_delta;
             if(++hist_err > 2)
                 hist_err = -2;
         } else {
             csa.sen_encoder = csa.noc_encoder;
-            csa.delta_encoder = delta_enc;
             hist_err = 0;
         }
     }
@@ -371,11 +373,25 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
     hist[1] = csa.sen_encoder;
 #else
     csa.sen_encoder = csa.noc_encoder;
-    csa.delta_encoder = delta_enc;
 #endif
 
     if (csa.sen_encoder != csa.noc_encoder)
         encoder_err++;
+
+    if (csa.cali_encoder_en) {
+        tbl_idx = csa.sen_encoder >> 4;
+        tbl_idx_next = (tbl_idx == 4095) ? 0 : (tbl_idx + 1);
+        tbl_percent = (float)(csa.sen_encoder & 0xf) / 0x10;
+        uint16_t idx_val = *(uint16_t *)(CALI_ENCODER_TBL + tbl_idx * 2);
+        uint32_t idx_next_val = *(uint16_t *)(CALI_ENCODER_TBL + tbl_idx_next * 2);
+        if (tbl_idx == 4095)
+            idx_next_val += 0x10000;
+        csa.sen_encoder = lroundf(idx_val + (idx_next_val - idx_val) * tbl_percent);
+    }
+
+    int16_t delta_enc = csa.sen_encoder - sen_encoder_bk;
+    csa.delta_encoder = delta_enc;
+    sen_encoder_bk = csa.sen_encoder;
 
     // 9us lag steps = step/sec * 0.000009 sec
     csa.sen_encoder += delta_enc * ((float)CURRENT_LOOP_FREQ * 0.000019f); // 0.000009f
@@ -455,8 +471,13 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
         csa.sen_i_sd = i_alpha * cos_tmp_angle_elec + i_beta * sin_tmp_angle_elec;
 
         if (csa.anticogging_en) {
-            int8_t *p = (int8_t *)ANTICOGGING_TBL + (csa.sen_encoder >> 4) * 2;
-            csa.sen_i_sq -= csa.anticogging_max_val[0] * (*p) / 100.0f;
+            tbl_idx = csa.sen_encoder >> 4;
+            tbl_idx_next = (tbl_idx == 4095) ? 0 : (tbl_idx + 1);
+            tbl_percent = (float)(csa.sen_encoder & 0xf) / 0x10;
+            int8_t idx_val = *(int8_t *)(ANTICOGGING_TBL + tbl_idx * 2);
+            int8_t idx_next_val = *(int8_t *)(CALI_ENCODER_TBL + tbl_idx_next * 2);
+            float val = idx_val + (idx_next_val - idx_val) * tbl_percent;
+            csa.sen_i_sq -= csa.anticogging_max_val[0] * val / 100.0f;
         }
         float err_i_sq = csa.sen_i_sq - csa.sen_i_sq_avg;
         csa.sen_i_sq_avg += err_i_sq * 0.001f;
@@ -486,12 +507,14 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
 #else
         pid_f_set_target(&csa.pid_i_sq, target_current);
 #endif
-        csa.cal_v_sq = pid_f_compute_no_d(&csa.pid_i_sq, csa.sen_i_sq);
-        csa.cal_v_sd = pid_f_compute_no_d(&csa.pid_i_sd, csa.sen_i_sd); // target default 0
+        csa.cal_v_sq = pid_f_compute_no_d(&csa.pid_i_sq, csa.sen_i_sq) / voltage_ratio;
+        csa.cal_v_sd = pid_f_compute_no_d(&csa.pid_i_sd, csa.sen_i_sd) / voltage_ratio; // target default 0
 
         if (csa.anticogging_en) {
-            int8_t *p = (int8_t *)ANTICOGGING_TBL + (csa.sen_encoder >> 4) * 2;
-            csa.cal_v_sq += csa.anticogging_max_val[1] * (*(p+1)) / 100.0f;
+            int8_t idx_val = *(int8_t *)(ANTICOGGING_TBL + tbl_idx * 2 + 1);
+            int8_t idx_next_val = *(int8_t *)(CALI_ENCODER_TBL + tbl_idx_next * 2 + 1);
+            float val = idx_val + (idx_next_val - idx_val) * tbl_percent;
+            csa.cal_v_sq += (csa.anticogging_max_val[1] * val / 100.0f) / voltage_ratio;
         }
         float err_v_sq = csa.cal_v_sq - csa.cal_v_sq_avg;
         csa.cal_v_sq_avg += err_v_sq * 0.001f;
