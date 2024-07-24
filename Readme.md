@@ -112,19 +112,19 @@ Mode 4 of `state` is a position mode without acceleration or deceleration and is
 
 ## Command Demonstration
 
-The address of the `state` itself is `0x0219` and its length is 1 byte.
+The address of the `state` itself is `0x0240` and its length is 1 byte.
 To lock the motor and enter position mode after power up, send the following data to port 5:
 ```
-20  19 02  05
+20  40 02  05
 ```
-`20` is the subcommand `write`, `19 02` is the little-endian for address 0x0219 (little-endian is used unless otherwise noted),
+`20` is the subcommand `write`, `40 02` is the little-endian for address 0x0240 (little-endian is used unless otherwise noted),
 and `05` is the value to be written.
 
 
 The complete command containing the CRC is (host address defaults to `0`, motor address defaults to `0xfe`, 3rd byte is data length, last two bytes are CRC):
 
 ```
-00 fe 05  05 20  19 02  05  88 f5
+00 fe 05  05 20  40 02  05  58 e6
 ```
 
 The complete response package is:

@@ -328,28 +328,26 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
     int16_t out_pwm_u = 0, out_pwm_v = 0, out_pwm_w = 0;
     bool dbg_str = csa.dbg_str_msk && (csa.loop_cnt % csa.dbg_str_skip) == 0;
 
-    uint16_t noc_encoder_bk = csa.noc_encoder;
     csa.ori_encoder = encoder_read();
-    csa.noc_encoder = csa.ori_encoder - csa.bias_encoder;
 
     //gpio_set_value(&dbg_out2, 1);
 
     // filter out disturbed error position values
 #if 1
     if (hist_err < 0 || abs(hist[1] - hist[0]) > 500) {
-        csa.sen_encoder = csa.noc_encoder;
+        csa.nob_encoder = csa.ori_encoder;
         if (hist_err < 0)
             hist_err++;
     } else {
         uint32_t hist_raised[2] = {hist[0], hist[1]};
-        uint32_t sen_raised = csa.noc_encoder;
+        uint32_t sen_raised = csa.ori_encoder;
 
         // empty in range: 1/3 to 2/3
         if ((hist[0] < 0x10000/3 || hist[0] >= 0x10000*2/3) && (hist[1] < 0x10000/3 || hist[1] >= 0x10000*2/3)) {
             if (hist[0] < 0x10000/3 && hist[1] < 0x10000/3) {
-                if (csa.noc_encoder < 0x10000*2/3)
+                if (csa.ori_encoder < 0x10000*2/3)
                     sen_raised += 0x10000;
-            } else if (csa.noc_encoder < 0x10000/3) {
+            } else if (csa.ori_encoder < 0x10000/3) {
                     sen_raised += 0x10000;
             }
             if (hist[0] < 0x10000/3)
@@ -360,34 +358,36 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
         int16_t hist_delta = lroundf((int16_t)(hist_raised[1] - hist_raised[0]) * 0.8f);
         uint32_t estimate = hist_raised[1] + hist_delta;
         if (abs(sen_raised - estimate) > 500) {
-            csa.sen_encoder = estimate >= 0x10000 ? (estimate - 0x10000) : estimate;
+            csa.nob_encoder = estimate >= 0x10000 ? (estimate - 0x10000) : estimate;
             if(++hist_err > 2)
                 hist_err = -2;
         } else {
-            csa.sen_encoder = csa.noc_encoder;
+            csa.nob_encoder = csa.ori_encoder;
             hist_err = 0;
         }
     }
 
     hist[0] = hist[1];
-    hist[1] = csa.sen_encoder;
+    hist[1] = csa.nob_encoder;
 #else
-    csa.sen_encoder = csa.noc_encoder;
+    csa.nob_encoder = csa.ori_encoder;
 #endif
 
-    if (csa.sen_encoder != csa.noc_encoder)
+    if (csa.nob_encoder != csa.ori_encoder)
         encoder_err++;
 
     if (csa.cali_encoder_en) {
-        tbl_idx = csa.sen_encoder >> 4;
+        tbl_idx = csa.nob_encoder >> 4;
         tbl_idx_next = (tbl_idx == 4095) ? 0 : (tbl_idx + 1);
-        tbl_percent = (float)(csa.sen_encoder & 0xf) / 0x10;
+        tbl_percent = (float)(csa.nob_encoder & 0xf) / 0x10;
         uint16_t idx_val = *(uint16_t *)(CALI_ENCODER_TBL + tbl_idx * 2);
         uint32_t idx_next_val = *(uint16_t *)(CALI_ENCODER_TBL + tbl_idx_next * 2);
         if (tbl_idx == 4095)
             idx_next_val += 0x10000;
-        csa.sen_encoder = lroundf(idx_val + (idx_next_val - idx_val) * tbl_percent);
+        csa.nob_encoder = lroundf(idx_val + (idx_next_val - idx_val) * tbl_percent);
     }
+
+    csa.sen_encoder = csa.nob_encoder - csa.bias_encoder;
 
     int16_t delta_enc = csa.sen_encoder - sen_encoder_bk;
     csa.delta_encoder = delta_enc;

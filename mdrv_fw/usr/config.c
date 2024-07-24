@@ -96,7 +96,7 @@ const csa_t csa_dft = {
                         { .offset = offsetof(csa_t, pid_i_sd) + offsetof(pid_f_t, i_term), .size = 4 * 2 },
                         { .offset = offsetof(csa_t, sen_encoder), .size = 2 },
                         { .offset = offsetof(csa_t, cal_v_sq), .size = 4 * 2 }
-                        //{ .offset = offsetof(csa_t, noc_encoder), .size = 2 }
+                        //{ .offset = offsetof(csa_t, nob_encoder), .size = 2 }
                 }, { // speed
                         { .offset = offsetof(csa_t, pid_speed) + offsetof(pid_f_t, target), .size = 4 * 3 },
                         { .offset = offsetof(csa_t, cal_current), .size = 4 },
@@ -343,13 +343,13 @@ void csa_list_show(void)
     CSA_SHOW(0, cal_v_sd, "v_sd info");
     d_info("\n"); debug_flush(true);
 
-    CSA_SHOW(1, ori_encoder, "noc_encoder before add offset");
+    CSA_SHOW(1, ori_encoder, "Origin encoder value");
     CSA_SHOW(1, ori_pos, "sen_pos before add offset");
     d_info("\n"); debug_flush(true);
 
-    CSA_SHOW(1, delta_encoder, "encoder value delta");
-    CSA_SHOW(1, noc_encoder, "encoder value");
-    CSA_SHOW(1, sen_encoder, "encoder value filtered");
+    CSA_SHOW(1, delta_encoder, "Encoder value delta");
+    CSA_SHOW(1, nob_encoder, "Encoder value before add bias");
+    CSA_SHOW(1, sen_encoder, "Encoder value filtered");
     CSA_SHOW(1, sen_pos, "multiturn + sen_encoder data");
     CSA_SHOW(1, sen_speed, "delta_encoder filtered");
     CSA_SHOW(0, sen_i_sq, "i_sq from adc");

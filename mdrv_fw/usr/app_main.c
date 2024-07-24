@@ -312,10 +312,10 @@ void cali_elec_angle(void)
     d_debug("cali [%d, %d]", pole_cnt, sub_cnt);
 
     if (sub_cnt == 0) {
-        a0 = csa.ori_encoder;
+        a0 = csa.nob_encoder;
         d_debug_c(" - a0: %04x\n", a0);
     } else if (sub_cnt == 2) {
-        a1 = csa.ori_encoder;
+        a1 = csa.nob_encoder;
         d_debug_c(" - a1: %04x\n", a1);
     } else {
         d_debug_c("\n");

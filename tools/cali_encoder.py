@@ -9,6 +9,9 @@ import _thread
 #import numpy as np
 import matplotlib.pyplot as plt
 
+# rotate motor by state = 1, cali_angle_step > 0 and bias_encoder = 0
+# enable plot0 for a short period, then export cdbus_gui data to mpk file
+
 if len(sys.argv) <= 1:
     print(f'usage: {sys.argv[0]} mpk_dat_file')
     exit(-1)

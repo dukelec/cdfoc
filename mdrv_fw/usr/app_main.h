@@ -130,7 +130,7 @@ typedef struct {
     int32_t         ori_pos;
 
     float           delta_encoder;
-    uint16_t        noc_encoder; // no compensation
+    uint16_t        nob_encoder; // no bias
     uint16_t        sen_encoder;
     int32_t         sen_pos;
     float           sen_speed;
