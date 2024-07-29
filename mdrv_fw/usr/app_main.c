@@ -76,30 +76,6 @@ static void device_init(void)
     cdn_add_intf(&dft_ns, &r_dev.cd_dev, csa.bus_net, csa.bus_cfg.mac);
 }
 
-void set_led_state(led_state_t state)
-{
-    static bool is_err = false;
-    if (is_err)
-        return;
-
-    switch (state) {
-    case LED_POWERON:
-        gpio_set_value(&led_r, 0);
-        gpio_set_value(&led_g, 1);
-        break;
-    case LED_WARN:
-        gpio_set_value(&led_r, 1);
-        gpio_set_value(&led_g, 0);
-        break;
-    default:
-    case LED_ERROR:
-        is_err = true;
-        gpio_set_value(&led_r, 1);
-        gpio_set_value(&led_g, 1);
-        break;
-    }
-}
-
 
 extern uint32_t end; // end of bss
 #define STACK_CHECK_SKIP 0x200
@@ -378,6 +354,8 @@ void cali_elec_angle(void)
 
 void app_main(void)
 {
+    gpio_set_value(&led_r, 1);
+    gpio_set_value(&led_g, 1);
     printf("\nstart app_main (mdrv)...\n");
 
     stack_check_init();
@@ -455,7 +433,7 @@ void app_main(void)
     __HAL_TIM_ENABLE_IT(&htim1, TIM_IT_CC4);
 
     d_info("pwm on.\n");
-    set_led_state(LED_POWERON);
+    gpio_set_value(&led_r, 0);
 
     uint32_t last_fault_val = 0xffffffff;
 
@@ -466,6 +444,7 @@ void app_main(void)
         if (csa.state != ST_STOP && !gpio_get_value(&drv_fault)) {
             uint32_t cur_fault_val = (drv_read_reg(0x00) << 16) | drv_read_reg(0x01);
             gpio_set_value(&led_r, 1);
+            gpio_set_value(&led_g, 0);
             csa.cali_run = false;
             if (cur_fault_val != last_fault_val) {
                 d_error("drv status: %08x\n", cur_fault_val);
