@@ -609,11 +609,17 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
     csa.loop_cnt++;
 
     if (!LL_ADC_REG_IsConversionOngoing(hadc1.Instance)) {
-        int32_t adc_temperature = HAL_ADC_GetValue(&hadc1);
+        uint32_t adc_temperature = HAL_ADC_GetValue(&hadc1);
         uint32_t adc_dc = HAL_ADC_GetValue(&hadc2);
 
         float v_dc = (adc_dc / 4095.0f * 3.3f) / 4.7f * (4.7f + 75);
         csa.bus_voltage += (v_dc - csa.bus_voltage) * 0.001f;
+        
+        #define _B 3970
+        float r_ntc = (10000.0f * adc_temperature) / (4095 - adc_temperature);
+        //    pull-up: 10K                              r_ntc = 100K  ->          @ 25°C
+        float temperature = (1.0f / ((1.0f / _B) * logf(r_ntc / 100000) + (1.0f / (25 + 273.15f))) - 273.15f);
+        csa.temperature += (temperature - csa.temperature) * 0.001f;
 
         LL_ADC_REG_StartConversion(hadc1.Instance);
     }

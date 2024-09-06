@@ -378,6 +378,7 @@ void csa_list_show(void)
     CSA_SHOW(0, sen_speed_avg, "");
     CSA_SHOW(0, sen_rpm_avg, "");
     CSA_SHOW(0, bus_voltage, "");
+    CSA_SHOW(0, temperature, "");
     d_info("\n"); debug_flush(true);
 
     d_info("\x1b[92mColor Test...\x1b[0m\n");

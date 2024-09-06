@@ -153,6 +153,7 @@ typedef struct {
     float           sen_speed_avg;
     float           sen_rpm_avg;
     float           bus_voltage;
+    float           temperature;
 
 } csa_t; // config status area
 
