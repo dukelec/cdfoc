@@ -71,13 +71,13 @@ Also be careful to prevent the motor from overheating.
 Then write 1 to `state` to enter the drag mode, where a constant current is continuously passed through some of the motor's coils
 (please complete the subsequent operations as soon as possible to prevent the motor from overheating).
 
-Write 1 to `cali_run` to start the calibration, the motor coil will be energized sequentially, the motor will turn clockwise first, then counterclockwise,
-and finally print the calculated encoder offset value, write it to `bias_encoder`, and finally save it. 
+Write 1 to `cali_run` to start the calibration. The motor coils will be energized sequentially, causing the motor to turn clockwise first, then counterclockwise.
+Afterward, the calculated encoder offset value will be printed and written to `bias_encoder`. Be sure to save it to flash.
 
-Write 1 to `cali_run` as soon as possible after writing 1 to `state`, so that the coils can be energized in turn, sharing the strain on individual coils. 
+Write 1 to `cali_run` as soon as possible after writing 1 to `state`, so that the coils can be energized in turn, sharing the strain on individual coils.
 
 If the motor does not rotate clockwise first during calibration (the encoder value not increases),
-you will need to swap any two wires of the motor to change the direction of motor rotation. 
+you will need to swap any two wires of the motor to change the direction of motor rotation.
 
 
 ### Torque Mode (state = 2)

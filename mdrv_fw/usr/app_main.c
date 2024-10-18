@@ -77,33 +77,6 @@ static void device_init(void)
 }
 
 
-extern uint32_t end; // end of bss
-#define STACK_CHECK_SKIP 0x200
-#define STACK_CHECK_SIZE (64 + STACK_CHECK_SKIP)
-
-static void stack_check_init(void)
-{
-    int i;
-    printf("stack_check_init: skip: %p ~ %p, to %p\n",
-            &end, &end + STACK_CHECK_SKIP, &end + STACK_CHECK_SIZE);
-    for (i = STACK_CHECK_SKIP; i < STACK_CHECK_SIZE; i+=4)
-        *(uint32_t *)(&end + i) = 0xababcdcd;
-}
-
-static void stack_check(void)
-{
-    int i;
-    for (i = STACK_CHECK_SKIP; i < STACK_CHECK_SIZE; i+=4) {
-        if (*(uint32_t *)(&end + i) != 0xababcdcd) {
-            printf("stack overflow %p (skip: %p ~ %p): %08lx\n",
-                    &end + i, &end, &end + STACK_CHECK_SKIP, *(uint32_t *)(&end + i));
-            d_error("stack overflow %p (skip: %p ~ %p): %08lx\n",
-                    &end + i, &end, &end + STACK_CHECK_SKIP, *(uint32_t *)(&end + i));
-            while (true);
-        }
-    }
-}
-
 #if 0
 static void dump_hw_status(void)
 {
@@ -317,7 +290,8 @@ void cali_elec_angle(void)
             d_info("cali: finished, result:\n");
             d_info("cali:  cw: %02x\n", (amount_f / csa.motor_poles) & 0xffff);
             d_info("cali: ccw: %02x\n", (amount_r / csa.motor_poles) & 0xffff);
-            d_info("cali: avg: %02x\n", ((amount_f + amount_r) / csa.motor_poles / 2) & 0xffff);
+            csa.bias_encoder = ((amount_f + amount_r) / csa.motor_poles / 2) & 0xffff;
+            d_info("cali: avg: %02x, updated to bias_encoder\n", csa.bias_encoder);
             uint8_t dat = ST_STOP;
             state_w_hook_before(0, 1, &dat);
             csa.state = ST_STOP;
@@ -354,11 +328,13 @@ void cali_elec_angle(void)
 
 void app_main(void)
 {
+    uint64_t *stack_check = (uint64_t *)((uint32_t)&end + 256);
+
     gpio_set_value(&led_r, 1);
     gpio_set_value(&led_g, 1);
     printf("\nstart app_main (mdrv)...\n");
+    *stack_check = 0xababcdcd12123434;
 
-    stack_check_init();
     load_conf();
     debug_init(&dft_ns, &csa.dbg_dst, &csa.dbg_en);
     device_init();
@@ -452,13 +428,17 @@ void app_main(void)
             }
         }
 
-        stack_check();
         app_motor_routine();
         cdn_routine(&dft_ns); // handle cdnet
         common_service_routine();
         cali_elec_angle();
         //dump_hw_status();
         debug_flush(false);
+
+        if (*stack_check != 0xababcdcd12123434) {
+            printf("stack overflow\n");
+            while (true);
+        }
     }
 }
 

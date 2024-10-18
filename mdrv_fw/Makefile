@@ -67,8 +67,7 @@ Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_uart_ex.c \
 Core/Src/system_stm32g4xx.c \
 Core/Src/sysmem.c \
 Core/Src/syscalls.c \
-cdnet/dispatch/cdnet_dispatch.c \
-cdnet/dispatch/helper.c \
+cdnet/core/cdnet_core.c \
 cdnet/parser/cdnet_l0.c \
 cdnet/parser/cdnet_l1.c \
 cdnet/dev/cdctl_it.c \
@@ -147,7 +146,7 @@ C_INCLUDES =  \
 -IDrivers/CMSIS/Device/ST/STM32G4xx/Include \
 -IDrivers/CMSIS/Include \
 -Icdnet/parser \
--Icdnet/dispatch \
+-Icdnet/core \
 -Icdnet/utils \
 -Icdnet/dev \
 -Icdnet/arch/stm32 \

@@ -10,7 +10,7 @@
 #ifndef __APP_MAIN_H__
 #define __APP_MAIN_H__
 
-#include "cdnet_dispatch.h"
+#include "cdnet_core.h"
 #include "cd_debug.h"
 #include "cdbus_uart.h"
 #include "cdctl.h"
