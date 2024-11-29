@@ -10,7 +10,7 @@
 #include "app_main.h"
 #include "math.h"
 
-regr_t csa_w_allow[] = {
+reg2r_t csa_w_allow[] = {
         { .offset = offsetof(csa_t, magic_code), .size = offsetof(csa_t, pid_pos) - offsetof(csa_t, magic_code) },
         { .offset = offsetof(csa_t, pid_pos), .size = offsetof(pid_i_t, target) },
         { .offset = offsetof(csa_t, pid_speed), .size = offsetof(pid_f_t, target) },
@@ -32,7 +32,7 @@ csa_hook_t csa_w_hook[] = {
 
 csa_hook_t csa_r_hook[] = {};
 
-int csa_w_allow_num = sizeof(csa_w_allow) / sizeof(regr_t);
+int csa_w_allow_num = sizeof(csa_w_allow) / sizeof(reg2r_t);
 int csa_w_hook_num = sizeof(csa_w_hook) / sizeof(csa_hook_t);
 int csa_r_hook_num = sizeof(csa_r_hook) / sizeof(csa_hook_t);
 
@@ -222,8 +222,8 @@ int flash_write(uint32_t addr, uint32_t len, const uint8_t *buf)
                 int16_t *: "[h]", \
                 uint32_t *: "[I]", \
                 float *: "[f]", \
-                regr_t: "H,H", \
-                regr_t *: "{H,H}", \
+                regr_t: "H,B", \
+                regr_t *: "{H,B2}", \
                 default: "-"))
 
 

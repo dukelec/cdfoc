@@ -46,8 +46,13 @@ typedef enum {
 
 typedef struct {
     uint16_t        offset;
-    uint16_t        size;
+    uint8_t         size;
 } regr_t; // reg range
+
+typedef struct {
+    uint16_t        offset;
+    uint16_t        size;
+} reg2r_t; // reg range
 
 
 typedef struct {
@@ -161,7 +166,7 @@ typedef struct {
 typedef uint8_t (*hook_func_t)(uint16_t sub_offset, uint8_t len, uint8_t *dat);
 
 typedef struct {
-    regr_t          range;
+    reg2r_t         range;
     hook_func_t     before;
     hook_func_t     after;
 } csa_hook_t;
@@ -170,7 +175,7 @@ typedef struct {
 extern csa_t csa;
 extern const csa_t csa_dft;
 
-extern regr_t csa_w_allow[]; // writable list
+extern reg2r_t csa_w_allow[]; // writable list
 extern int csa_w_allow_num;
 
 extern csa_hook_t csa_w_hook[];

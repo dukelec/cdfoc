@@ -154,7 +154,7 @@ static uint8_t csa_hook_exec(bool after, uint16_t offset, uint8_t len, uint8_t *
     for (int i = 0; i < hook_num; i++) {
         hook_func_t hook_func = after ? hook[i].after : hook[i].before;
         if (hook_func) {
-            regr_t *regr = &hook[i].range;
+            reg2r_t *regr = &hook[i].range;
             uint16_t start = clip(offset, regr->offset, regr->offset + regr->size);
             uint16_t end = clip(offset + len, regr->offset, regr->offset + regr->size);
             if (start != end)
@@ -207,7 +207,7 @@ static void p5_service_routine(void)
         ret_val = csa_hook_exec(false, offset, len, src_dat);
         if (!ret_val) {
             for (int i = 0; i < csa_w_allow_num; i++) {
-                regr_t *regr = csa_w_allow + i;
+                reg2r_t *regr = csa_w_allow + i;
                 uint16_t start = clip(offset, regr->offset, regr->offset + regr->size);
                 uint16_t end = clip(offset + len, regr->offset, regr->offset + regr->size);
                 if (start == end) {
