@@ -72,9 +72,8 @@ uint8_t motor_w_hook_after(uint16_t sub_offset, uint8_t len, uint8_t *dat)
 
     if (csa.state == ST_POS_TC) {
         local_irq_save(flags);
-        if (csa.cal_pos != csa.tc_pos) {
+        if (csa.cal_pos != csa.tc_pos)
             csa.tc_state = 1; // restart t_curve
-        }
         local_irq_restore(flags);
     }
     return 0;

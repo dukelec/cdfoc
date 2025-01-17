@@ -61,7 +61,7 @@ static void device_init(void)
         list_put(&packet_free_head, &packet_alloc[i].node);
 
     spi_wr_init(&r_spi);
-    cdctl_dev_init(&r_dev, &frame_free_head, &csa.bus_cfg, &r_spi, NULL, &r_int);
+    cdctl_dev_init(&r_dev, &frame_free_head, &csa.bus_cfg, &r_spi, NULL, &r_int, EXTI9_5_IRQn);
 
     // 12MHz / (0 + 2) * (48 + 2) / 2^1 = 150MHz
     d_info("pll_n: %02x\n", cdctl_reg_r(&r_dev, REG_PLL_N));
