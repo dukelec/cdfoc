@@ -14,9 +14,7 @@
 #define SEN_TLE5012B
 
 extern SPI_HandleTypeDef hspi1;
-extern SPI_HandleTypeDef hspi2;
 extern SPI_HandleTypeDef hspi3;
-extern UART_HandleTypeDef huart3;
 extern I2C_HandleTypeDef hi2c1;
 
 gpio_t led_r = { .group = LED_R_GPIO_Port, .num = LED_R_Pin };
@@ -30,13 +28,17 @@ gpio_t drv_en = { .group = DRV_EN_GPIO_Port, .num = DRV_EN_Pin };
 static gpio_t drv_fault = { .group = DRV_FAULT_GPIO_Port, .num = DRV_FAULT_Pin };
 static gpio_t drv_cs = { .group = DRV_CS_GPIO_Port, .num = DRV_CS_Pin };
 gpio_t s_cs = { .group = SEN_CS_GPIO_Port, .num = SEN_CS_Pin };
-//static spi_t s_spi = { .hspi = &hspi1, .ns_pin = &s_cs };
-
-uart_t debug_uart = { .huart = &huart3 };
 
 static gpio_t r_int = { .group = CD_INT_GPIO_Port, .num = CD_INT_Pin };
 static gpio_t r_cs = { .group = CD_CS_GPIO_Port, .num = CD_CS_Pin };
-static spi_t r_spi = { .hspi = &hspi2, .ns_pin = &r_cs };
+static spi_t r_spi = {
+        .spi = SPI2,
+        .ns_pin = &r_cs,
+        .dma_rx = DMA2,
+        .dma_ch_rx = DMA2_Channel1,
+        .dma_ch_tx = DMA2_Channel2,
+        .dma_mask = (2 << 0)
+};
 
 static cd_frame_t frame_alloc[FRAME_MAX];
 list_head_t frame_free_head = {0};
@@ -51,27 +53,28 @@ cdn_ns_t dft_ns = {0};      // CDNET
 static void device_init(void)
 {
     int i;
-    cdn_init_ns(&dft_ns, &packet_free_head);
+    cdn_init_ns(&dft_ns, &packet_free_head, &frame_free_head);
 
     for (i = 0; i < FRAME_MAX; i++)
         list_put(&frame_free_head, &frame_alloc[i].node);
     for (i = 0; i < PACKET_MAX; i++)
         list_put(&packet_free_head, &packet_alloc[i].node);
 
+    spi_wr_init(&r_spi);
     cdctl_dev_init(&r_dev, &frame_free_head, &csa.bus_cfg, &r_spi, NULL, &r_int);
 
     // 12MHz / (0 + 2) * (48 + 2) / 2^1 = 150MHz
-    d_info("pll_n: %02x\n", cdctl_read_reg(&r_dev, REG_PLL_N));
-    cdctl_write_reg(&r_dev, REG_PLL_ML, 0x30); // 0x30: 48
-    d_info("pll_ml: %02x\n", cdctl_read_reg(&r_dev, REG_PLL_ML));
+    d_info("pll_n: %02x\n", cdctl_reg_r(&r_dev, REG_PLL_N));
+    cdctl_reg_w(&r_dev, REG_PLL_ML, 0x30); // 0x30: 48
+    d_info("pll_ml: %02x\n", cdctl_reg_r(&r_dev, REG_PLL_ML));
 
-    d_info("pll_ctrl: %02x\n", cdctl_read_reg(&r_dev, REG_PLL_CTRL));
-    cdctl_write_reg(&r_dev, REG_PLL_CTRL, 0x10); // enable pll
-    d_info("clk_status: %02x\n", cdctl_read_reg(&r_dev, REG_CLK_STATUS));
-    cdctl_write_reg(&r_dev, REG_CLK_CTRL, 0x01); // select pll
+    d_info("pll_ctrl: %02x\n", cdctl_reg_r(&r_dev, REG_PLL_CTRL));
+    cdctl_reg_w(&r_dev, REG_PLL_CTRL, 0x10); // enable pll
+    d_info("clk_status: %02x\n", cdctl_reg_r(&r_dev, REG_CLK_STATUS));
+    cdctl_reg_w(&r_dev, REG_CLK_CTRL, 0x01); // select pll
 
-    d_info("clk_status after select pll: %02x\n", cdctl_read_reg(&r_dev, REG_CLK_STATUS));
-    d_info("version after select pll: %02x\n", cdctl_read_reg(&r_dev, REG_VERSION));
+    d_info("clk_status after select pll: %02x\n", cdctl_reg_r(&r_dev, REG_CLK_STATUS));
+    d_info("version after select pll: %02x\n", cdctl_reg_r(&r_dev, REG_VERSION));
 
     cdn_add_intf(&dft_ns, &r_dev.cd_dev, csa.bus_net, csa.bus_cfg.mac);
 }
@@ -85,7 +88,7 @@ static void dump_hw_status(void)
         t_l = get_systick();
         printf("ctl: state %d, t_len %d, r_len %d, irq %d\n",
                 r_dev.state, r_dev.tx_head.len, r_dev.rx_head.len,
-                !gpio_get_value(r_dev.int_n));
+                !gpio_get_val(r_dev.int_n));
         printf("  r_cnt %d (lost %d, err %d, no-free %d), t_cnt %d (cd %d, err %d)\n",
                 r_dev.rx_cnt, r_dev.rx_lost_cnt, r_dev.rx_error_cnt,
                 r_dev.rx_no_free_node_cnt,
@@ -101,14 +104,14 @@ uint16_t encoder_reg_r(uint8_t addr)
     uint16_t buf_tx[1];
     uint16_t buf_rx[1];
     buf_tx[0] = (0x40 | addr) << 8;
-    gpio_set_value(&s_cs, 0);
+    gpio_set_val(&s_cs, 0);
     HAL_SPI_TransmitReceive(&hspi1, (uint8_t *)buf_tx, (uint8_t *)buf_rx, 1, HAL_MAX_DELAY);
-    gpio_set_value(&s_cs, 1);
+    gpio_set_val(&s_cs, 1);
     delay_systick(2000 / SYSTICK_US_DIV); // >= 40us
     buf_tx[0] = 0;
-    gpio_set_value(&s_cs, 0);
+    gpio_set_val(&s_cs, 0);
     HAL_SPI_TransmitReceive(&hspi1, (uint8_t *)buf_tx, (uint8_t *)buf_rx, 1, HAL_MAX_DELAY);
-    gpio_set_value(&s_cs, 1);
+    gpio_set_val(&s_cs, 1);
     if ((buf_rx[0] & 0xff) != 0)
         d_error("enc reg r, err ret: %04x\n", buf_rx[0]);
     return buf_rx[0] >> 8;
@@ -119,14 +122,14 @@ void encoder_reg_w(uint8_t addr, uint16_t val)
     uint16_t buf_tx[1];
     uint16_t buf_rx[1];
     buf_tx[0] = ((0x80 | addr) << 8) | val;
-    gpio_set_value(&s_cs, 0);
+    gpio_set_val(&s_cs, 0);
     HAL_SPI_TransmitReceive(&hspi1, (uint8_t *)buf_tx, (uint8_t *)buf_rx, 1, HAL_MAX_DELAY);
-    gpio_set_value(&s_cs, 1);
+    gpio_set_val(&s_cs, 1);
     delay_systick(50000 / SYSTICK_US_DIV); // >= 20ms
     buf_tx[0] = 0;
-    gpio_set_value(&s_cs, 0);
+    gpio_set_val(&s_cs, 0);
     HAL_SPI_TransmitReceive(&hspi1, (uint8_t *)buf_tx, (uint8_t *)buf_rx, 1, HAL_MAX_DELAY);
-    gpio_set_value(&s_cs, 1);
+    gpio_set_val(&s_cs, 1);
     if (((buf_rx[0] & 0xff) != 0) || (buf_rx[0] >> 8) != val)
         d_error("enc reg w, err ret: %04x\n", buf_rx[0]);
     return;
@@ -138,10 +141,10 @@ uint16_t encoder_reg_r(uint8_t addr)
     uint16_t buf[2];
     buf[0] = 0x8001 | (addr << 4);
 
-    gpio_set_value(&s_cs, 0);
+    gpio_set_val(&s_cs, 0);
     HAL_SPI_Transmit(&hspi1, (uint8_t *)buf, 1, HAL_MAX_DELAY);
     HAL_SPI_Receive(&hspi1, (uint8_t *)buf, 1, HAL_MAX_DELAY);
-    gpio_set_value(&s_cs, 1);
+    gpio_set_val(&s_cs, 1);
 
     return buf[0];
 }
@@ -152,9 +155,9 @@ void encoder_reg_w(uint8_t addr, uint16_t val)
     buf[0] = 0x0001 | (addr << 4);
     buf[1] = val;
 
-    gpio_set_value(&s_cs, 0);
+    gpio_set_val(&s_cs, 0);
     HAL_SPI_Transmit(&hspi1, (uint8_t *)buf, 2, HAL_MAX_DELAY);
-    gpio_set_value(&s_cs, 1);
+    gpio_set_val(&s_cs, 1);
 }
 
 #endif
@@ -211,9 +214,9 @@ uint16_t drv_read_reg(uint8_t reg)
     uint16_t rx_val;
     uint16_t val = 0x8000 | reg << 11;
 
-    gpio_set_value(&drv_cs, 0);
+    gpio_set_val(&drv_cs, 0);
     HAL_SPI_TransmitReceive(&hspi3, (uint8_t *)&val, (uint8_t *)&rx_val, 1, HAL_MAX_DELAY);
-    gpio_set_value(&drv_cs, 1);
+    gpio_set_val(&drv_cs, 1);
     return rx_val & 0x7ff;
 }
 
@@ -221,9 +224,9 @@ void drv_write_reg(uint8_t reg, uint16_t val)
 {
     val |= reg << 11;
 
-    gpio_set_value(&drv_cs, 0);
+    gpio_set_val(&drv_cs, 0);
     HAL_SPI_Transmit(&hspi3, (uint8_t *)&val, 1, HAL_MAX_DELAY);
-    gpio_set_value(&drv_cs, 1);
+    gpio_set_val(&drv_cs, 1);
 }
 
 
@@ -330,8 +333,18 @@ void app_main(void)
 {
     uint64_t *stack_check = (uint64_t *)((uint32_t)&end + 256);
 
-    gpio_set_value(&led_r, 1);
-    gpio_set_value(&led_g, 1);
+    gpio_set_val(&led_r, 1);
+    gpio_set_val(&led_g, 1);
+
+    HAL_NVIC_SetPriority(ADC1_2_IRQn, 2, 1);
+    HAL_NVIC_EnableIRQ(ADC1_2_IRQn);
+    HAL_NVIC_SetPriority(TIM1_CC_IRQn, 0, 0);
+    HAL_NVIC_EnableIRQ(TIM1_CC_IRQn);
+    HAL_NVIC_SetPriority(DMA2_Channel1_IRQn, 3, 2);
+    HAL_NVIC_EnableIRQ(DMA2_Channel1_IRQn);
+    HAL_NVIC_SetPriority(EXTI9_5_IRQn, 3, 1);
+    HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
+
     printf("\nstart app_main (mdrv)...\n");
     *stack_check = 0xababcdcd12123434;
 
@@ -398,7 +411,7 @@ void app_main(void)
     __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, DRV_PWM_HALF);
     __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_2, DRV_PWM_HALF);
     __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_3, DRV_PWM_HALF);
-    __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_4, 250); // >= 1, ```|_|``` trigger on neg-edge, sensor
+    __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_4, 500); // >= 1, ```|_|``` trigger on neg-edge, sensor
     __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_5, 12); // >= 1, ```|_|``` trigger on neg-edge, adc
     // adc 3.5 cycles @ 170M/4 -> 82.35 nS -> /2 -> 41.2 nS, pwm 12 -> 70.6 nS /1
 
@@ -409,7 +422,7 @@ void app_main(void)
     __HAL_TIM_ENABLE_IT(&htim1, TIM_IT_CC4);
 
     d_info("pwm on.\n");
-    gpio_set_value(&led_r, 0);
+    gpio_set_val(&led_r, 0);
 
     uint32_t last_fault_val = 0xffffffff;
 
@@ -417,10 +430,10 @@ void app_main(void)
         //encoder_read();
         //d_debug("drv: %08x\n", drv_read_reg(0x01) << 16 | drv_read_reg(0x00));
 
-        if (csa.state != ST_STOP && !gpio_get_value(&drv_fault)) {
+        if (csa.state != ST_STOP && !gpio_get_val(&drv_fault)) {
             uint32_t cur_fault_val = (drv_read_reg(0x00) << 16) | drv_read_reg(0x01);
-            gpio_set_value(&led_r, 1);
-            gpio_set_value(&led_g, 0);
+            gpio_set_val(&led_r, 1);
+            gpio_set_val(&led_g, 0);
             csa.cali_run = false;
             if (cur_fault_val != last_fault_val) {
                 d_error("drv status: %08x\n", cur_fault_val);
@@ -443,26 +456,26 @@ void app_main(void)
 }
 
 
-void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+void EXTI9_5_IRQHandler(void)
 {
-    if (GPIO_Pin == r_int.num) {
-        cdctl_int_isr(&r_dev);
-    }
+    __HAL_GPIO_EXTI_CLEAR_IT(CD_INT_Pin);
+    cdctl_int_isr(&r_dev);
 }
 
-void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi)
+void DMA2_Channel1_IRQHandler(void)
 {
+    r_spi.dma_rx->IFCR = r_spi.dma_mask;
     cdctl_spi_isr(&r_dev);
 }
-void HAL_SPI_RxCpltCallback(SPI_HandleTypeDef *hspi)
+
+void TIM1_CC_IRQHandler(void)
 {
-    cdctl_spi_isr(&r_dev);
+    encoder_isr();
+    __HAL_TIM_CLEAR_FLAG(&htim1, TIM_FLAG_CC4);
 }
-void HAL_SPI_TxCpltCallback(SPI_HandleTypeDef *hspi)
+
+void ADC1_2_IRQHandler(void)
 {
-    cdctl_spi_isr(&r_dev);
-}
-void HAL_SPI_ErrorCallback(SPI_HandleTypeDef *hspi)
-{
-    printf("spi error...\n");
+    // reading register JDRx automatically clears ADC_FLAG_JEOC
+    adc_isr();
 }

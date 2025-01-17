@@ -83,8 +83,11 @@ int flash_write(uint32_t addr, uint32_t len, const uint8_t *buf)
     uint64_t *src_dat = (uint64_t *)buf;
 
     ret = HAL_FLASH_Unlock();
-    for (int i = 0; ret == HAL_OK && i < cnt; i++)
-        ret = HAL_FLASH_Program(FLASH_TYPEPROGRAM_DOUBLEWORD, (uint32_t)(dst_dat + i), *(src_dat + i));
+    for (int i = 0; ret == HAL_OK && i < cnt; i++) {
+        uint64_t dat = get_unaligned32((uint8_t *)(src_dat + i));
+        dat |= (uint64_t)get_unaligned32((uint8_t *)(src_dat + i) + 4) << 32;
+        ret = HAL_FLASH_Program(FLASH_TYPEPROGRAM_DOUBLEWORD, (uint32_t)(dst_dat + i), dat);
+    }
     ret |= HAL_FLASH_Lock();
 
     d_verbose("nvm write: %08x %d(%d), ret: %d\n", dst_dat, len, cnt, ret);

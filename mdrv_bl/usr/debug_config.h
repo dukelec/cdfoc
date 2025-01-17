@@ -12,39 +12,14 @@
 
 #include "arch_wrapper.h"
 
-static inline
-void dbg_transmit(uart_t *uart, const uint8_t *buf, uint16_t len)
+static inline void arch_dbg_tx(const uint8_t *buf, uint16_t len)
 {
-#if 1 // avoid hal check
-    uint16_t i;
-    for (i = 0; i < len; i++) {
-        while (!__HAL_UART_GET_FLAG(uart->huart, UART_FLAG_TXE));
-        uart->huart->Instance->TDR = *(buf + i);
+#define DBG_UART         USART3
+
+    for (uint16_t i = 0; i < len; i++) {
+        while (!(DBG_UART->ISR & UART_FLAG_TXE)); // UART_FLAG_TXFE
+        DBG_UART->TDR = *buf++;
     }
-#else
-    HAL_UART_Transmit(uart->huart, (uint8_t *)buf, len, HAL_MAX_DELAY);
-#endif
-}
-
-static inline
-void dbg_transmit_it(uart_t *uart, const uint8_t *buf, uint16_t len)
-{
-    HAL_UART_Transmit_DMA(uart->huart, (uint8_t *)buf, len);
-}
-
-static inline bool dbg_transmit_is_ready(uart_t *uart)
-{
-#if 1 // DMA
-    if (uart->huart->TxXferCount == 0) {
-        uart->huart->gState = HAL_UART_STATE_READY;
-        return true;
-    } else {
-        return false;
-    }
-#else
-    return uart->huart->gState == HAL_UART_STATE_READY;
-#endif
 }
 
 #endif
-

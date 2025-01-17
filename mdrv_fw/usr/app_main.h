@@ -207,7 +207,7 @@ uint16_t drv_read_reg(uint8_t reg);
 void drv_write_reg(uint8_t reg, uint16_t val);
 void app_motor_init(void);
 void app_motor_routine(void);
-void selection_sort(int32_t arr[], int len, int32_t order[]);
+void adc_isr(void);
 
 uint16_t encoder_read(void);
 void encoder_isr_prepare(void);

@@ -12,37 +12,35 @@
 
 #include "arch_wrapper.h"
 
-static inline
-void dbg_transmit(uart_t *uart, const uint8_t *buf, uint16_t len)
+static inline void arch_dbg_tx(const uint8_t *buf, uint16_t len)
 {
-#if 1 // avoid hal check
-    uint16_t i;
-    for (i = 0; i < len; i++) {
-        while (!__HAL_UART_GET_FLAG(uart->huart, UART_FLAG_TXE));
-        uart->huart->Instance->TDR = *(buf + i);
-    }
-#else
-    HAL_UART_Transmit(uart->huart, (uint8_t *)buf, len, HAL_MAX_DELAY);
-#endif
-}
+#if 1
 
-static inline
-void dbg_transmit_it(uart_t *uart, const uint8_t *buf, uint16_t len)
-{
-    HAL_UART_Transmit_DMA(uart->huart, (uint8_t *)buf, len);
-}
+#define DBG_UART         USART3
 
-static inline bool dbg_transmit_is_ready(uart_t *uart)
-{
-#if 1 // DMA
-    if (uart->huart->TxXferCount == 0) {
-        uart->huart->gState = HAL_UART_STATE_READY;
-        return true;
-    } else {
-        return false;
+    for (uint16_t i = 0; i < len; i++) {
+        while (!(DBG_UART->ISR & UART_FLAG_TXE)); // UART_FLAG_TXFE
+        DBG_UART->TDR = *buf++;
     }
+
 #else
-    return uart->huart->gState == HAL_UART_STATE_READY;
+
+#define DBG_DMA         DMA1
+#define DBG_DMA_CH      DMA1_Channel4
+#define DBG_DMA_MASK    (2 << 12)       // DMA_ISR.TCIF4
+
+    // init once:
+    //DBG_UART->CR3 |= USART_CR3_DMAT;
+    //DBG_DMA_CH->CPAR = (uint32_t)&DBG_UART->TDR;
+
+    DBG_DMA_CH->CNDTR = len;
+    DBG_DMA_CH->CMAR = (uint32_t)buf;
+    DBG_DMA_CH->CCR |= DMA_CCR_EN;
+
+    while (!(DBG_DMA->ISR & DBG_DMA_MASK));
+    DBG_DMA->IFCR = DBG_DMA_MASK;
+    DBG_DMA_CH->CCR &= ~DMA_CCR_EN;
+
 #endif
 }
 

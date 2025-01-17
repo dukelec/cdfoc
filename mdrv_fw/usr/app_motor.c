@@ -26,12 +26,12 @@ static int encoder_err = 0;
 uint8_t state_w_hook_before(uint16_t sub_offset, uint8_t len, uint8_t *dat)
 {
     if (*dat == ST_STOP) {
-        gpio_set_value(&drv_en, 0);
-        gpio_set_value(&led_r, 0);
+        gpio_set_val(&drv_en, 0);
+        gpio_set_val(&led_r, 0);
         csa.adc_sel = 0;
 
     } else if (csa.state == ST_STOP && *dat != ST_STOP) {
-        gpio_set_value(&drv_en, 1);
+        gpio_set_val(&drv_en, 1);
         csa.adc_sel = 0;
         delay_systick(50);
 
@@ -108,7 +108,7 @@ void app_motor_routine(void)
     pid_i_init(&csa.pid_pos, false);
 
     if (frame_free_head.len > 1) {
-        cdn_pkt_t *pkt = cdn_pkt_get(&raw_pend);
+        cdn_pkt_t *pkt = cdn_list_get(&raw_pend);
         if (pkt)
             cdn_sock_sendto(&sock_raw_dbg, pkt);
     }
@@ -116,10 +116,10 @@ void app_motor_routine(void)
     static uint8_t tc_state_old = 0;
     if (csa.tc_rpt_end) {
         if (csa.tc_state == 0 && tc_state_old != 0) {
-            cdn_pkt_t *pkt = cdn_pkt_get(dft_ns.free_pkts);
+            cdn_pkt_t *pkt = cdn_pkt_alloc(sock_tc_rpt.ns);
             if (pkt) {
-                cdn_init_pkt(pkt);
                 pkt->dst = csa.tc_rpt_dst;
+                cdn_pkt_prepare(&sock_tc_rpt, pkt);
                 pkt->dat[0] = 0x40;
                 pkt->len = 1;
                 cdn_sock_sendto(&sock_tc_rpt, pkt);
@@ -136,7 +136,7 @@ static void raw_dbg(int idx)
 
     if (!(csa.dbg_raw_msk & (1 << idx))) {
         if (pkt_raw[idx]) {
-            list_put(dft_ns.free_pkts, &pkt_raw[idx]->node);
+            cdn_pkt_free(&dft_ns, pkt_raw[idx]);
             pkt_raw[idx] = NULL;
         }
         return;
@@ -149,16 +149,16 @@ static void raw_dbg(int idx)
     }
 
     if (!pkt_less && !pkt_raw[idx]) {
-        if (dft_ns.free_pkts->len < 5) {
+        if (dft_ns.free_pkt->len < 5) {
             pkt_less = true;
             return;
 
         } else {
-            pkt_raw[idx] = cdn_pkt_get(dft_ns.free_pkts);
-            cdn_init_pkt(pkt_raw[idx]);
+            pkt_raw[idx] = cdn_pkt_alloc(sock_raw_dbg.ns);
             pkt_raw[idx]->dst = csa.dbg_raw_dst;
+            cdn_pkt_prepare(&sock_raw_dbg, pkt_raw[idx]);
             pkt_raw[idx]->dat[0] = 0x40 | idx;
-            *(uint32_t *)(pkt_raw[idx]->dat + 1) = csa.loop_cnt;
+            put_unaligned32(csa.loop_cnt, pkt_raw[idx]->dat + 1);
             pkt_raw[idx]->len = 5;
         }
     }
@@ -314,10 +314,10 @@ static uint16_t hist[HIST_LEN] = { 0 };
 static int8_t hist_err = -2;
 static uint16_t sen_encoder_bk = 0;
 
-void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
+void adc_isr(void)
 {
-    gpio_set_value(&dbg_out1, 1);
-    gpio_set_value(&s_cs, 1);
+    gpio_set_val(&dbg_out1, 1);
+    gpio_set_val(&s_cs, 1);
 
     uint16_t tbl_idx = 0;
     uint16_t tbl_idx_next = 0;
@@ -330,7 +330,7 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
 
     csa.ori_encoder = encoder_read();
 
-    //gpio_set_value(&dbg_out2, 1);
+    //gpio_set_val(&dbg_out2, 1);
 
     // filter out disturbed error position values
 #if 1
@@ -396,7 +396,7 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
     // 9us lag steps = step/sec * 0.000009 sec
     csa.sen_encoder += delta_enc * ((float)CURRENT_LOOP_FREQ * 0.000019f); // 0.000009f
 
-    //gpio_set_value(&dbg_out2, 0);
+    //gpio_set_val(&dbg_out2, 0);
 
 
     if (abs((uint16_t)(csa.ori_pos & 0xffff) - csa.sen_encoder) > 0x10000/2) {
@@ -594,7 +594,7 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
         hadc2.Instance->JSQR = (hadc2.Instance->JSQR & 0x1ff) | (2 << 9); // b
     }
 
-    //gpio_set_value(&led_r, !gpio_get_value(&led_r)); // debug for hw config
+    //gpio_set_val(&led_r, !gpio_get_val(&led_r)); // debug for hw config
     csa.dbg_u = out_pwm_u;
     csa.dbg_v = out_pwm_v;
 
@@ -629,5 +629,5 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
         d_warn("encoder dat late\n");
 
     encoder_isr_prepare();
-    gpio_set_value(&dbg_out1, 0);
+    gpio_set_val(&dbg_out1, 0);
 }
