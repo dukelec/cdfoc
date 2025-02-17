@@ -23,6 +23,7 @@
 #define P_3F(x) (int)(x), abs(((x)-(int)(x))*1000) // "%d.%.3d"
 
 
+#define BL_ARGS             0x20000000 // first word
 #define CALI_ENCODER_TBL    0x0801b800 // 8k, 2bytes x 4096
 #define ANTICOGGING_TBL     0x0801d800 // 8k, 2bytes x 4096
 #define APP_CONF_ADDR       0x0801f800 // page 63, the last page
@@ -59,7 +60,7 @@ typedef struct {
     uint16_t        magic_code;     // 0xcdcd
     uint16_t        conf_ver;
     uint8_t         conf_from;      // 0: default, 1: all from flash, 2: partly from flash
-    bool            do_reboot;
+    uint8_t         do_reboot;
     bool            _reserved_bl;   // keep_in_bl for bl
     bool            save_conf;
 

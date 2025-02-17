@@ -56,9 +56,9 @@ static void device_init(void)
     cdn_init_ns(&dft_ns, &packet_free_head, &frame_free_head);
 
     for (i = 0; i < FRAME_MAX; i++)
-        list_put(&frame_free_head, &frame_alloc[i].node);
+        cd_list_put(&frame_free_head, &frame_alloc[i]);
     for (i = 0; i < PACKET_MAX; i++)
-        list_put(&packet_free_head, &packet_alloc[i].node);
+        cdn_list_put(&packet_free_head, &packet_alloc[i]);
 
     spi_wr_init(&r_spi);
     cdctl_dev_init(&r_dev, &frame_free_head, &csa.bus_cfg, &r_spi, NULL, &r_int, EXTI9_5_IRQn);

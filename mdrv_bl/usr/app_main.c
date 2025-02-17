@@ -12,6 +12,7 @@
 extern SPI_HandleTypeDef hspi2;
 extern UART_HandleTypeDef huart3;
 
+uint32_t *bl_args = (uint32_t *)BL_ARGS;
 gpio_t led_g = { .group = LED_G_GPIO_Port, .num = LED_G_Pin };
 uart_t debug_uart = { .huart = &huart3 };
 
@@ -34,12 +35,13 @@ static void device_init(void)
     cdn_init_ns(&dft_ns, &packet_free_head, &frame_free_head);
 
     for (i = 0; i < FRAME_MAX; i++)
-        list_put(&frame_free_head, &frame_alloc[i].node);
+        cd_list_put(&frame_free_head, &frame_alloc[i]);
     for (i = 0; i < PACKET_MAX; i++)
-        list_put(&packet_free_head, &packet_alloc[i].node);
+        cdn_list_put(&packet_free_head, &packet_alloc[i]);
 
     cdctl_cfg_t cfg = csa.bus_cfg;
-    cfg.baud_l = cfg.baud_h = 115200;
+    if (!csa.keep_in_bl)
+        cfg.baud_l = cfg.baud_h = 115200;
     cdctl_dev_init(&r_dev, &frame_free_head, &cfg, &r_spi, NULL);
 
     // 16MHz / (2 + 2) * (73 + 2) / 2^1 = 150MHz
@@ -92,14 +94,14 @@ void app_main(void)
     bool dbg_en_bk = csa.dbg_en;
     csa.dbg_en = false; // silence
     debug_init(&dft_ns, &csa.dbg_dst, &csa.dbg_en);
+    csa.keep_in_bl = *bl_args == 0xcdcd0001;
     device_init();
     common_service_init();
-    printf("conf: %s\n", csa.conf_from ? "flash" : "dft");
+    printf("conf: %s, args: %08lx\n", csa.conf_from ? "flash" : "dft", *bl_args);
     gpio_set_val(&led_g, 1);
 
     uint32_t t_last = get_systick();
-    uint32_t boot_time = get_systick();
-    bool update_baud = false;
+    bool update_baud = csa.keep_in_bl;
 
     while (true) {
         if (get_systick() - t_last > (update_baud ? 100000 : 200000) / SYSTICK_US_DIV) {
@@ -107,7 +109,7 @@ void app_main(void)
             gpio_set_val(&led_g, !gpio_get_val(&led_g));
         }
 
-        if (!csa.keep_in_bl && !update_baud && get_systick() - boot_time > 1000000 / SYSTICK_US_DIV) {
+        if (!csa.keep_in_bl && !update_baud && get_systick() > 1000000 / SYSTICK_US_DIV) {
             update_baud = true;
             if (csa.bus_cfg.baud_l != 115200 || csa.bus_cfg.baud_h != 115200) {
                 cdctl_set_baud_rate(&r_dev, csa.bus_cfg.baud_l, csa.bus_cfg.baud_h);
@@ -118,7 +120,7 @@ void app_main(void)
             csa.dbg_en = dbg_en_bk;
         }
 
-        if (!csa.keep_in_bl && get_systick() - boot_time > 2000000 / SYSTICK_US_DIV)
+        if (!csa.keep_in_bl && get_systick() > 2000000 / SYSTICK_US_DIV)
             jump_to_app();
 
         cdctl_routine(&r_dev);

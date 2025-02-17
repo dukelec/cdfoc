@@ -365,6 +365,7 @@ void common_service_routine(void)
         save_conf();
     }
     if (csa.do_reboot) {
+        *(uint32_t *)BL_ARGS = 0xcdcd0000 | csa.do_reboot;
         gpio_set_val(&drv_en, 0);
         NVIC_SystemReset();
     }

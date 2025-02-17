@@ -174,7 +174,7 @@ static void raw_dbg(int idx)
     }
 
     if (pkt_raw[idx]->len >= csa.dbg_raw_th) {
-        list_put(&raw_pend, &pkt_raw[idx]->node);
+        cdn_list_put(&raw_pend, pkt_raw[idx]);
         pkt_raw[idx] = NULL;
     }
 }
