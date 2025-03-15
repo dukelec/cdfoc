@@ -63,19 +63,6 @@ static void device_init(void)
     spi_wr_init(&r_spi);
     cdctl_dev_init(&r_dev, &frame_free_head, &csa.bus_cfg, &r_spi, NULL, &r_int, EXTI9_5_IRQn);
 
-    // 12MHz / (0 + 2) * (48 + 2) / 2^1 = 150MHz
-    d_info("pll_n: %02x\n", cdctl_reg_r(&r_dev, REG_PLL_N));
-    cdctl_reg_w(&r_dev, REG_PLL_ML, 0x30); // 0x30: 48
-    d_info("pll_ml: %02x\n", cdctl_reg_r(&r_dev, REG_PLL_ML));
-
-    d_info("pll_ctrl: %02x\n", cdctl_reg_r(&r_dev, REG_PLL_CTRL));
-    cdctl_reg_w(&r_dev, REG_PLL_CTRL, 0x10); // enable pll
-    d_info("clk_status: %02x\n", cdctl_reg_r(&r_dev, REG_CLK_STATUS));
-    cdctl_reg_w(&r_dev, REG_CLK_CTRL, 0x01); // select pll
-
-    d_info("clk_status after select pll: %02x\n", cdctl_reg_r(&r_dev, REG_CLK_STATUS));
-    d_info("version after select pll: %02x\n", cdctl_reg_r(&r_dev, REG_VERSION));
-
     cdn_add_intf(&dft_ns, &r_dev.cd_dev, csa.bus_net, csa.bus_cfg.mac);
 }
 

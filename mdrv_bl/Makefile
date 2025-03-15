@@ -64,6 +64,7 @@ cdnet/core/cdnet_core.c \
 cdnet/parser/cdnet_l0.c \
 cdnet/parser/cdnet_l1.c \
 cdnet/parser/cdnet.c \
+cdnet/dev/cdctl_pll_cal.c \
 cdnet/dev/cdctl.c \
 cdnet/utils/cd_list.c \
 cdnet/utils/cd_debug.c \

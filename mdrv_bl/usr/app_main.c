@@ -39,24 +39,11 @@ static void device_init(void)
     for (i = 0; i < PACKET_MAX; i++)
         cdn_list_put(&packet_free_head, &packet_alloc[i]);
 
-    cdctl_cfg_t cfg = csa.bus_cfg;
-    if (!csa.keep_in_bl)
-        cfg.baud_l = cfg.baud_h = 115200;
-    cdctl_dev_init(&r_dev, &frame_free_head, &cfg, &r_spi, NULL);
-
-    // 16MHz / (2 + 2) * (73 + 2) / 2^1 = 150MHz
-    cdctl_reg_w(&r_dev, REG_PLL_N, 0x2);
-    d_info("pll_n: %02x\n", cdctl_reg_r(&r_dev, REG_PLL_N));
-    cdctl_reg_w(&r_dev, REG_PLL_ML, 0x49); // 0x49: 73
-    d_info("pll_ml: %02x\n", cdctl_reg_r(&r_dev, REG_PLL_ML));
-
-    d_info("pll_ctrl: %02x\n", cdctl_reg_r(&r_dev, REG_PLL_CTRL));
-    cdctl_reg_w(&r_dev, REG_PLL_CTRL, 0x10); // enable pll
-    d_info("clk_status: %02x\n", cdctl_reg_r(&r_dev, REG_CLK_STATUS));
-    cdctl_reg_w(&r_dev, REG_CLK_CTRL, 0x01); // select pll
-
-    d_info("clk_status after select pll: %02x\n", cdctl_reg_r(&r_dev, REG_CLK_STATUS));
-    d_info("version after select pll: %02x\n", cdctl_reg_r(&r_dev, REG_VERSION));
+    cdctl_dev_init(&r_dev, &frame_free_head, &csa.bus_cfg, &r_spi, NULL);
+    if (!csa.keep_in_bl) {
+        cdctl_set_baud_rate(&r_dev, 115200, 115200);
+        cdctl_flush(&r_dev);
+    }
 
     cdn_add_intf(&dft_ns, &r_dev.cd_dev, csa.bus_net, csa.bus_cfg.mac);
 }
@@ -114,8 +101,6 @@ void app_main(void)
             if (csa.bus_cfg.baud_l != 115200 || csa.bus_cfg.baud_h != 115200) {
                 cdctl_set_baud_rate(&r_dev, csa.bus_cfg.baud_l, csa.bus_cfg.baud_h);
                 cdctl_flush(&r_dev);
-                //printf("baud rate updated, %ld %ld\n", csa.bus_cfg.baud_l, csa.bus_cfg.baud_h);
-                d_info("baud updated, %ld %ld\n", csa.bus_cfg.baud_l, csa.bus_cfg.baud_h);
             }
             csa.dbg_en = dbg_en_bk;
         }
