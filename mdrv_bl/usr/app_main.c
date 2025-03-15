@@ -79,9 +79,10 @@ void app_main(void)
     printf("\nstart bl...\n");
     load_conf();
     bool dbg_en_bk = csa.dbg_en;
-    csa.dbg_en = false; // silence
-    debug_init(&dft_ns, &csa.dbg_dst, &csa.dbg_en);
     csa.keep_in_bl = *bl_args == 0xcdcd0001;
+    if (!csa.keep_in_bl)
+        csa.dbg_en = false; // silence
+    debug_init(&dft_ns, &csa.dbg_dst, &csa.dbg_en);
     device_init();
     common_service_init();
     printf("conf: %s, args: %08lx\n", csa.conf_from ? "flash" : "dft", *bl_args);

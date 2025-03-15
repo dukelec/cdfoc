@@ -142,13 +142,13 @@ static void raw_dbg(int idx)
     }
 
     if (pkt_less) {
-        if (raw_pend.len == 0) {
+        if (raw_pend.len == 0 && dft_ns.free_frm->len >= FRAME_MAX - 5) {
             pkt_less = false;
         }
     }
 
     if (!pkt_less && !pkt_raw[idx]) {
-        if (dft_ns.free_pkt->len < 5) {
+        if (dft_ns.free_pkt->len < 5 || dft_ns.free_frm->len < 5) {
             pkt_less = true;
             return;
 
@@ -218,6 +218,12 @@ static inline void t_curve_compute(void)
         float dt_pos = csa.tc_vc / (CURRENT_LOOP_FREQ / 25.0f);
         p64f += (double)dt_pos;
         int32_t p32i = lround(p64f);
+
+        if (csa.tc_max_err && abs(csa.sen_pos - p32i) > csa.tc_max_err) {
+            p32i = clip(p32i, csa.sen_pos - csa.tc_max_err, csa.sen_pos + csa.tc_max_err);
+            p64f = p32i;
+            // todo: set warning flag
+        }
 
         if (fabsf(csa.tc_vc) <= v_step * 4.4f) { // avoid exceeding
             csa.cal_pos = (csa.tc_pos >= csa.cal_pos) ? min(p32i, csa.tc_pos) : max(p32i, csa.tc_pos);

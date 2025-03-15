@@ -25,7 +25,7 @@
 #define APP_CONF_ADDR       0x0801f800 // page 63, the last page
 #define APP_CONF_VER        0x0100
 
-#define FRAME_MAX           10
+#define FRAME_MAX           30
 #define PACKET_MAX          30
 
 

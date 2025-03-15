@@ -32,7 +32,7 @@
 #define CURRENT_LOOP_FREQ   (170000000 / 4096 / 2)
 #define DRV_PWM_HALF        2048
 
-#define FRAME_MAX           10
+#define FRAME_MAX           60
 #define PACKET_MAX          60
 
 
@@ -112,7 +112,8 @@ typedef struct {
     float           anticogging_max_val[2];
 
     float           nominal_voltage;
-    uint8_t         _reserved[24];
+    uint16_t        tc_max_err;
+    uint8_t         _reserved[22];
 
     // end of flash
     #define         _end_save state
@@ -227,6 +228,7 @@ extern gpio_t dbg_out1;
 extern gpio_t sen_int;
 extern cdn_ns_t dft_ns;
 extern list_head_t frame_free_head;
+extern cdctl_dev_t r_dev;
 
 extern uint32_t end; // end of bss
 

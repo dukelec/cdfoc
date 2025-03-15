@@ -127,7 +127,8 @@ const csa_t csa_dft = {
         //.cali_angle_step = 0.003179136f // @ ic-MU3 25KHz spi
         //.cali_angle_step = 0
 
-        .nominal_voltage = 12.0f
+        .nominal_voltage = 12.0f,
+        .tc_max_err = 0x1000
 };
 
 csa_t csa;
@@ -269,7 +270,7 @@ void csa_list_show(void)
     CSA_SHOW_SUB(0, pid_pos, pid_i_t, kd, "");
     CSA_SHOW_SUB(0, pid_pos, pid_i_t, out_min, "");
     CSA_SHOW_SUB(0, pid_pos, pid_i_t, out_max, "");
-    d_info("\n"); debug_flush(true);
+    d_info("\n"); debug_flush(true); while (r_dev.tx_head.len) {}
 
     CSA_SHOW_SUB(0, pid_speed, pid_f_t, kp, "");
     CSA_SHOW_SUB(0, pid_speed, pid_f_t, ki, "");
@@ -303,7 +304,7 @@ void csa_list_show(void)
 
     CSA_SHOW(1, dbg_str_msk, "Config which debug data to be send");
     CSA_SHOW(1, dbg_str_skip, "Reduce debug data");
-    d_info("\n"); debug_flush(true);
+    d_info("\n"); debug_flush(true); while (r_dev.tx_head.len) {}
 
     CSA_SHOW_SUB(2, dbg_raw_dst, cdn_sockaddr_t, addr, "Send raw debug data to this address");
     CSA_SHOW_SUB(1, dbg_raw_dst, cdn_sockaddr_t, port, "Send raw debug data to this port");
@@ -333,11 +334,12 @@ void csa_list_show(void)
     CSA_SHOW(0, anticogging_en, "");
     CSA_SHOW(0, anticogging_max_val, "");
     CSA_SHOW(0, nominal_voltage, "");
+    CSA_SHOW(0, tc_max_err, "Limit position error");
     d_info("\n"); debug_flush(true);
 
     CSA_SHOW(0, state, "0: stop, 1: calibrate, 2: cur loop, 3: speed loop, 4: pos loop, 5: t_curve");
     //CSA_SHOW(0, err_flag, "not used");
-    d_info("\n"); debug_flush(true);
+    d_info("\n"); debug_flush(true); while (r_dev.tx_head.len) {}
 
     CSA_SHOW(1, cal_pos, "pos loop target");
     CSA_SHOW(1, cal_speed, "speed loop target");
@@ -361,7 +363,7 @@ void csa_list_show(void)
     d_info("\n"); debug_flush(true);
 
     CSA_SHOW(0, loop_cnt, "Increase at current loop, for raw dbg");
-    d_info("\n"); debug_flush(true);
+    d_info("\n"); debug_flush(true); while (r_dev.tx_head.len) {}
 
     d_debug("   //--------------- Follows are not writable: -------------------\n");
     CSA_SHOW(0, tc_state, "t_curve: 0: stop, 1: run, 2: tailer");
@@ -382,7 +384,7 @@ void csa_list_show(void)
     CSA_SHOW(0, sen_rpm_avg, "");
     CSA_SHOW(0, bus_voltage, "");
     CSA_SHOW(0, temperature, "");
-    d_info("\n"); debug_flush(true);
+    d_info("\n"); debug_flush(true); while (r_dev.tx_head.len) {}
 
     d_info("\x1b[92mColor Test...\x1b[0m\n");
 }
