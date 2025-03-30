@@ -79,6 +79,7 @@ typedef struct {
     int32_t         peak_cur_duration;
 
     uint8_t         motor_poles;
+    bool            motor_wire_swap;
     uint16_t        bias_encoder;
     int32_t         bias_pos;
 

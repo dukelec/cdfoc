@@ -468,6 +468,8 @@ void adc_isr(void)
 
         csa.dbg_ia = ia;
         csa.dbg_ib = ib;
+        if (csa.motor_wire_swap)
+            swap(ia, ib);
 
         float i_alpha = ia;
         float i_beta = (ia + ib * 2) / 1.732050808f; // √3
@@ -560,6 +562,8 @@ void adc_isr(void)
         */
         if (dbg_str)
             d_debug_c(", o %5d.%.2d %5d %5d %5d\n", P_2F(csa.cal_v_sq), out_pwm_u, out_pwm_v, out_pwm_w);
+        if (csa.motor_wire_swap)
+            swap(out_pwm_u, out_pwm_v);
     } else {
         csa.cal_v_sq = 0;
         pid_f_set_target(&csa.pid_i_sq, 0);

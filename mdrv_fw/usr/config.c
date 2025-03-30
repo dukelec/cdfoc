@@ -292,6 +292,7 @@ void csa_list_show(void)
     d_info("\n"); debug_flush(true);
 
     CSA_SHOW(0, motor_poles, "Motor poles");
+    CSA_SHOW(0, motor_wire_swap, "Software swaps motor wiring");
     CSA_SHOW(1, bias_encoder, "Offset for encoder value");
     CSA_SHOW(0, bias_pos, "Offset for pos value");
     d_info("\n"); debug_flush(true);
