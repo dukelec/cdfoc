@@ -362,7 +362,7 @@ void adc_isr(void)
         }
         int16_t hist_delta = lroundf((int16_t)(hist_raised[1] - hist_raised[0]) * 0.8f);
         uint32_t estimate = hist_raised[1] + hist_delta;
-        if (abs(sen_raised - estimate) > 500) {
+        if (abs((int32_t)(sen_raised - estimate)) > 500) {
             csa.nob_encoder = estimate >= 0x10000 ? (estimate - 0x10000) : estimate;
             if(++hist_err > 2)
                 hist_err = -2;
