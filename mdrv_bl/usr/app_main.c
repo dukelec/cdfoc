@@ -39,7 +39,13 @@ static void device_init(void)
     for (i = 0; i < PACKET_MAX; i++)
         cdn_list_put(&packet_free_head, &packet_alloc[i]);
 
-    cdctl_dev_init(&r_dev, &frame_free_head, &csa.bus_cfg, &r_spi, NULL);
+    int ret = cdctl_dev_init(&r_dev, &frame_free_head, &csa.bus_cfg, &r_spi);
+    if (ret) {
+        // NRST as GPIO fails occasionally, no MCO output; reboot to recover
+        printf("cdctl_dev_init error, reboot ...\n");
+        delay_systick(50);
+        NVIC_SystemReset();
+    }
     if (!csa.keep_in_bl) {
         cdctl_set_baud_rate(&r_dev, 115200, 115200);
         cdctl_flush(&r_dev);
@@ -83,6 +89,7 @@ void app_main(void)
     if (!csa.keep_in_bl)
         csa.dbg_en = false; // silence
     debug_init(&dft_ns, &csa.dbg_dst, &csa.dbg_en);
+    delay_systick(50);
     device_init();
     common_service_init();
     printf("conf: %s, args: %08lx\n", csa.conf_from ? "flash" : "dft", *bl_args);
@@ -92,12 +99,12 @@ void app_main(void)
     bool update_baud = csa.keep_in_bl;
 
     while (true) {
-        if (get_systick() - t_last > (update_baud ? 100000 : 200000) / SYSTICK_US_DIV) {
+        if (get_systick() - t_last > (update_baud ? 100000 : 200000) / CD_SYSTICK_US_DIV) {
             t_last = get_systick();
             gpio_set_val(&led_g, !gpio_get_val(&led_g));
         }
 
-        if (!csa.keep_in_bl && !update_baud && get_systick() > 1000000 / SYSTICK_US_DIV) {
+        if (!csa.keep_in_bl && !update_baud && get_systick() > 1000000 / CD_SYSTICK_US_DIV) {
             update_baud = true;
             if (csa.bus_cfg.baud_l != 115200 || csa.bus_cfg.baud_h != 115200) {
                 cdctl_set_baud_rate(&r_dev, csa.bus_cfg.baud_l, csa.bus_cfg.baud_h);
@@ -106,7 +113,7 @@ void app_main(void)
             csa.dbg_en = dbg_en_bk;
         }
 
-        if (!csa.keep_in_bl && get_systick() > 2000000 / SYSTICK_US_DIV)
+        if (!csa.keep_in_bl && get_systick() > 2000000 / CD_SYSTICK_US_DIV)
             jump_to_app();
 
         cdctl_routine(&r_dev);

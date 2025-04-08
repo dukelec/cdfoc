@@ -61,7 +61,7 @@ static void device_init(void)
         cdn_list_put(&packet_free_head, &packet_alloc[i]);
 
     spi_wr_init(&r_spi);
-    cdctl_dev_init(&r_dev, &frame_free_head, &csa.bus_cfg, &r_spi, NULL, &r_int, EXTI9_5_IRQn);
+    cdctl_dev_init(&r_dev, &frame_free_head, &csa.bus_cfg, &r_spi, &r_int, EXTI9_5_IRQn);
 
     cdn_add_intf(&dft_ns, &r_dev.cd_dev, csa.bus_net, csa.bus_cfg.mac);
 }
@@ -244,7 +244,7 @@ void cali_elec_angle(void)
     }
 
     uint32_t t_cur = get_systick();
-    if (t_cur - t_last < 1000000 / SYSTICK_US_DIV)
+    if (t_cur - t_last < 1000000 / CD_SYSTICK_US_DIV)
         return;
     t_last = t_cur;
 

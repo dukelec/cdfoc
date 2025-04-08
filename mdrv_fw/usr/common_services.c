@@ -74,7 +74,7 @@ static void p1_service_routine(void)
 
         if (clip(local_mac, mac_start, mac_end) == local_mac && strstr(info_str, string) != NULL) {
             uint32_t t_last = get_systick();
-            while (get_systick() - t_last < wait_time * 1000 / SYSTICK_US_DIV);
+            while (get_systick() - t_last < wait_time * 1000 / CD_SYSTICK_US_DIV);
             pkt->dat[0] = 0x80;
             strcpy((char *)pkt->dat + 1, info_str);
             pkt->len = strlen(info_str) + 1;

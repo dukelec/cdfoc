@@ -12,13 +12,13 @@
 
 #define CDCTL_OSC_CLK       12000000UL // 12MHz
 
-#define ARCH_SPI_DMA
-#define ARCH_I2C
+#define CD_ARCH_SPI_DMA
+#define CD_ARCH_I2C
 
-#define DEBUG
-#define VERBOSE
-//#define LIST_DEBUG
-#define DBG_STR_LEN         160
+#define CD_DEBUG
+#define CD_VERBOSE
+//#define CD_LIST_DEBUG
+#define CD_DBG_STR_LEN      160
 
 #define CD_LIST_IT
 #define CD_IRQ_SAFE
