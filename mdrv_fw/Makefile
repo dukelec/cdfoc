@@ -77,6 +77,7 @@ cdnet/dev/cdctl_it.c \
 cdnet/utils/cd_list.c \
 cdnet/utils/cd_debug.c \
 cdnet/utils/hex_dump.c \
+usr/misc.c \
 usr/config.c \
 usr/common_services.c \
 usr/app_main.c \

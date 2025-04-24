@@ -15,10 +15,6 @@ static int adc_cali_cnt;
 static uint32_t adc_ofs[3][2];
 static volatile int adc_cali_st = 0;
 
-static cdn_sock_t sock_tc_rpt = { .port = 0x10, .ns = &dft_ns, .tx_only = true };
-static cdn_sock_t sock_raw_dbg = { .port = 0xa, .ns = &dft_ns, .tx_only = true }; // raw debug
-static list_head_t raw_pend = { 0 };
-
 static int vector_over_limit = 0;
 static int encoder_err = 0;
 
@@ -86,8 +82,8 @@ void app_motor_init(void)
     pid_f_init(&csa.pid_i_sd, true);
     pid_f_init(&csa.pid_speed, true);
     pid_i_init(&csa.pid_pos, true);
-    cdn_sock_bind(&sock_raw_dbg);
     csa.bus_voltage = csa.nominal_voltage;
+    misc_init();
 }
 
 void app_motor_routine(void)
@@ -99,84 +95,12 @@ void app_motor_routine(void)
         encoder_err = 0;
         t_last = get_systick();
     }
-
     // update _ki, _kd
     pid_f_init(&csa.pid_i_sq, false);
     pid_f_init(&csa.pid_i_sd, false);
     pid_f_init(&csa.pid_speed, false);
     pid_i_init(&csa.pid_pos, false);
-
-    if (frame_free_head.len > 1) {
-        cdn_pkt_t *pkt = cdn_list_get(&raw_pend);
-        if (pkt)
-            cdn_sock_sendto(&sock_raw_dbg, pkt);
-    }
-
-    static uint8_t tc_state_old = 0;
-    if (csa.tc_rpt_end) {
-        if (csa.tc_state == 0 && tc_state_old != 0) {
-            cdn_pkt_t *pkt = cdn_pkt_alloc(sock_tc_rpt.ns);
-            if (pkt) {
-                pkt->dst = csa.tc_rpt_dst;
-                cdn_pkt_prepare(&sock_tc_rpt, pkt);
-                pkt->dat[0] = 0x40;
-                pkt->len = 1;
-                cdn_sock_sendto(&sock_tc_rpt, pkt);
-            }
-        }
-    }
-    tc_state_old = csa.tc_state;
-}
-
-static void raw_dbg(int idx)
-{
-    static cdn_pkt_t *pkt_raw[4] = { NULL };
-    static bool pkt_less = false;
-
-    if (!(csa.dbg_raw_msk & (1 << idx))) {
-        if (pkt_raw[idx]) {
-            cdn_pkt_free(&dft_ns, pkt_raw[idx]);
-            pkt_raw[idx] = NULL;
-        }
-        return;
-    }
-
-    if (pkt_less) {
-        if (raw_pend.len == 0 && dft_ns.free_frm->len >= FRAME_MAX - 5) {
-            pkt_less = false;
-        }
-    }
-
-    if (!pkt_less && !pkt_raw[idx]) {
-        if (dft_ns.free_pkt->len < 5 || dft_ns.free_frm->len < 5) {
-            pkt_less = true;
-            return;
-
-        } else {
-            pkt_raw[idx] = cdn_pkt_alloc(sock_raw_dbg.ns);
-            pkt_raw[idx]->dst = csa.dbg_raw_dst;
-            cdn_pkt_prepare(&sock_raw_dbg, pkt_raw[idx]);
-            pkt_raw[idx]->dat[0] = 0x40 | idx;
-            put_unaligned32(csa.loop_cnt, pkt_raw[idx]->dat + 1);
-            pkt_raw[idx]->len = 5;
-        }
-    }
-    if (!pkt_raw[idx])
-        return;
-
-    for (int i = 0; i < 6; i++) {
-        regr_t *regr = &csa.dbg_raw[idx][i];
-        if (!regr->size)
-            break;
-        uint8_t *dst_dat = pkt_raw[idx]->dat + pkt_raw[idx]->len;
-        memcpy(dst_dat, ((void *) &csa) + regr->offset, regr->size);
-        pkt_raw[idx]->len += regr->size;
-    }
-
-    if (pkt_raw[idx]->len >= csa.dbg_raw_th) {
-        cdn_list_put(&raw_pend, pkt_raw[idx]);
-        pkt_raw[idx] = NULL;
-    }
+    dbg_routine();
 }
 
 

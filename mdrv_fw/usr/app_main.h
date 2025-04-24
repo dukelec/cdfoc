@@ -215,6 +215,11 @@ void adc_isr(void);
 uint16_t encoder_read(void);
 void encoder_isr_prepare(void);
 
+void misc_init(void);
+void dbg_routine(void);
+void raw_dbg(int idx);
+void cali_elec_angle(void);
+
 extern SPI_HandleTypeDef hspi1;
 extern ADC_HandleTypeDef hadc1;
 extern ADC_HandleTypeDef hadc2;
