@@ -7,7 +7,7 @@
  * Author: Duke Fong <d@d-l.io>
  */
 
-#include "math.h"
+#include <math.h>
 #include "app_main.h"
 
 #define ADC_CALI_LEN 50
@@ -16,7 +16,8 @@ static uint32_t adc_ofs[3][2];
 static volatile int adc_cali_st = 0;
 
 static int vector_over_limit = 0;
-static int encoder_err = 0;
+static int encoder_err_flg = 0;
+static int encoder_err = 10000;
 
 
 uint8_t state_w_hook_before(uint16_t sub_offset, uint8_t len, uint8_t *dat)
@@ -89,10 +90,10 @@ void app_motor_init(void)
 void app_motor_routine(void)
 {
     static uint32_t t_last = 0;
-    if ((vector_over_limit || encoder_err) && (t_last == 0 || get_systick() - t_last > 500)) {
-        d_debug("\n\n!~!~ %d ~!~! --- %d\n\n", vector_over_limit, encoder_err);
+    if ((vector_over_limit || encoder_err_flg) && (t_last == 0 || get_systick() - t_last > 500)) {
+        d_debug("\n\n!~!~ %d ~!~! --- %d\n\n", vector_over_limit, encoder_err_flg);
         vector_over_limit = 0;
-        encoder_err = 0;
+        encoder_err_flg = 0;
         t_last = get_systick();
     }
     // update _ki, _kd
@@ -238,11 +239,6 @@ static inline void speed_loop_compute(void)
 }
 
 
-#define HIST_LEN 2
-static uint16_t hist[HIST_LEN] = { 0 };
-static int8_t hist_err = -2;
-static uint16_t sen_encoder_bk = 0;
-
 void adc_isr(void)
 {
     gpio_set_val(&dbg_out1, 1);
@@ -258,87 +254,48 @@ void adc_isr(void)
     bool dbg_str = csa.dbg_str_msk && (csa.loop_cnt % csa.dbg_str_skip) == 0;
 
     csa.ori_encoder = encoder_read();
+    uint16_t cali_encoder = csa.ori_encoder;
+    if (csa.cali_encoder_en) {
+        uint16_t idx = csa.ori_encoder >> 4;
+        uint16_t idx_next = (idx == 4095) ? 0 : (idx + 1);
+        tbl_percent = (float)(csa.ori_encoder & 0xf) / 0x10;
+        uint16_t idx_val = *(uint16_t *)(CALI_ENCODER_TBL + idx * 2);
+        uint32_t idx_next_val = *(uint16_t *)(CALI_ENCODER_TBL + idx_next * 2);
+        if (idx == 4095)
+            idx_next_val += 0x10000;
+        cali_encoder = lroundf(idx_val + (idx_next_val - idx_val) * tbl_percent);
+    }
 
     //gpio_set_val(&dbg_out2, 1);
 
-    // filter out disturbed error position values
-#if 1
-    if (hist_err < 0 || abs(hist[1] - hist[0]) > 500) {
-        csa.nob_encoder = csa.ori_encoder;
-        if (hist_err < 0)
-            hist_err++;
-    } else {
-        uint32_t hist_raised[2] = {hist[0], hist[1]};
-        uint32_t sen_raised = csa.ori_encoder;
-
-        // empty in range: 1/3 to 2/3
-        if ((hist[0] < 0x10000/3 || hist[0] >= 0x10000*2/3) && (hist[1] < 0x10000/3 || hist[1] >= 0x10000*2/3)) {
-            if (hist[0] < 0x10000/3 && hist[1] < 0x10000/3) {
-                if (csa.ori_encoder < 0x10000*2/3)
-                    sen_raised += 0x10000;
-            } else if (csa.ori_encoder < 0x10000/3) {
-                    sen_raised += 0x10000;
-            }
-            if (hist[0] < 0x10000/3)
-                hist_raised[0] += 0x10000;
-            if (hist[1] < 0x10000/3)
-                hist_raised[1] += 0x10000;
-        }
-        int16_t hist_delta = lroundf((int16_t)(hist_raised[1] - hist_raised[0]) * 0.8f);
-        uint32_t estimate = hist_raised[1] + hist_delta;
-        if (abs((int32_t)(sen_raised - estimate)) > 500) {
-            csa.nob_encoder = estimate >= 0x10000 ? (estimate - 0x10000) : estimate;
-            if(++hist_err > 2)
-                hist_err = -2;
+    int16_t enc_delta = cali_encoder - csa.nob_encoder;
+    if (abs(enc_delta) > 6000) { // filter out disturbed error position values
+        if (++encoder_err > 2) {
+            csa.nob_encoder = cali_encoder;
+            encoder_err = 0;
+            // csa.delta_encoder kept
         } else {
-            csa.nob_encoder = csa.ori_encoder;
-            hist_err = 0;
+            csa.delta_encoder = csa.sen_speed_avg / CURRENT_LOOP_FREQ;
+            csa.nob_encoder += lroundf(csa.delta_encoder);
+            encoder_err_flg++;
         }
+    } else {
+        csa.delta_encoder = enc_delta;
+        csa.nob_encoder += enc_delta;
+        encoder_err = 0;
     }
 
-    hist[0] = hist[1];
-    hist[1] = csa.nob_encoder;
-#else
-    csa.nob_encoder = csa.ori_encoder;
-#endif
-
-    if (csa.nob_encoder != csa.ori_encoder)
-        encoder_err++;
-
-    if (csa.cali_encoder_en) {
-        tbl_idx = csa.nob_encoder >> 4;
-        tbl_idx_next = (tbl_idx == 4095) ? 0 : (tbl_idx + 1);
-        tbl_percent = (float)(csa.nob_encoder & 0xf) / 0x10;
-        uint16_t idx_val = *(uint16_t *)(CALI_ENCODER_TBL + tbl_idx * 2);
-        uint32_t idx_next_val = *(uint16_t *)(CALI_ENCODER_TBL + tbl_idx_next * 2);
-        if (tbl_idx == 4095)
-            idx_next_val += 0x10000;
-        csa.nob_encoder = lroundf(idx_val + (idx_next_val - idx_val) * tbl_percent);
-    }
-
+    // 19us lag steps = step/sec * 0.000019 sec
+    csa.nob_encoder += lroundf(csa.sen_speed_avg * 0.000019f);
     csa.sen_encoder = csa.nob_encoder - csa.bias_encoder;
-
-    int16_t delta_enc = csa.sen_encoder - sen_encoder_bk;
-    csa.delta_encoder = delta_enc;
-    sen_encoder_bk = csa.sen_encoder;
-
-    // 9us lag steps = step/sec * 0.000009 sec
-    csa.sen_encoder += delta_enc * ((float)CURRENT_LOOP_FREQ * 0.000019f); // 0.000009f
 
     //gpio_set_val(&dbg_out2, 0);
 
-
-    if (abs((uint16_t)(csa.ori_pos & 0xffff) - csa.sen_encoder) > 0x10000/2) {
-        if (csa.sen_encoder < 0x10000/2)
-            csa.ori_pos += 0x10000;
-        else
-            csa.ori_pos -= 0x10000;
-    }
-    csa.ori_pos = (csa.ori_pos & 0xffff0000) | csa.sen_encoder;
+    csa.ori_pos += (int16_t)(csa.sen_encoder - (uint16_t)csa.ori_pos);
     csa.sen_pos = csa.ori_pos - csa.bias_pos;
 
     if (dbg_str)
-            d_debug("%04x %d %08x", csa.ori_encoder, delta_enc, csa.sen_pos);
+            d_debug("%04x %04x %08x", csa.ori_encoder, csa.sen_encoder, csa.sen_pos);
 
     float angle_mech = csa.sen_encoder*((float)M_PI*2/0x10000);
     uint16_t encoder_sub = csa.sen_encoder % lroundf((float)0x10000/csa.motor_poles);
@@ -402,9 +359,9 @@ void adc_isr(void)
         csa.sen_i_sd = i_alpha * cos_tmp_angle_elec + i_beta * sin_tmp_angle_elec;
 
         if (csa.anticogging_en) {
-            tbl_idx = csa.sen_encoder >> 4;
+            tbl_idx = csa.nob_encoder >> 4;
             tbl_idx_next = (tbl_idx == 4095) ? 0 : (tbl_idx + 1);
-            tbl_percent = (float)(csa.sen_encoder & 0xf) / 0x10;
+            tbl_percent = (float)(csa.nob_encoder & 0xf) / 0x10;
             int8_t idx_val = *(int8_t *)(ANTICOGGING_TBL + tbl_idx * 2);
             int8_t idx_next_val = *(int8_t *)(CALI_ENCODER_TBL + tbl_idx_next * 2);
             float val = idx_val + (idx_next_val - idx_val) * tbl_percent;

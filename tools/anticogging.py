@@ -23,10 +23,12 @@ $ ./anticogging.py
 
 """
 
+R_bias_encoder = 0x146
 R_tc_pos = 0x01f8
 R_anticogging_en = 0x021a
 R_anticogging_max_val = 0x021c
 R_state = 0x0240
+R_nob_encoder = 0x264
 R_tc_state = 0x0284
 R_sen_i_sq_avg = 0x029c
 R_cal_v_sq_avg = 0x02a0
@@ -170,8 +172,10 @@ print('disable anticogging_en first ...')
 csa_write(R_anticogging_en, b'\x00')
 sleep(1)
 
-print('goto 0 pos...')
-csa_write(R_tc_pos, struct.pack("<i", 0))
+bias_encoder = struct.unpack("<H", csa_read(R_bias_encoder, 2)[1:])[0]
+
+print(f'goto 0 pos... (bias_encoder: {bias_encoder:04x})')
+csa_write(R_tc_pos, struct.pack("<i", -bias_encoder))
 while True:
     sleep(0.5)
     if csa_read(R_tc_state, 1)[1] == 0:
@@ -184,11 +188,12 @@ origin_val = []
 for i in range(4096):
     pos = i << 4
     print(f'i: {i}, pos: {pos}')
-    csa_write(R_tc_pos, struct.pack("<i", pos))
+    csa_write(R_tc_pos, struct.pack("<i", pos - bias_encoder))
     while True:
         sleep(0.5) # 0.2
         d = struct.unpack("<ff", csa_read(R_sen_i_sq_avg, 8)[1:])
-        print(f'd: {d}')
+        nob_encoder = struct.unpack("<H", csa_read(R_nob_encoder, 2)[1:])[0]
+        print(f'd: {d}, nob_encoder: {nob_encoder:04x}')
         origin_val.append(d)
         break # TODO: read the value twice and compare them
 

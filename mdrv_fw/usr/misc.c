@@ -20,7 +20,6 @@ void misc_init(void)
     cdn_sock_bind(&sock_raw_dbg);
 }
 
-
 void dbg_routine(void)
 {
     if (frame_free_head.len > 1) {
@@ -103,15 +102,17 @@ void cali_elec_angle(void)
     static int pole_cnt = -1;
     static int sub_cnt;
     static uint32_t t_last;
-    static uint32_t a0, a1;
+    static uint16_t a0, a1;
     static int amount_f, amount_r;
     static int dir = 1; // -1 or +1
-    static int m_first;
+    static uint16_t m_first;
 
     if (!csa.cali_run)
         return;
 
     if (pole_cnt == -1) {
+        csa.cali_encoder_en = false;
+        csa.anticogging_en = false;
         csa.cali_angle_elec = 0;
         csa.cali_angle_step = 0;
         csa.state = ST_CALI;
@@ -142,26 +143,26 @@ void cali_elec_angle(void)
     }
 
     if ((dir == 1 && sub_cnt == 3) || (dir == -1 && sub_cnt == 0)) {
-        if (a1 < a0)
-            a1 += 0x10000;
-        uint32_t n = (a0 + (a1 - a0) / 2) & 0xffff;
-        int m = (uint16_t)(n - (65536 * pole_cnt / csa.motor_poles));
+        int16_t delta_a = a1 - a0;
+        uint16_t n = a0 + delta_a / 2;
+        uint16_t m = n - (pole_cnt * 0x10000 / csa.motor_poles);
         if (m_first < 0)
             m_first = m;
-        if (m_first < 65536 / 3 && m < 65536 / 2)
-            m += 0x10000;
         d_info("cali: n: %04x, m: %04x\n", n, m);
         d_info("cali: ----------------\n");
+        int16_t delta_m = m - m_first;
         if (dir == 1)
-            amount_f += m;
+            amount_f += delta_m;
         else
-            amount_r += m;
+            amount_r += delta_m;
 
         if (dir == -1 && pole_cnt == 0) {
+            uint16_t avg_cw = m_first + amount_f / csa.motor_poles;
+            uint16_t avg_ccw = m_first + amount_r / csa.motor_poles;
             d_info("cali: finished, result:\n");
-            d_info("cali:  cw: %02x\n", (amount_f / csa.motor_poles) & 0xffff);
-            d_info("cali: ccw: %02x\n", (amount_r / csa.motor_poles) & 0xffff);
-            csa.bias_encoder = ((amount_f + amount_r) / csa.motor_poles / 2) & 0xffff;
+            d_info("cali:  cw: %02x\n", avg_cw);
+            d_info("cali: ccw: %02x\n", avg_ccw);
+            csa.bias_encoder = m_first + (amount_f + amount_r) / csa.motor_poles / 2;
             d_info("cali: avg: %02x, updated to bias_encoder\n", csa.bias_encoder);
             uint8_t dat = ST_STOP;
             state_w_hook_before(0, 1, &dat);

@@ -226,7 +226,7 @@ int flash_write(uint32_t addr, uint32_t len, const uint8_t *buf)
                 int16_t *: "[h]", \
                 uint32_t *: "[I]", \
                 float *: "[f]", \
-                regr_t: "H,B", \
+                regr_t: "H,B2", \
                 regr_t *: "{H,B2}", \
                 default: "-"))
 
