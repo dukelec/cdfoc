@@ -64,10 +64,10 @@ typedef struct {
     bool            _reserved_bl;   // keep_in_bl for bl
     bool            save_conf;
 
-    uint8_t         bus_net;
+    uint8_t         _bus_net;
     cdctl_cfg_t     bus_cfg;
     bool            dbg_en;
-    cdn_sockaddr_t  dbg_dst;
+    uint8_t         _reserved0[6];
     #define         _end_common pid_pos
 
     pid_i_t         pid_pos;
@@ -86,22 +86,21 @@ typedef struct {
     regr_t          qxchg_mcast;     // for multicast
     regr_t          qxchg_set[5];
     regr_t          qxchg_ret[5];
-    regr_t          qxchg_ro[5];
+    uint8_t         _reserved1[20];
 
     uint8_t         dbg_str_msk;
     uint16_t        dbg_str_skip;    // for period string debug
 
-    cdn_sockaddr_t  dbg_raw_dst;
+    uint8_t         _reserved2[6];
     uint8_t         dbg_raw_msk;
-    uint8_t         dbg_raw_th;      // len threshold (+ 1 samples < pkt size)
+    uint8_t         dbg_raw_th;     // len threshold (+ 1 samples < frm size)
     regr_t          dbg_raw[4][6];  // for: cur, speed, pos, tcurve
 
     int32_t         tc_pos;
     uint32_t        tc_speed;
     uint32_t        tc_accel;
 
-    bool            tc_rpt_end;
-    cdn_sockaddr_t  tc_rpt_dst;
+    uint8_t         _reserved3[8];
 
     float           cali_angle_elec;
     float           cali_current;
@@ -114,7 +113,7 @@ typedef struct {
 
     float           nominal_voltage;
     uint16_t        tc_max_err;
-    uint8_t         _reserved[22];
+    uint8_t         _reserved4[22];
 
     // end of flash
     #define         _end_save state
@@ -157,7 +156,7 @@ typedef struct {
 
     float           sen_i_sq_avg;
     float           cal_v_sq_avg;
-    uint8_t         _reserved2[8];
+    uint8_t         _reserved5[8];
     float           sen_speed_avg;
     float           sen_rpm_avg;
     float           bus_voltage;
@@ -215,8 +214,6 @@ void adc_isr(void);
 uint16_t encoder_read(void);
 void encoder_isr_prepare(void);
 
-void misc_init(void);
-void dbg_routine(void);
 void raw_dbg(int idx);
 void cali_elec_angle(void);
 

@@ -15,8 +15,7 @@ const csa_t csa_dft = {
 
         .bus_net = 0,
         .bus_cfg = CDCTL_CFG_DFT(0xfe),
-        .dbg_en = false,
-        .dbg_dst = { .addr = {0x80, 0x00, 0x00}, .port = 9 }
+        .dbg_en = false
 };
 
 csa_t csa;
@@ -70,7 +69,7 @@ int flash_erase(uint32_t addr, uint32_t len)
     if (ret == HAL_OK)
         ret = HAL_FLASHEx_Erase(&f, &err_sector);
     ret |= HAL_FLASH_Lock();
-    d_debug("nvm erase: %08x +%08x (%d %d), %08x, ret: %d\n", addr, len, f.Page, f.NbPages, err_sector, ret);
+    d_debug("nvm erase: %08lx +%08lx (%ld %ld), %08lx, ret: %d\n", addr, len, f.Page, f.NbPages, err_sector, ret);
     return ret;
 }
 

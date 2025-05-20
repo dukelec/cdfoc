@@ -25,8 +25,8 @@ list_head_t frame_free_head = {0};
 static cdn_pkt_t packet_alloc[PACKET_MAX];
 list_head_t packet_free_head = {0};
 
-static cdctl_dev_t r_dev = {0};    // CDBUS
-cdn_ns_t dft_ns = {0};             // CDNET
+cdctl_dev_t r_dev = {0};    // CDBUS
+cdn_ns_t dft_ns = {0};      // CDNET
 
 
 static void device_init(void)
@@ -88,7 +88,6 @@ void app_main(void)
     csa.keep_in_bl = *bl_args == 0xcdcd0001;
     if (!csa.keep_in_bl)
         csa.dbg_en = false; // silence
-    debug_init(&dft_ns, &csa.dbg_dst, &csa.dbg_en);
     delay_systick(50);
     device_init();
     common_service_init();
@@ -119,7 +118,6 @@ void app_main(void)
         cdctl_routine(&r_dev);
         cdn_routine(&dft_ns); // handle cdnet
         common_service_routine();
-        debug_flush(false);
     }
 }
 

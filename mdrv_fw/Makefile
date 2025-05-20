@@ -75,7 +75,6 @@ cdnet/arch/stm32/arch_wrapper.c \
 cdnet/dev/cdctl_pll_cal.c \
 cdnet/dev/cdctl_it.c \
 cdnet/utils/cd_list.c \
-cdnet/utils/cd_debug.c \
 cdnet/utils/hex_dump.c \
 usr/misc.c \
 usr/config.c \

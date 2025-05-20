@@ -132,5 +132,5 @@ plt.grid()
 plt.show()
 
 # cdbus_gui/tools:
-# ./cdg_iap.py --cfg ../configs/cdfoc-xxx.json --in-file cali_encoder_data.bin --addr=0x0801b800
+# ./cdg_iap.py --baud 10000000 --cfg ../configs/cdfoc-xxx.json --in-file cali_encoder_data.bin --addr=0x0801b800
 

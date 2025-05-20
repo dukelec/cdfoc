@@ -67,7 +67,6 @@ cdnet/parser/cdnet.c \
 cdnet/dev/cdctl_pll_cal.c \
 cdnet/dev/cdctl.c \
 cdnet/utils/cd_list.c \
-cdnet/utils/cd_debug.c \
 usr/config.c \
 usr/common_services.c \
 usr/app_main.c

@@ -63,7 +63,7 @@ static void device_init(void)
     spi_wr_init(&r_spi);
     cdctl_dev_init(&r_dev, &frame_free_head, &csa.bus_cfg, &r_spi, &r_int, EXTI9_5_IRQn);
 
-    cdn_add_intf(&dft_ns, &r_dev.cd_dev, csa.bus_net, csa.bus_cfg.mac);
+    cdn_add_intf(&dft_ns, &r_dev.cd_dev, 0, csa.bus_cfg.mac);
 }
 
 
@@ -231,16 +231,15 @@ void app_main(void)
     HAL_NVIC_SetPriority(DMA2_Channel1_IRQn, 3, 2);
     HAL_NVIC_EnableIRQ(DMA2_Channel1_IRQn);
     HAL_NVIC_SetPriority(EXTI9_5_IRQn, 3, 1);
-    HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
 
     printf("\nstart app_main (mdrv)...\n");
     *stack_check = 0xababcdcd12123434;
 
     load_conf();
-    debug_init(&dft_ns, &csa.dbg_dst, &csa.dbg_en);
     device_init();
     common_service_init();
     d_info("conf (mdrv): %s\n", csa.conf_from ? "load from flash" : "use default");
+    HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
     csa_list_show();
 
     delay_systick(50);
@@ -324,7 +323,7 @@ void app_main(void)
             gpio_set_val(&led_g, 0);
             csa.cali_run = false;
             if (cur_fault_val != last_fault_val) {
-                d_error("drv status: %08x\n", cur_fault_val);
+                d_error("drv status: %08lx\n", cur_fault_val);
                 last_fault_val = cur_fault_val;
             }
         }
@@ -334,7 +333,6 @@ void app_main(void)
         common_service_routine();
         cali_elec_angle();
         //dump_hw_status();
-        debug_flush(false);
 
         if (*stack_check != 0xababcdcd12123434) {
             printf("stack overflow\n");

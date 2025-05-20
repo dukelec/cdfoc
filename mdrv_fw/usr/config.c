@@ -41,10 +41,8 @@ const csa_t csa_dft = {
         .magic_code = 0xcdcd,
         .conf_ver = APP_CONF_VER,
 
-        .bus_net = 0,
         .bus_cfg = CDCTL_CFG_DFT(0xfe),
         .dbg_en = false,
-        .dbg_dst = { .addr = {0x80, 0x00, 0x00}, .port = 9 },
 
         .pid_pos = { // motor must have enough power to follow the target position
                 .kp = 100, .ki = 4000, .kd = 0.02,
@@ -86,7 +84,6 @@ const csa_t csa_dft = {
         .dbg_str_msk = 0x0, //0 or 0xff,
         .dbg_str_skip = 0x1fff, // 0x01ff,
 
-        .dbg_raw_dst = { .addr = {0x80, 0x00, 0x00}, .port = 0xa },
         .dbg_raw_msk = 0,
         .dbg_raw_th = 200,
         .dbg_raw = {
@@ -118,9 +115,6 @@ const csa_t csa_dft = {
 
         .tc_speed = 65536*20,
         .tc_accel = 65536*5,
-
-        .tc_rpt_end = false,
-        .tc_rpt_dst = { .addr = {0x80, 0x00, 0x00}, .port = 0x10 },
 
         .cali_angle_elec = (float)M_PI/2,
         .cali_current = 200,
@@ -187,7 +181,7 @@ int flash_erase(uint32_t addr, uint32_t len)
     if (ret == HAL_OK)
         ret = HAL_FLASHEx_Erase(&f, &err_sector);
     ret |= HAL_FLASH_Lock();
-    d_debug("nvm erase: %08x +%08x (%d %d), %08x, ret: %d\n", addr, len, f.Page, f.NbPages, err_sector, ret);
+    d_debug("nvm erase: %08lx +%08lx (%ld %ld), %08lx, ret: %d\n", addr, len, f.Page, f.NbPages, err_sector, ret);
     return ret;
 }
 
@@ -207,7 +201,7 @@ int flash_write(uint32_t addr, uint32_t len, const uint8_t *buf)
     }
     ret |= HAL_FLASH_Lock();
 
-    d_verbose("nvm write: %08x %d(%d), ret: %d\n", dst_dat, len, cnt, ret);
+    d_verbose("nvm write: %p %ld(%d), ret: %d\n", dst_dat, len, cnt, ret);
     return ret;
 }
 
@@ -241,14 +235,15 @@ int flash_write(uint32_t addr, uint32_t len, const uint8_t *buf)
 
 void csa_list_show(void)
 {
-    d_info("csa_list_show:\n\n"); debug_flush(true);
+    d_info("csa_list_show:\n\n");
+    while (frame_free_head.len < FRAME_MAX - 5);
 
     CSA_SHOW(1, magic_code, "Magic code: 0xcdcd");
     CSA_SHOW(1, conf_ver, "Config version");
     CSA_SHOW(1, conf_from, "0: default config, 1: all from flash, 2: partly from flash");
     CSA_SHOW(0, do_reboot, "1: reboot to bl, 2: reboot to app");
     CSA_SHOW(0, save_conf, "Write 1 to save current config to flash");
-    d_info("\n"); debug_flush(true);
+    d_info("\n");
 
     CSA_SHOW_SUB(1, bus_cfg, cdctl_cfg_t, mac, "RS-485 port id, range: 0~254");
     CSA_SHOW_SUB(0, bus_cfg, cdctl_cfg_t, baud_l, "RS-485 baud rate for first byte");
@@ -258,100 +253,93 @@ void csa_list_show(void)
     CSA_SHOW_SUB(0, bus_cfg, cdctl_cfg_t, tx_permit_len, "Allow send wait time");
     CSA_SHOW_SUB(0, bus_cfg, cdctl_cfg_t, max_idle_len, "Max idle wait time for BS mode");
     CSA_SHOW_SUB(0, bus_cfg, cdctl_cfg_t, tx_pre_len, " Active TX_EN before TX");
-    d_debug("\n"); debug_flush(true);
+    d_debug("\n");
 
     CSA_SHOW(0, dbg_en, "1: Report debug message to host, 0: do not report");
-    CSA_SHOW_SUB(2, dbg_dst, cdn_sockaddr_t, addr, "Send debug message to this address");
-    CSA_SHOW_SUB(1, dbg_dst, cdn_sockaddr_t, port, "Send debug message to this port");
-    d_info("\n"); debug_flush(true);
+    d_info("\n");
 
     CSA_SHOW_SUB(0, pid_pos, pid_i_t, kp, "");
     CSA_SHOW_SUB(0, pid_pos, pid_i_t, ki, "");
     CSA_SHOW_SUB(0, pid_pos, pid_i_t, kd, "");
     CSA_SHOW_SUB(0, pid_pos, pid_i_t, out_min, "");
     CSA_SHOW_SUB(0, pid_pos, pid_i_t, out_max, "");
-    d_info("\n"); debug_flush(true); while (r_dev.tx_head.len) {}
+    d_info("\n");
 
     CSA_SHOW_SUB(0, pid_speed, pid_f_t, kp, "");
     CSA_SHOW_SUB(0, pid_speed, pid_f_t, ki, "");
     CSA_SHOW_SUB(0, pid_speed, pid_f_t, kd, "");
     CSA_SHOW_SUB(0, pid_speed, pid_f_t, out_min, "");
     CSA_SHOW_SUB(0, pid_speed, pid_f_t, out_max, "");
-    d_info("\n"); debug_flush(true);
+    d_info("\n");
 
     CSA_SHOW_SUB(0, pid_i_sq, pid_f_t, kp, "");
     CSA_SHOW_SUB(0, pid_i_sq, pid_f_t, ki, "");
     CSA_SHOW_SUB(0, pid_i_sq, pid_f_t, out_min, "");
     CSA_SHOW_SUB(0, pid_i_sq, pid_f_t, out_max, "");
-    d_info("\n"); debug_flush(true);
+    d_info("\n");
 
     CSA_SHOW_SUB(0, pid_i_sd, pid_f_t, kp, "");
     CSA_SHOW_SUB(0, pid_i_sd, pid_f_t, ki, "");
     CSA_SHOW_SUB(0, pid_i_sd, pid_f_t, out_min, "");
     CSA_SHOW_SUB(0, pid_i_sd, pid_f_t, out_max, "");
-    d_info("\n"); debug_flush(true);
+    d_info("\n");
 
     CSA_SHOW(0, motor_poles, "Motor poles");
     CSA_SHOW(0, motor_wire_swap, "Software swaps motor wiring");
     CSA_SHOW(1, bias_encoder, "Offset for encoder value");
     CSA_SHOW(0, bias_pos, "Offset for pos value");
-    d_info("\n"); debug_flush(true);
+    d_info("\n");
     
     CSA_SHOW(1, qxchg_mcast, "Offset and size for quick-exchange multicast");
     CSA_SHOW(1, qxchg_set, "Config the write data components for quick-exchange channel");
     CSA_SHOW(1, qxchg_ret, "Config the return data components for quick-exchange channel");
-    CSA_SHOW(1, qxchg_ro, "Config the return data components for the read only quick-exchange channel");
-    d_info("\n"); debug_flush(true);
+    d_info("\n");
 
     CSA_SHOW(1, dbg_str_msk, "Config which debug data to be send");
     CSA_SHOW(1, dbg_str_skip, "Reduce debug data");
-    d_info("\n"); debug_flush(true); while (r_dev.tx_head.len) {}
+    d_info("\n");
 
-    CSA_SHOW_SUB(2, dbg_raw_dst, cdn_sockaddr_t, addr, "Send raw debug data to this address");
-    CSA_SHOW_SUB(1, dbg_raw_dst, cdn_sockaddr_t, port, "Send raw debug data to this port");
     CSA_SHOW(1, dbg_raw_msk, "Config which raw debug data to be send");
     CSA_SHOW(0, dbg_raw_th, "Config raw debug data package size");
     CSA_SHOW(1, dbg_raw[0], "Config raw debug for current loop");
     CSA_SHOW(1, dbg_raw[1], "Config raw debug for speed loop");
     CSA_SHOW(1, dbg_raw[2], "Config raw debug for position loop");
     CSA_SHOW(1, dbg_raw[3], "Config raw debug for position plan");
-    d_info("\n"); debug_flush(true);
+    d_info("\n");
 
     CSA_SHOW(1, tc_pos, "Set target position");
     CSA_SHOW(1, tc_speed, "Set target speed");
     CSA_SHOW(1, tc_accel, "Set target accel");
-    CSA_SHOW(0, tc_rpt_end, "Report finish event");
-    CSA_SHOW_SUB(2, tc_rpt_dst, cdn_sockaddr_t, addr, "Send report to this address");
-    CSA_SHOW_SUB(1, tc_rpt_dst, cdn_sockaddr_t, port, "Send report to this port");
-    d_info("\n"); debug_flush(true);
+    d_info("\n");
 
     CSA_SHOW(0, cali_angle_elec, "Calibration mode angle");
     CSA_SHOW(0, cali_current, "Calibration mode current");
     CSA_SHOW(0, cali_angle_step, "Calibration mode speed");
     CSA_SHOW(0, cali_run, "0: stopped, write 1 start calibration");
-    d_info("\n"); debug_flush(true);
+    d_info("\n");
 
     CSA_SHOW(0, cali_encoder_en, "");
     CSA_SHOW(0, anticogging_en, "");
     CSA_SHOW(0, anticogging_max_val, "");
     CSA_SHOW(0, nominal_voltage, "");
     CSA_SHOW(0, tc_max_err, "Limit position error");
-    d_info("\n"); debug_flush(true);
+    d_info("\n");
+    while (frame_free_head.len < FRAME_MAX - 5);
 
     CSA_SHOW(0, state, "0: stop, 1: calibrate, 2: cur loop, 3: speed loop, 4: pos loop, 5: t_curve");
     //CSA_SHOW(0, err_flag, "not used");
-    d_info("\n"); debug_flush(true); while (r_dev.tx_head.len) {}
+    d_info("\n");
 
     CSA_SHOW(1, cal_pos, "pos loop target");
     CSA_SHOW(1, cal_speed, "speed loop target");
     CSA_SHOW(0, cal_current, "cur loop target");
     CSA_SHOW(0, cal_v_sq, "v_sq info");
     CSA_SHOW(0, cal_v_sd, "v_sd info");
-    d_info("\n"); debug_flush(true);
+    d_info("\n");
 
     CSA_SHOW(1, ori_encoder, "Origin encoder value");
     CSA_SHOW(1, ori_pos, "sen_pos before add offset");
-    d_info("\n"); debug_flush(true);
+    d_info("\n");
 
     CSA_SHOW(1, delta_encoder, "Encoder value delta");
     CSA_SHOW(1, nob_encoder, "Encoder value before add bias");
@@ -361,23 +349,23 @@ void csa_list_show(void)
     CSA_SHOW(0, sen_i_sq, "i_sq from adc");
     CSA_SHOW(0, sen_i_sd, "i_sd from adc");
     CSA_SHOW(0, sen_angle_elec, "Get electric angle from sen_encoder");
-    d_info("\n"); debug_flush(true);
+    d_info("\n");
 
     CSA_SHOW(0, loop_cnt, "Increase at current loop, for raw dbg");
-    d_info("\n"); debug_flush(true); while (r_dev.tx_head.len) {}
+    d_info("\n");
 
     d_debug("   //--------------- Follows are not writable: -------------------\n");
     CSA_SHOW(0, tc_state, "t_curve: 0: stop, 1: run, 2: tailer");
     CSA_SHOW(0, tc_vc, "Motor current speed");
     CSA_SHOW(0, tc_ac, "Motor current accel");
-    d_info("\n"); debug_flush(true);
+    d_info("\n");
 
     CSA_SHOW(0, adc_sel, "");
     CSA_SHOW(0, dbg_ia, "");
     CSA_SHOW(0, dbg_ib, "");
     CSA_SHOW(0, dbg_u, "");
     CSA_SHOW(0, dbg_v, "");
-    d_info("\n"); debug_flush(true);
+    d_info("\n");
 
     CSA_SHOW(0, sen_i_sq_avg, "");
     CSA_SHOW(0, cal_v_sq_avg, "");
@@ -385,7 +373,8 @@ void csa_list_show(void)
     CSA_SHOW(0, sen_rpm_avg, "");
     CSA_SHOW(0, bus_voltage, "");
     CSA_SHOW(0, temperature, "");
-    d_info("\n"); debug_flush(true); while (r_dev.tx_head.len) {}
+    d_info("\n");
 
+    while (frame_free_head.len < FRAME_MAX - 5);
     d_info("\x1b[92mColor Test...\x1b[0m\n");
 }

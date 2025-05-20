@@ -55,8 +55,8 @@ from cdnet.dispatch import *
 args = CdArgs()
 local_mac = int(args.get("--local-mac", dft="0x00"), 0)
 dev_str = args.get("--dev", dft="ttyACM0")
-baud = int(args.get("--baud", dft="115200"), 0)
-target_addr = args.get("--target-addr", dft="80:00:fe")
+baud = int(args.get("--baud", dft="10000000"), 0)
+target_addr = args.get("--target-addr", dft="00:00:fe")
 
 out_file = args.get("--out-file")
 reboot_flag = args.get("--reboot") != None
@@ -78,7 +78,7 @@ elif args.get("--info", "-i") != None:
 
 dev = CDBusSerial(dev_str, baud=baud)
 CDNetIntf(dev, mac=local_mac)
-sock = CDNetSocket(('', 0xcdcd))
+sock = CDNetSocket(('', 0x40))
 sock_dbg = CDNetSocket(('', 9))
 
 
@@ -94,14 +94,14 @@ _thread.start_new_thread(dbg_echo, ())
 def csa_write(offset, dat):
     sock.sendto(b'\x20' + struct.pack("<H", offset) + dat, (target_addr, 5))
     ret, _ = sock.recvfrom(timeout=1)
-    if ret == None or ret[0] != 0x80:
+    if ret == None or ret[0] != 0:
         print(f'csa_write error at: 0x{offset:x}: {dat.hex()}')
     return ret
 
 def csa_read(offset, len_):
     sock.sendto(b'\x00' + struct.pack("<HB", offset, len_), (target_addr, 5))
     ret, _ = sock.recvfrom(timeout=1)
-    if ret == None or ret[0] != 0x80:
+    if ret == None or ret[0] != 0:
         print(f'csa_write read at: 0x{offset:x}, len: {len_}')
     return ret
 
@@ -110,7 +110,7 @@ def _read_flash(addr, _len):
     sock.sendto(b'\x00' + struct.pack("<IB", addr, _len), (target_addr, 8))
     ret, _ = sock.recvfrom()
     print(('  %08x: ' % addr) + ret.hex())
-    if ret[0] != 0x80 or len(ret[1:]) != _len:
+    if ret[0] != 0x00 or len(ret[1:]) != _len:
         print('read flash error')
         exit(-1)
     return ret[1:]
@@ -120,7 +120,7 @@ def _write_flash(addr, dat):
     sock.sendto(b'\x20' + struct.pack("<I", addr) + dat, (target_addr, 8))
     ret, _ = sock.recvfrom()
     print('  write ret: ' + ret.hex())
-    if ret != b'\x80':
+    if ret != b'\x00':
         print('write flash error')
         exit(-1)
 
@@ -128,7 +128,7 @@ def _erase_flash(addr, _len):
     sock.sendto(b'\x2f' + struct.pack("<II", addr, _len), (target_addr, 8))
     ret, _ = sock.recvfrom()
     print('  erase ret: ' + ret.hex())
-    if ret != b'\x80':
+    if ret != b'\x00':
         print('erase flash error')
         exit(-1)
 

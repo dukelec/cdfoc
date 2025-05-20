@@ -7,10 +7,29 @@ Sockets: RS-485: molex 5264 (4 pin x 2), motor: molex 5264 (3 pin), sensor: sh1.
 
 Download this project:
 ```
-git clone --recurse-submodules https://github.com/dukelec/cdfoc
+git clone --recursive https://github.com/dukelec/cdfoc
 ```
 
 <img src="doc/cdfoc_motor.avif">
+
+
+## Protocol
+
+CDFOC is an open-source Field-Oriented Control (FOC) motor controller that communicates over an RS485 interface.
+ - Default baud rate: 115200 bps
+ - Maximum speed: 50 Mbps
+ - Default address: 0xfe
+
+The underlying protocol is CDBUS, with the following frame format:  
+`src, dst, len, [payload], crc_l, crc_h`
+
+Each frame includes a 3-byte header, a variable-length payload, and a 2-byte CRC (identical to Modbus CRC).  
+For more information on the CDBUS protocol, please refer to:
+ - https://cdbus.org
+
+The payload is encoded using the CDNET protocol. For detailed information, please refer to:
+ - https://github.com/dukelec/cdnet
+ - https://github.com/dukelec/cdnet/wiki/CDNET-Intro-and-Demo
 
 
 ## Block Diagram
@@ -34,12 +53,6 @@ If you need to restore the default configuration, change `magic_code` to another
 Plots:
 
 <img src="doc/plot.avif">
-
-
-## Protocol
-
-The CDFOC communication protocol is the same as CDSTEP except for the differences in the register lists,
-please refer to: https://github.com/dukelec/cdstep
 
 
 ## Operating
@@ -124,15 +137,15 @@ and `05` is the value to be written.
 The complete command containing the CRC is (host address defaults to `0`, motor address defaults to `0xfe`, 3rd byte is data length, last two bytes are CRC):
 
 ```
-00 fe 05  05 20  40 02  05  58 e6
+00 fe 06  40 05  20  40 02  05  eb 8f
 ```
 
 The complete response package is:
 ```
-fe 00 01  40  crc_l crc_h
+fe 00 03  05 40  00  crc_l crc_h
 ```
 
-Where `0x40` means no error, for more information please refer to the description of CDSTEP and CDNET.
+Where `0x00` means no error, for more information please refer to the description of CDSTEP and CDNET.
 
 
 ### Quick Exchange Commands
@@ -144,27 +157,25 @@ If you need to change both the target position and the target speed, e.g. positi
 
 Goes to 0 degrees, full command with CRC:
 ```
-00 fe 06  06 20  00 00 00 00  63 99
+00 fe 07  40 06  20  00 00 00 00  b9 e0
 ```
 
 Goes to 180 degrees, full command with CRC:  
 (0x10000 units for one revolution, 0x8000 for 180 degrees)
 
 ```
-00 fe 06  06 20  00 80 00 00  62 71
+00 fe 07  40 06  20  00 80 00 00  b8 08
 ```
 
 Rotates to the 5th revolution position and sends the speed value (0x00140000 or 14 revolutions per second) with the CRC:
 ```
-00 fe 0a  06 20  00 00 05 00  00 00 14 00  fe 6e
+00 fe 0b  40 06  20  00 00 05 00  00 00 14 00  3b ef
 ```
 
 Demonstration of return data for the above three commands:
 ```
-fe 00 0b  40  xx xx xx xx yy yy yy yy  crc_l crc_h
+fe 00 0b  06 40  00  xx xx xx xx yy yy yy yy  crc_l crc_h
 ```
 
-where `0x40` means no error, `xx` and `yy` are defined by `qxchg_ret` to return 8 bytes of data such as `cal_pos`.
-
-
+where `0x00` means no error, `xx` and `yy` are defined by `qxchg_ret` to return 8 bytes of data such as `cal_pos`.
 

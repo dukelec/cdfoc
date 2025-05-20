@@ -54,7 +54,7 @@ uint8_t state_w_hook_before(uint16_t sub_offset, uint8_t len, uint8_t *dat)
         adc_cali_st = 1; // start adc_cali
         while (adc_cali_st);
         delay_systick(5);
-        d_debug("adc cali: ab %d %d, ca %d %d, cb %d %d\n",
+        d_debug("adc cali: ab %lu %lu, ca %lu %lu, cb %lu %lu\n",
                 adc_ofs[0][0], adc_ofs[0][1], adc_ofs[1][0], adc_ofs[1][1], adc_ofs[2][0], adc_ofs[2][1]);
 
         drv_write_reg(0x02, (1 << 10) | (1 << 7) | (1 << 5)); // shutdown all on err, otw err, 3x pwm mode
@@ -84,7 +84,6 @@ void app_motor_init(void)
     pid_f_init(&csa.pid_speed, true);
     pid_i_init(&csa.pid_pos, true);
     csa.bus_voltage = csa.nominal_voltage;
-    misc_init();
 }
 
 void app_motor_routine(void)
@@ -101,7 +100,6 @@ void app_motor_routine(void)
     pid_f_init(&csa.pid_i_sd, false);
     pid_f_init(&csa.pid_speed, false);
     pid_i_init(&csa.pid_pos, false);
-    dbg_routine();
 }
 
 
@@ -295,7 +293,7 @@ void adc_isr(void)
     csa.sen_pos = csa.ori_pos - csa.bias_pos;
 
     if (dbg_str)
-            d_debug("%04x %04x %08x", csa.ori_encoder, csa.sen_encoder, csa.sen_pos);
+            d_debug("%04x %04x %08lx", csa.ori_encoder, csa.sen_encoder, csa.sen_pos);
 
     float angle_mech = csa.sen_encoder*((float)M_PI*2/0x10000);
     uint16_t encoder_sub = csa.sen_encoder % lroundf((float)0x10000/csa.motor_poles);
@@ -372,7 +370,7 @@ void adc_isr(void)
 
         if (dbg_str)
             //d_debug_c(", i %5d %5d %5d", ia, ib, ic);
-            d_debug_c(", i %5d %5d", adc1_val, adc2_val);
+            d_debug_c(", i %5ld %5ld", adc1_val, adc2_val);
         if (dbg_str)
             d_debug_c(" (q %5d.%.2d, d %5d.%.2d)", P_2F(csa.sen_i_sq), P_2F(csa.sen_i_sd));
     }
