@@ -71,6 +71,8 @@ static void p5_service_routine(void)
     if (!pkt)
         return;
     uint8_t *rx_dat = pkt->dat;
+    bool reply = !(rx_dat[0] & 0x80);
+    rx_dat[0] &= ~0x80;
     pkt->dst = pkt->src;
     cdn_pkt_prepare(&sock5, pkt);
 
@@ -112,8 +114,10 @@ static void p5_service_routine(void)
         return;
     }
 
-    cdn_sock_sendto(&sock5, pkt);
-    return;
+    if (reply)
+        cdn_sock_sendto(&sock5, pkt);
+    else
+        cdn_pkt_free(&dft_ns, pkt);
 }
 
 
@@ -129,6 +133,8 @@ static void p8_service_routine(void)
     if (!pkt)
         return;
     uint8_t *rx_dat = pkt->dat;
+    bool reply = !(rx_dat[0] & 0x80);
+    rx_dat[0] &= ~0x80;
     pkt->dst = pkt->src;
     cdn_pkt_prepare(&sock8, pkt);
 
@@ -154,13 +160,13 @@ static void p8_service_routine(void)
         pkt->len = 1;
         pkt->dat[0] = ret == HAL_OK ? 0 : 1;
 #if 0
-    } else if (pkt->len == 9 && rx_dat[0] == 0x10) {
+    } else if (rx_dat[0] == 0x10 && pkt->len == 9) {
         uint32_t f_addr = get_unaligned32(rx_dat + 1);
         uint32_t f_len = get_unaligned32(rx_dat + 5);
         uint16_t crc = crc16((const uint8_t *)f_addr, f_len);
 
         d_debug("nvm crc addr: %x, len: %x, crc: %02x", f_addr, f_len, crc);
-        *(uint16_t *)(pkt->dat + 1) = crc;
+        put_unaligned16(crc, pkt->dat + 1);
         pkt->dat[0] = 0;
         pkt->len = 3;
 #endif
@@ -170,8 +176,10 @@ static void p8_service_routine(void)
         return;
     }
 
-    cdn_sock_sendto(&sock8, pkt);
-    return;
+    if (reply)
+        cdn_sock_sendto(&sock8, pkt);
+    else
+        cdn_pkt_free(&dft_ns, pkt);
 }
 
 

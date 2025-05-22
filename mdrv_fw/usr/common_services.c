@@ -8,7 +8,6 @@
  */
 
 #include "app_main.h"
-#include <math.h>
 
 static char cpu_id[25];
 static char info_str[100];
@@ -101,6 +100,8 @@ static void p8_service_routine(void)
     if (!pkt)
         return;
     uint8_t *rx_dat = pkt->dat;
+    bool reply = !(rx_dat[0] & 0x80);
+    rx_dat[0] &= ~0x80;
     pkt->dst = pkt->src;
     cdn_pkt_prepare(&sock8, pkt);
 
@@ -126,13 +127,13 @@ static void p8_service_routine(void)
         pkt->len = 1;
         pkt->dat[0] = ret == HAL_OK ? 0 : 1;
 #if 0
-    } else if (pkt->len == 9 && rx_dat[0] == 0x10) {
+    } else if (rx_dat[0] == 0x10 && pkt->len == 9) {
         uint32_t f_addr = get_unaligned32(rx_dat + 1);
         uint32_t f_len = get_unaligned32(rx_dat + 5);
         uint16_t crc = crc16((const uint8_t *)f_addr, f_len);
 
         d_debug("nvm crc addr: %x, len: %x, crc: %02x", f_addr, f_len, crc);
-        *(uint16_t *)(pkt->dat + 1) = crc;
+        put_unaligned16(crc, pkt->dat + 1);
         pkt->dat[0] = 0;
         pkt->len = 3;
 #endif
@@ -142,8 +143,10 @@ static void p8_service_routine(void)
         return;
     }
 
-    cdn_sock_sendto(&sock8, pkt);
-    return;
+    if (reply)
+        cdn_sock_sendto(&sock8, pkt);
+    else
+        cdn_pkt_free(&dft_ns, pkt);
 }
 
 
@@ -183,6 +186,8 @@ static void p5_service_routine(void)
         return;
     }
     uint8_t *rx_dat = pkt->dat;
+    bool reply = !(rx_dat[0] & 0x80);
+    rx_dat[0] &= ~0x80;
     pkt->dst = pkt->src;
     cdn_pkt_prepare(&sock5, pkt);
 
@@ -250,8 +255,10 @@ static void p5_service_routine(void)
         return;
     }
 
-    cdn_sock_sendto(&sock5, pkt);
-    return;
+    if (reply)
+        cdn_sock_sendto(&sock5, pkt);
+    else
+        cdn_pkt_free(&dft_ns, pkt);
 }
 
 // qxchg
@@ -261,67 +268,60 @@ static void p6_service_routine(void)
     cdn_pkt_t *pkt = cdn_sock_recvfrom(&sock6);
     if (!pkt)
         return;
-    uint8_t *rx_dat = pkt->dat;
+    bool mcast = !!(pkt->src.port & 0x10);
+    bool reply = !(pkt->src.port & 0x08);
     pkt->dst = pkt->src;
     cdn_pkt_prepare(&sock5, pkt);
+    uint8_t *src_dat = pkt->dat;
+    uint8_t *dst_dat = pkt->dat;
 
-    if (rx_dat[0] == 0x2f) { // multicast
-        if (1 + csa.qxchg_mcast.offset + csa.qxchg_mcast.size <= pkt->len) {
-            memmove(&rx_dat[1], &rx_dat[1 + csa.qxchg_mcast.offset], csa.qxchg_mcast.size);
-            pkt->dat[0] = 0x20;
-            pkt->len = 1 + csa.qxchg_mcast.size;
+    if (mcast) { // multicast
+        if (csa.qxchg_mcast.offset + csa.qxchg_mcast.size <= pkt->len) {
+            memmove(pkt->dat, pkt->dat + csa.qxchg_mcast.offset, csa.qxchg_mcast.size);
+            pkt->len = csa.qxchg_mcast.size;
+        } else {
+            d_warn("qxchg: wrong cmd, len: %d\n", pkt->len);
+            cdn_pkt_free(&dft_ns, pkt);
+            return;
         }
     }
 
-    if (rx_dat[0] == 0x20 && pkt->len >= 1) {
-        uint8_t *src_dat = rx_dat + 1;
-        uint8_t *dst_dat = pkt->dat + 1;
-
-        for (int i = 0; !ret_val && i < 5; i++) {
-            regr_t *regr = csa.qxchg_set + i;
-            if (!regr->size)
-                break;
-            uint16_t lim_size = min(pkt->len - (src_dat - pkt->dat), regr->size);
-            if (!lim_size)
-                break;
-
-            ret_val = csa_hook_exec(false, regr->offset, lim_size, src_dat);
-            if (!ret_val) {
-                NVIC_DisableIRQ(ADC1_2_IRQn);
-                memcpy(((void *) &csa) + regr->offset, src_dat, lim_size);
-                NVIC_EnableIRQ(ADC1_2_IRQn);
-                ret_val = csa_hook_exec(true, regr->offset, lim_size, src_dat);
-            }
-
-            src_dat += lim_size;
+    for (int i = 0; !ret_val && i < 5; i++) {
+        regr_t *regr = csa.qxchg_set + i;
+        if (!regr->size)
+            break;
+        if (src_dat + regr->size > pkt->dat + pkt->len)
+            break;
+        ret_val = csa_hook_exec(false, regr->offset, regr->size, src_dat);
+        if (!ret_val) {
+            NVIC_DisableIRQ(ADC1_2_IRQn);
+            memcpy(((void *) &csa) + regr->offset, src_dat, regr->size);
+            NVIC_EnableIRQ(ADC1_2_IRQn);
+            ret_val = csa_hook_exec(true, regr->offset, regr->size, src_dat);
         }
+        src_dat += regr->size;
+    }
 
-        for (int i = 0; !ret_val && i < 5; i++) {
-            regr_t *regr = csa.qxchg_ret + i;
-            if (!regr->size)
-                break;
-            ret_val = csa_hook_exec(false, regr->offset, regr->size, NULL);
-            if (!ret_val) {
-                NVIC_DisableIRQ(ADC1_2_IRQn);
-                memcpy(dst_dat, ((void *) &csa) + regr->offset, regr->size);
-                NVIC_EnableIRQ(ADC1_2_IRQn);
-                ret_val = csa_hook_exec(true, regr->offset, regr->size, NULL);
-            }
-            dst_dat += regr->size;
+    for (int i = 0; !ret_val && i < 5; i++) {
+        regr_t *regr = csa.qxchg_ret + i;
+        if (!regr->size)
+            break;
+        ret_val = csa_hook_exec(false, regr->offset, regr->size, NULL);
+        if (!ret_val) {
+            NVIC_DisableIRQ(ADC1_2_IRQn);
+            memcpy(dst_dat, ((void *) &csa) + regr->offset, regr->size);
+            NVIC_EnableIRQ(ADC1_2_IRQn);
+            ret_val = csa_hook_exec(true, regr->offset, regr->size, NULL);
         }
+        dst_dat += regr->size;
+    }
 
-        pkt->len = dst_dat - pkt->dat;
-        pkt->dat[0] = ret_val;
-        d_debug("qxchg: i %d, o %d\n", src_dat - pkt->dat, pkt->len);
-
-    } else {
-        d_warn("qxchg: wrong cmd, len: %d\n", pkt->len);
+    pkt->len = ret_val ? 0 : dst_dat - pkt->dat;
+    d_debug("qxchg: i %d, o %d\n", src_dat - pkt->dat, pkt->len);
+    if (reply)
+        cdn_sock_sendto(&sock6, pkt);
+    else
         cdn_pkt_free(&dft_ns, pkt);
-        return;
-    }
-
-    cdn_sock_sendto(&sock6, pkt);
-    return;
 }
 
 

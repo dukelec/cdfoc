@@ -151,31 +151,31 @@ Where `0x00` means no error, for more information please refer to the descriptio
 ### Quick Exchange Commands
 
 `qxchg_set` uses only one element by default, pointing to the area where the table entries `tc_pos`, `tc_speed` and `tc_accel` are located.  
-If you want to change the target position parameter `tc_pos` to 0, you can write data `20  00 00 00 00` to port 6 (`20` is the subcommand number).  
+If you want to change the target position parameter `tc_pos` to 0, you can write data `00 00 00 00` to port 6.  
 
-If you need to change both the target position and the target speed, e.g. position to 0x00010000 and speed to 0x00005000, writes: `20  00 00 01 00  00 50 00 00`.
+If you need to change both the target position and the target speed, e.g. position to 0x00010000 and speed to 0x00005000, writes: `00 00 01 00  00 50 00 00`.
 
 Goes to 0 degrees, full command with CRC:
 ```
-00 fe 07  40 06  20  00 00 00 00  b9 e0
+00 fe 06  40 06  00 00 00 00  64 f8
 ```
 
 Goes to 180 degrees, full command with CRC:  
 (0x10000 units for one revolution, 0x8000 for 180 degrees)
 
 ```
-00 fe 07  40 06  20  00 80 00 00  b8 08
+00 fe 06  40 06  00 80 00 00  65 10
 ```
 
 Rotates to the 5th revolution position and sends the speed value (0x00140000 or 14 revolutions per second) with the CRC:
 ```
-00 fe 0b  40 06  20  00 00 05 00  00 00 14 00  3b ef
+00 fe 0a  40 06  00 00 05 00  00 00 14 00  ae c4
 ```
 
 Demonstration of return data for the above three commands:
 ```
-fe 00 0b  06 40  00  xx xx xx xx yy yy yy yy  crc_l crc_h
+fe 00 0a  06 40  xx xx xx xx yy yy yy yy  crc_l crc_h
 ```
 
-where `0x00` means no error, `xx` and `yy` are defined by `qxchg_ret` to return 8 bytes of data such as `cal_pos`.
+The `xx` and `yy` are defined by `qxchg_ret` to return 8 bytes of data such as `cal_pos`.
 
