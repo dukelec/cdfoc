@@ -15,7 +15,7 @@
 #include "cdbus_uart.h"
 #include "cdctl_it.h"
 #include "pid_f.h"
-#include "pid_i.h"
+#include "pid_pos.h"
 
 // printf float value without enable "-u _printf_float"
 // e.g.: printf("%d.%.2d\n", P_2F(2.14));
@@ -161,6 +161,7 @@ typedef struct {
     float           sen_rpm_avg;
     float           bus_voltage;
     float           temperature;
+    float           tc_vc_avg;
 
 } csa_t; // config status area
 

@@ -45,11 +45,10 @@ const csa_t csa_dft = {
         .dbg_en = false,
 
         .pid_pos = { // motor must have enough power to follow the target position
-                .kp = 100, .ki = 4000, .kd = 0.02,
+                .kp = 100, .ki = 4000, .kd = 0.002,
                 .out_min = -65536*100,
                 .out_max = 65536*100, // limit output speed
-                .period = 25.0 / CURRENT_LOOP_FREQ,
-                .filter_len = 3
+                .period = 25.0 / CURRENT_LOOP_FREQ
         },
         .pid_speed = {
                 .kp = 0.006, .ki = 0.8, .kd = 0.000008,
@@ -144,6 +143,10 @@ void load_conf(void)
     }
     if (csa.conf_from)
         memset(&csa.do_reboot, 0, 3);
+    csa.pid_pos.period = csa_dft.pid_pos.period;
+    csa.pid_speed.period = csa_dft.pid_speed.period;
+    csa.pid_i_sq.period = csa_dft.pid_i_sq.period;
+    csa.pid_i_sd.period = csa_dft.pid_i_sd.period;
 }
 
 int save_conf(void)

@@ -17,7 +17,11 @@ static volatile int adc_cali_st = 0;
 
 static int vector_over_limit = 0;
 static int encoder_err_flg = 0;
-static int encoder_err = 10000;
+static int encoder_err = 0;
+
+static uint16_t pos_rec[5] = {0};
+static int32_t pos_tmp[5];
+static float speed_rec[5] = {0};
 
 
 uint8_t state_w_hook_before(uint16_t sub_offset, uint8_t len, uint8_t *dat)
@@ -164,6 +168,7 @@ static inline void t_curve_compute(void)
         csa.tc_vc = 0;
         csa.tc_ac = 0;
     }
+    csa.tc_vc_avg += (csa.tc_vc - csa.tc_vc_avg) * 0.1f;
 }
 
 
@@ -197,10 +202,7 @@ static inline void position_loop_compute(void)
 
 static inline void speed_loop_compute(void)
 {
-    static float s_avg = 0;
     static int s_cnt = 0;
-
-    s_avg += csa.delta_encoder * (float)CURRENT_LOOP_FREQ; // encoder steps per sec
 
     if (++s_cnt == 5) {
         s_cnt = 0;
@@ -208,11 +210,6 @@ static inline void speed_loop_compute(void)
     } else {
         return;
     }
-
-    csa.sen_speed = s_avg / 5.0f;
-    s_avg = 0;
-    csa.sen_speed_avg += (csa.sen_speed - csa.sen_speed_avg) * 0.005f;
-    csa.sen_rpm_avg = csa.sen_speed_avg / 0x10000 * 60;
 
     if (csa.state < ST_SPEED) {
         pid_f_reset(&csa.pid_speed, 0, 0);
@@ -266,26 +263,39 @@ void adc_isr(void)
 
     //gpio_set_val(&dbg_out2, 1);
 
-    int16_t enc_delta = cali_encoder - csa.nob_encoder;
-    if (abs(enc_delta) > 6000) { // filter out disturbed error position values
-        if (++encoder_err > 2) {
-            csa.nob_encoder = cali_encoder;
-            encoder_err = 0;
-            // csa.delta_encoder kept
-        } else {
-            csa.delta_encoder = csa.sen_speed_avg / CURRENT_LOOP_FREQ;
-            csa.nob_encoder += lroundf(csa.delta_encoder);
-            encoder_err_flg++;
-        }
-    } else {
-        csa.delta_encoder = enc_delta;
-        csa.nob_encoder += enc_delta;
-        encoder_err = 0;
+    for (int i = 0; i < 4; i++)
+        pos_rec[i] = pos_rec[i+1];
+    pos_rec[4] = cali_encoder;
+    pos_tmp[0] = pos_rec[0];
+    for (int i = 0; i < 4; i++) {
+        int16_t dt = pos_rec[i+1] - pos_rec[0];
+        pos_tmp[i+1] = pos_tmp[0] + dt;
     }
+    int32_t pos_min = pos_tmp[0];
+    int32_t pos_max = pos_tmp[0];
+    int32_t pos_sum = 0;
+    for (int i = 0; i < 5; i++) {
+        pos_sum += pos_tmp[i];
+        pos_min = min(pos_min, pos_tmp[i]);
+        pos_max = max(pos_max, pos_tmp[i]);
+    }
+    uint16_t pos_avg = DIV_ROUND_CLOSEST(pos_sum - pos_min - pos_max, 3);
+    csa.delta_encoder = (int16_t)(pos_avg - csa.nob_encoder);
+    csa.nob_encoder = pos_avg;
 
-    // 19us lag steps = step/sec * 0.000019 sec
-    csa.nob_encoder += lroundf(csa.sen_speed_avg * 0.000019f);
-    csa.sen_encoder = csa.nob_encoder - csa.bias_encoder;
+    for (int i = 0; i < 4; i++)
+        speed_rec[i] = speed_rec[i+1];
+    speed_rec[4] = csa.delta_encoder * CURRENT_LOOP_FREQ; // encoder steps per sec
+    float speed_sum = 0;
+    for (int i = 0; i < 5; i++)
+        speed_sum += speed_rec[i];
+    csa.sen_speed = speed_sum / 5;
+    csa.sen_speed_avg += (csa.sen_speed - csa.sen_speed_avg) * 0.1f;
+    csa.sen_rpm_avg += (csa.sen_speed_avg / 0x10000 * 60 - csa.sen_rpm_avg) * 0.01f;
+
+    // position compensation: step/sec * (2 loop period + 0.000019 sec)
+    int16_t pos_speed_comp = lroundf(csa.sen_speed_avg * (2.0f / CURRENT_LOOP_FREQ + 0.000019f));
+    csa.sen_encoder = csa.nob_encoder - csa.bias_encoder + pos_speed_comp;
 
     //gpio_set_val(&dbg_out2, 0);
 
@@ -357,9 +367,10 @@ void adc_isr(void)
         csa.sen_i_sd = i_alpha * cos_tmp_angle_elec + i_beta * sin_tmp_angle_elec;
 
         if (csa.anticogging_en) {
-            tbl_idx = csa.nob_encoder >> 4;
+            uint16_t pos = csa.nob_encoder + pos_speed_comp;
+            tbl_idx = pos >> 4;
             tbl_idx_next = (tbl_idx == 4095) ? 0 : (tbl_idx + 1);
-            tbl_percent = (float)(csa.nob_encoder & 0xf) / 0x10;
+            tbl_percent = (float)(pos & 0xf) / 0x10;
             int8_t idx_val = *(int8_t *)(ANTICOGGING_TBL + tbl_idx * 2);
             int8_t idx_next_val = *(int8_t *)(CALI_ENCODER_TBL + tbl_idx_next * 2);
             float val = idx_val + (idx_next_val - idx_val) * tbl_percent;

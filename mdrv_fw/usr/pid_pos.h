@@ -7,11 +7,10 @@
  * Author: http://brettbeauregard.com/blog/2011/04/improving-the-beginners-pid-introduction/
  * Modified by: Duke Fong <d@d-l.io>
  *
- * Notes: _i is integer version
  */
 
-#ifndef __PID_I_H__
-#define __PID_I_H__
+#ifndef __PID_POS_H__
+#define __PID_POS_H__
 
 typedef struct {
     // configuration
@@ -31,8 +30,6 @@ typedef struct {
 } pid_i_t;
 
 float pid_i_compute(pid_i_t *pid, int input);
-
-float pid_i_compute_no_d(pid_i_t *pid, int input);
 
 inline void pid_i_set_target(pid_i_t *pid, int target)
 {
