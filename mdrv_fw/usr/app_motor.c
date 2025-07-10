@@ -23,6 +23,12 @@ static uint16_t pos_rec[5] = {0};
 static int32_t pos_tmp[5];
 static float speed_rec[5] = {0};
 
+static uint8_t pos_loop_cnt = 0;
+static uint8_t speed_loop_cnt = 0;
+static float cal_speed_bk = 0;
+static int32_t cal_current_bk = 0;
+
+
 
 uint8_t state_w_hook_before(uint16_t sub_offset, uint8_t len, uint8_t *dat)
 {
@@ -174,25 +180,25 @@ static inline void t_curve_compute(void)
 
 static inline void position_loop_compute(void)
 {
-    static int s_cnt = 0;
-    
-    if (++s_cnt == 5)
-        s_cnt = 0;
-    else
+    if (++pos_loop_cnt < 5)
         return;
+    pos_loop_cnt = 0;
 
     if (csa.state < ST_POSITION) {
         pid_i_reset(&csa.pid_pos, csa.sen_pos, 0);
         pid_i_set_target(&csa.pid_pos, csa.sen_pos);
         csa.cal_pos = csa.sen_pos;
-        if (csa.state == ST_STOP)
+        if (csa.state == ST_STOP) {
             csa.cal_speed = 0;
+            cal_speed_bk = 0;
+        }
         t_curve_compute(); // reset t_curve
         return;
     }
 
     t_curve_compute();
     pid_i_set_target(&csa.pid_pos, csa.cal_pos);
+    cal_speed_bk = csa.cal_speed;
     csa.cal_speed = pid_i_compute(&csa.pid_pos, csa.sen_pos);
 
     raw_dbg(2);
@@ -202,21 +208,19 @@ static inline void position_loop_compute(void)
 
 static inline void speed_loop_compute(void)
 {
-    static int s_cnt = 0;
-
-    if (++s_cnt == 5) {
-        s_cnt = 0;
-        position_loop_compute();
-    } else {
+    if (++speed_loop_cnt < 5)
         return;
-    }
+    speed_loop_cnt = 0;
+    position_loop_compute();
 
     if (csa.state < ST_SPEED) {
         pid_f_reset(&csa.pid_speed, 0, 0);
         pid_f_set_target(&csa.pid_speed, 0);
         if (csa.state == ST_STOP) {
             csa.cal_current = 0;
+            cal_current_bk = 0;
             csa.cal_speed = 0;
+            cal_speed_bk = 0;
         }
     } else {
         if (csa.state == ST_SPEED) {
@@ -225,8 +229,10 @@ static inline void speed_loop_compute(void)
                     min(csa.pid_speed.target + v_step, csa.cal_speed) : max(csa.pid_speed.target - v_step, csa.cal_speed);
             pid_f_set_target(&csa.pid_speed, speed);
         } else {
-            pid_f_set_target(&csa.pid_speed, csa.cal_speed); // TODO: only set once after modified
+            float speed = cal_speed_bk + (csa.cal_speed - cal_speed_bk) / 5 * (pos_loop_cnt + 1);
+            pid_f_set_target(&csa.pid_speed, speed);
         }
+        cal_current_bk = csa.cal_current;
         csa.cal_current = lroundf(pid_f_compute(&csa.pid_speed, csa.sen_speed));
     }
 
@@ -304,6 +310,7 @@ void adc_isr(void)
 
     if (dbg_str)
             d_debug("%04x %04x %08lx", csa.ori_encoder, csa.sen_encoder, csa.sen_pos);
+    speed_loop_compute();
 
     float angle_mech = csa.sen_encoder*((float)M_PI*2/0x10000);
     uint16_t encoder_sub = csa.sen_encoder % lroundf((float)0x10000/csa.motor_poles);
@@ -389,8 +396,17 @@ void adc_isr(void)
     // current --> pwm
     if (csa.state != ST_STOP) {
         float v_alpha, v_beta;
+        int32_t target_current;
+        if (csa.state >= ST_SPEED) {
+            float current = cal_current_bk + (float)(csa.cal_current - cal_current_bk) * (speed_loop_cnt + 1) / 5;
+            target_current = lroundf(current);
+        } else if (csa.state == ST_CALI) {
+            target_current = -csa.cali_current;
+        } else {
+            target_current = csa.cal_current;
+        }
         // sign select direction for cali_current
-        int32_t target_current = (csa.state == ST_CALI) ? -csa.cali_current : csa.cal_current;
+
 #if defined(CAL_CURRENT_SMOOTH)
         static bool near_limit = false;
         if (!near_limit) {
@@ -503,7 +519,6 @@ void adc_isr(void)
     __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_2, DRV_PWM_HALF - out_pwm_v); // TIM1_CH2: B
     __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, DRV_PWM_HALF - out_pwm_w); // TIM1_CH1: C
 
-    speed_loop_compute();
     raw_dbg(0);
     csa.loop_cnt++;
 
