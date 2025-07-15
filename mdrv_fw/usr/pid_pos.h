@@ -4,9 +4,9 @@
  * Copyright (c) 2016, DUKELEC, Inc.
  * All rights reserved.
  *
- * Author: http://brettbeauregard.com/blog/2011/04/improving-the-beginners-pid-introduction/
- * Modified by: Duke Fong <d@d-l.io>
+ * Author: Duke Fong <d@d-l.io>
  *
+ * Notes: _i is int input version
  */
 
 #ifndef __PID_POS_H__
@@ -22,11 +22,9 @@ typedef struct {
 
     // runtime and internal
     float i_term;
-    int last_input;
+    int _reserved0;
     float _ki, _kd;
-    
-    int filter_len;
-    int filter_hist[5];
+    int _reserved1[6];
 } pid_i_t;
 
 float pid_i_compute(pid_i_t *pid, int input);

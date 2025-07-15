@@ -16,8 +16,6 @@ static uint32_t adc_ofs[3][2];
 static volatile int adc_cali_st = 0;
 
 static int vector_over_limit = 0;
-static int encoder_err_flg = 0;
-static int encoder_err = 0;
 
 static uint16_t pos_rec[5] = {0};
 static int32_t pos_tmp[5];
@@ -27,6 +25,10 @@ static uint8_t pos_loop_cnt = 0;
 static uint8_t speed_loop_cnt = 0;
 static float cal_speed_bk = 0;
 static int32_t cal_current_bk = 0;
+
+static volatile bool adc_has_new;
+static volatile uint32_t adc_temperature;
+static volatile uint32_t adc_dc;
 
 
 
@@ -99,10 +101,9 @@ void app_motor_init(void)
 void app_motor_routine(void)
 {
     static uint32_t t_last = 0;
-    if ((vector_over_limit || encoder_err_flg) && (t_last == 0 || get_systick() - t_last > 500)) {
-        d_debug("\n\n!~!~ %d ~!~! --- %d\n\n", vector_over_limit, encoder_err_flg);
+    if (vector_over_limit && (t_last == 0 || get_systick() - t_last > 500)) {
+        d_debug("\n\n!~!~ %d ~!~!\n\n", vector_over_limit);
         vector_over_limit = 0;
-        encoder_err_flg = 0;
         t_last = get_systick();
     }
     // update _ki, _kd
@@ -110,6 +111,18 @@ void app_motor_routine(void)
     pid_f_init(&csa.pid_i_sd, false);
     pid_f_init(&csa.pid_speed, false);
     pid_i_init(&csa.pid_pos, false);
+
+    if (adc_has_new) {
+        float v_dc = (adc_dc / 4095.0f * 3.3f) / 4.7f * (4.7f + 75);
+        csa.bus_voltage += (v_dc - csa.bus_voltage) * 0.001f;
+
+        #define _B 3970
+        float r_ntc = (10000.0f * adc_temperature) / (4095 - adc_temperature);
+        //    pull-up: 10K                              r_ntc = 100K  ->          @ 25°C
+        float temperature = (1.0f / ((1.0f / _B) * logf(r_ntc / 100000) + (1.0f / (25 + 273.15f))) - 273.15f);
+        csa.temperature += (temperature - csa.temperature) * 0.001f;
+        adc_has_new = false;
+    }
 }
 
 
@@ -197,6 +210,8 @@ static inline void position_loop_compute(void)
     }
 
     t_curve_compute();
+    csa.pid_pos.out_min = csa.tc_vc_avg - 65536;
+    csa.pid_pos.out_max = csa.tc_vc_avg + 65536;
     pid_i_set_target(&csa.pid_pos, csa.cal_pos);
     cal_speed_bk = csa.cal_speed;
     csa.cal_speed = pid_i_compute(&csa.pid_pos, csa.sen_pos);
@@ -233,7 +248,7 @@ static inline void speed_loop_compute(void)
             pid_f_set_target(&csa.pid_speed, speed);
         }
         cal_current_bk = csa.cal_current;
-        csa.cal_current = lroundf(pid_f_compute(&csa.pid_speed, csa.sen_speed));
+        csa.cal_current = lroundf(pid_f_compute_no_d(&csa.pid_speed, csa.sen_speed));
     }
 
     raw_dbg(1);
@@ -523,18 +538,11 @@ void adc_isr(void)
     csa.loop_cnt++;
 
     if (!LL_ADC_REG_IsConversionOngoing(hadc1.Instance)) {
-        uint32_t adc_temperature = HAL_ADC_GetValue(&hadc1);
-        uint32_t adc_dc = HAL_ADC_GetValue(&hadc2);
-
-        float v_dc = (adc_dc / 4095.0f * 3.3f) / 4.7f * (4.7f + 75);
-        csa.bus_voltage += (v_dc - csa.bus_voltage) * 0.001f;
-        
-        #define _B 3970
-        float r_ntc = (10000.0f * adc_temperature) / (4095 - adc_temperature);
-        //    pull-up: 10K                              r_ntc = 100K  ->          @ 25°C
-        float temperature = (1.0f / ((1.0f / _B) * logf(r_ntc / 100000) + (1.0f / (25 + 273.15f))) - 273.15f);
-        csa.temperature += (temperature - csa.temperature) * 0.001f;
-
+        if (!adc_has_new) {
+            adc_temperature = HAL_ADC_GetValue(&hadc1);
+            adc_dc = HAL_ADC_GetValue(&hadc2);
+            adc_has_new = true;
+        }
         LL_ADC_REG_StartConversion(hadc1.Instance);
     }
 

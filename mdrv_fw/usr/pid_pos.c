@@ -4,10 +4,9 @@
  * Copyright (c) 2016, DUKELEC, Inc.
  * All rights reserved.
  *
- * Author: http://brettbeauregard.com/blog/2011/04/improving-the-beginners-pid-introduction/
- * Modified by: Duke Fong <d@d-l.io>
+ * Author: Duke Fong <d@d-l.io>
  *
- * Notes: _i is integer version
+ * Notes: _i is int input version
  */
 
 #include "cd_utils.h"
@@ -17,26 +16,28 @@
 
 float pid_i_compute(pid_i_t *pid, int input)
 {
-    int error, delta_input;
-    float output;
-
-    error = pid->target - input;
-    pid->i_term += pid->_ki * error;
-    pid->i_term = clip(pid->i_term, pid->out_min, pid->out_max);
-
-    //delta_input = input - pid->last_input; // delta_input = -delta_error
-    //pid->last_input = input;
+    int error = pid->target - input;
+    float i_del = pid->_ki * error;
     float di_avg = csa.tc_vc_avg - csa.sen_speed_avg;
+    float output = pid->kp * error + pid->i_term + pid->_kd * di_avg; // old i_term
 
-    output = pid->kp * error + pid->i_term + pid->_kd * di_avg;
-    output = clip(output, pid->out_min, pid->out_max);
-    return output;
+    if (output >= pid->out_max) {
+        if (i_del < 0)
+            pid->i_term += i_del;
+    } else if (output <= pid->out_min) {
+        if (i_del > 0)
+            pid->i_term += i_del;
+    } else {
+        pid->i_term += i_del;
+        output += i_del;
+    }
+    pid->i_term = clip(pid->i_term, pid->out_min, pid->out_max);
+    return clip(output, pid->out_min, pid->out_max);
 }
 
 
 void pid_i_reset(pid_i_t *pid, int input, float output)
 {
-    //pid->last_input = input;
     pid->i_term = clip(output, pid->out_min, pid->out_max);
 }
 
