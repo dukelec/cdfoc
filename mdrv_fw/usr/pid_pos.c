@@ -18,8 +18,7 @@ float pid_i_compute(pid_i_t *pid, int input)
 {
     int error = pid->target - input;
     float i_del = pid->_ki * error;
-    float di_avg = csa.tc_vc_avg - csa.sen_speed_avg;
-    float output = pid->kp * error + pid->i_term + pid->_kd * di_avg; // old i_term
+    float output = pid->kp * error + pid->i_term; // old i_term
 
     if (output >= pid->out_max) {
         if (i_del < 0)
@@ -44,7 +43,7 @@ void pid_i_reset(pid_i_t *pid, int input, float output)
 void pid_i_init(pid_i_t *pid, bool reset)
 {
     pid->_ki = pid->ki * pid->period;
-    pid->_kd = pid->kd / pid->period;
+    //pid->_kd = pid->kd / pid->period;
 
     if (reset)
         pid_i_reset(pid, 0, 0);

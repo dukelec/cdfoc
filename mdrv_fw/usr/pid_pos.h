@@ -14,7 +14,8 @@
 
 typedef struct {
     // configuration
-    float kp, ki, kd;
+    float kp, ki;
+    float _reserved0;
     float out_min, out_max;
     float period;
 
@@ -22,9 +23,9 @@ typedef struct {
 
     // runtime and internal
     float i_term;
-    int _reserved0;
+    int _reserved1;
     float _ki, _kd;
-    int _reserved1[6];
+    int _reserved2[6];
 } pid_i_t;
 
 float pid_i_compute(pid_i_t *pid, int input);

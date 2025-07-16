@@ -12,11 +12,12 @@
 #include "cd_utils.h"
 #include "pid_f.h"
 
-float pid_f_compute_no_d(pid_f_t *pid, float input)
+float pid_f_compute(pid_f_t *pid, float input4p, float input4i)
 {
-    float error = pid->target - input;
-    float i_del = pid->_ki * error;
-    float output = pid->kp * error + pid->i_term;
+    float error4p = pid->target - input4p;
+    float error4i = pid->target - input4i;
+    float i_del = pid->_ki * error4i;
+    float output = pid->kp * error4p + pid->i_term;
 
     if (output >= pid->out_max) {
         if (i_del < 0)

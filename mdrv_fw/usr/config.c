@@ -45,32 +45,32 @@ const csa_t csa_dft = {
         .dbg_en = false,
 
         .pid_pos = { // motor must have enough power to follow the target position
-                .kp = 100, .ki = 4000, .kd = 0.002,
+                .kp = 50, .ki = 500,
                 .out_min = -65536*100,
-                .out_max = 65536*100, // limit output speed
+                .out_max = 65536*100, // limit output speed, override by t_curve module
                 .period = 25.0 / CURRENT_LOOP_FREQ
         },
         .pid_speed = {
-                .kp = 0.006, .ki = 0.8,
+                .kp = 0.02, .ki = 2,
                 .out_min = -3000,
                 .out_max = 3000, // limit output current
                 .period = 5.0 / CURRENT_LOOP_FREQ
         },
         .pid_i_sq =  {
-                .kp = 0.12, .ki = 450,
+                .kp = 0.2, .ki = 50,
                 .out_min = -2000,
                 .out_max = 2000,
                 .period = 1.0 / CURRENT_LOOP_FREQ
         },
         .pid_i_sd =  {
-                .kp = 0.07, .ki = 350,
+                .kp = 0.07, .ki = 50,
                 .out_min = -1600,
                 .out_max = 1600,
                 .period = 1.0 / CURRENT_LOOP_FREQ
         },
 
         .motor_poles = 7,
-        .bias_encoder = 0x06ad,
+        .bias_encoder = 0x1234,
 
         .qxchg_set = {
                 { .offset = offsetof(csa_t, tc_pos), .size = 4 * 3 }
@@ -85,29 +85,30 @@ const csa_t csa_dft = {
         .dbg_raw_msk = 0,
         .dbg_raw_th = 200,
         .dbg_raw = {
-                { // cur : target (i_sq), i_term, last_input
-                        { .offset = offsetof(csa_t, pid_i_sq) + offsetof(pid_f_t, target), .size = 4 * 3 },
-                        // i_term, last_input
-                        { .offset = offsetof(csa_t, pid_i_sd) + offsetof(pid_f_t, i_term), .size = 4 * 2 },
-                        { .offset = offsetof(csa_t, sen_encoder), .size = 2 },
-                        { .offset = offsetof(csa_t, cal_v_sq), .size = 4 * 2 }
-                        //{ .offset = offsetof(csa_t, nob_encoder), .size = 2 }
+                { // cur
+                        { .offset = offsetof(csa_t, sen_i_sq), .size = 4 * 2 }, // sen_i_sq, sen_i_sd
+                        { .offset = offsetof(csa_t, pid_i_sq) + offsetof(pid_f_t, target), .size = 4 * 2 }, // target, i_term
+                        { .offset = offsetof(csa_t, pid_i_sd) + offsetof(pid_f_t, i_term), .size = 4 }, // i_term
+                        { .offset = offsetof(csa_t, cal_v_sq), .size = 4 * 2 }, // sq_cal, sd_cal
+                        { .offset = offsetof(csa_t, sen_encoder), .size = 2 }
                 }, { // speed
-                        { .offset = offsetof(csa_t, pid_speed) + offsetof(pid_f_t, target), .size = 4 * 3 },
+                        { .offset = offsetof(csa_t, sen_speed), .size = 4 },
+                        { .offset = offsetof(csa_t, pid_speed) + offsetof(pid_f_t, target), .size = 4 * 2 }, // target, i_term
                         { .offset = offsetof(csa_t, cal_current), .size = 4 },
                         { .offset = offsetof(csa_t, sen_encoder), .size = 2 },
-                        { .offset = offsetof(csa_t, delta_encoder), .size = 4 }
+                        { .offset = offsetof(csa_t, sen_speed_avg), .size = 4 }
                 }, { // pos
-                        { .offset = offsetof(csa_t, pid_pos) + offsetof(pid_i_t, target), .size = 4 * 3 },
+                        { .offset = offsetof(csa_t, sen_pos), .size = 4 },
+                        { .offset = offsetof(csa_t, pid_pos) + offsetof(pid_i_t, target), .size = 4 * 2 }, // target, i_term
                         { .offset = offsetof(csa_t, cal_speed), .size = 4 },
+                        { .offset = offsetof(csa_t, tc_vc_avg), .size = 4 },
+                        { .offset = offsetof(csa_t, sen_speed_avg), .size = 4 }
                 }, { // t_curve
                         { .offset = offsetof(csa_t, tc_state), .size = 1 },
                         { .offset = offsetof(csa_t, tc_pos), .size = 4 },
                         { .offset = offsetof(csa_t, cal_pos), .size = 4 },
-                        //{ .offset = offsetof(csa_t, sen_pos), .size = 4 },
                         { .offset = offsetof(csa_t, tc_vc), .size = 4 },
-                        { .offset = offsetof(csa_t, tc_ac), .size = 4 }//,
-                        //{ .offset = offsetof(csa_t, sen_speed), .size = 4 }
+                        { .offset = offsetof(csa_t, tc_ac), .size = 4 }
                 }
         },
 
@@ -119,7 +120,7 @@ const csa_t csa_dft = {
         //.cali_angle_step = 0.003179136f // @ ic-MU3 25KHz spi
         //.cali_angle_step = 0
 
-        .nominal_voltage = 12.0f,
+        .nominal_voltage = 24.0f,
         .tc_max_err = 0x1000
 };
 
@@ -262,7 +263,6 @@ void csa_list_show(void)
 
     CSA_SHOW_SUB(0, pid_pos, pid_i_t, kp, "");
     CSA_SHOW_SUB(0, pid_pos, pid_i_t, ki, "");
-    CSA_SHOW_SUB(0, pid_pos, pid_i_t, kd, "");
     CSA_SHOW_SUB(0, pid_pos, pid_i_t, out_min, "");
     CSA_SHOW_SUB(0, pid_pos, pid_i_t, out_max, "");
     d_info("\n");
@@ -374,6 +374,7 @@ void csa_list_show(void)
     CSA_SHOW(0, sen_rpm_avg, "");
     CSA_SHOW(0, bus_voltage, "");
     CSA_SHOW(0, temperature, "");
+    CSA_SHOW(0, tc_vc_avg, "");
     d_info("\n");
 
     while (frame_free_head.len < FRAME_MAX - 5);

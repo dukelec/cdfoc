@@ -248,7 +248,7 @@ static inline void speed_loop_compute(void)
             pid_f_set_target(&csa.pid_speed, speed);
         }
         cal_current_bk = csa.cal_current;
-        csa.cal_current = lroundf(pid_f_compute_no_d(&csa.pid_speed, csa.sen_speed));
+        csa.cal_current = lroundf(pid_f_compute(&csa.pid_speed, csa.sen_speed_avg, csa.sen_speed));
     }
 
     raw_dbg(1);
@@ -435,8 +435,8 @@ void adc_isr(void)
 #else
         pid_f_set_target(&csa.pid_i_sq, target_current);
 #endif
-        csa.cal_v_sq = pid_f_compute_no_d(&csa.pid_i_sq, csa.sen_i_sq) / voltage_ratio;
-        csa.cal_v_sd = pid_f_compute_no_d(&csa.pid_i_sd, csa.sen_i_sd) / voltage_ratio; // target default 0
+        csa.cal_v_sq = pid_f_compute(&csa.pid_i_sq, csa.sen_i_sq, csa.sen_i_sq) / voltage_ratio;
+        csa.cal_v_sd = pid_f_compute(&csa.pid_i_sd, csa.sen_i_sd, csa.sen_i_sd) / voltage_ratio; // target default 0
 
         if (csa.anticogging_en) {
             int8_t idx_val = *(int8_t *)(ANTICOGGING_TBL + tbl_idx * 2 + 1);
@@ -538,12 +538,14 @@ void adc_isr(void)
     csa.loop_cnt++;
 
     if (!LL_ADC_REG_IsConversionOngoing(hadc1.Instance)) {
+        uint32_t adc1_val = HAL_ADC_GetValue(&hadc1); // clear flag by read
+        uint32_t adc2_val = HAL_ADC_GetValue(&hadc2);
+        LL_ADC_REG_StartConversion(hadc1.Instance);
         if (!adc_has_new) {
-            adc_temperature = HAL_ADC_GetValue(&hadc1);
-            adc_dc = HAL_ADC_GetValue(&hadc2);
+            adc_temperature = adc1_val;
+            adc_dc = adc2_val;
             adc_has_new = true;
         }
-        LL_ADC_REG_StartConversion(hadc1.Instance);
     }
 
     uint16_t enc_check = encoder_read();

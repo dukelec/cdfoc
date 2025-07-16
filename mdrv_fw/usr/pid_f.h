@@ -29,7 +29,7 @@ typedef struct {
 } pid_f_t;
 
 
-float pid_f_compute_no_d(pid_f_t *pid, float input);
+float pid_f_compute(pid_f_t *pid, float input4p, float input4i);
 
 inline void pid_f_set_target(pid_f_t *pid, float target)
 {
