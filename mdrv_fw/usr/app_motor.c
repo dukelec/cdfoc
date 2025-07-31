@@ -91,6 +91,8 @@ void app_motor_init(void)
     pid_f_init(&csa.pid_i_sd, true);
     pid_f_init(&csa.pid_speed, true);
     pid_i_init(&csa.pid_pos, true);
+    smo_init(&csa.smo, true);
+    pll_init(&csa.pll, true);
     csa.bus_voltage = csa.nominal_voltage;
 }
 
@@ -107,6 +109,8 @@ void app_motor_routine(void)
     pid_f_init(&csa.pid_i_sd, false);
     pid_f_init(&csa.pid_speed, false);
     pid_i_init(&csa.pid_pos, false);
+    smo_init(&csa.smo, false);
+    pll_init(&csa.pll, false);
 
     if (adc_has_new) {
         float v_dc = (adc_dc / 4095.0f * 3.3f) / 4.7f * (4.7f + 75);
@@ -310,6 +314,13 @@ void adc_isr(void)
     float i_alpha = ia;
     float i_beta = (ia + ib * 2) / 1.732050808f; // √3
 
+    if (csa.state != ST_STOP) {
+        csa.smo.i_alpha_real = i_alpha * 3.3f / 2047 / 20.0f / 0.02f; // 20 V/V amplifier gain
+        csa.smo.i_beta_real = i_beta * 3.3f / 2047 / 20.0f / 0.02f;
+        smo_update(&csa.smo);
+        pll_update(&csa.pll, csa.smo.e_alpha, csa.smo.e_beta);
+    }
+
     csa.ori_encoder = encoder_read();
     uint16_t cali_encoder = csa.ori_encoder;
     if (csa.cali_encoder_en) {
@@ -469,6 +480,9 @@ void adc_isr(void)
         out_pwm_v = clip(out_pwm_v + out_ofs, -2047, 2047);
         out_pwm_w = clip(out_pwm_w + out_ofs, -2047, 2047);
 
+        csa.smo.v_alpha_real = (v_alpha / 2047) * (csa.bus_voltage / 2);
+        csa.smo.v_beta_real = (v_beta / 2047) * (csa.bus_voltage / 2);
+
         if (csa.motor_wire_swap)
             swap(out_pwm_u, out_pwm_v);
 
@@ -489,6 +503,8 @@ void adc_isr(void)
         pid_f_set_target(&csa.pid_i_sd, 0);
         pid_f_reset(&csa.pid_i_sq, 0, 0);
         pid_f_reset(&csa.pid_i_sd, 0, 0);
+        smo_init(&csa.smo, true);
+        pll_init(&csa.pll, true);
     }
 
     if (csa.adc_sel == 0) {

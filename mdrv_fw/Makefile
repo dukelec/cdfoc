@@ -82,7 +82,8 @@ usr/common_services.c \
 usr/app_main.c \
 usr/app_motor.c \
 usr/pid_pos.c \
-usr/pid_f.c
+usr/pid_f.c \
+usr/sensorless.c
 
 # ASM sources
 ASM_SOURCES =  \

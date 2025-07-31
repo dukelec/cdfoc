@@ -120,7 +120,20 @@ const csa_t csa_dft = {
         //.cali_angle_step = 0
 
         .nominal_voltage = 24.0f,
-        .tc_max_err = 0x1000
+        .tc_max_err = 0x1000,
+
+        .smo = {
+                .l = 0.0014,    // 1.4 mH
+                .r = 4.1,       // 4.1 Ohm
+                .gamma = 50000,
+                .eps = 0.5,
+                .delta_t = 1.0 / CURRENT_LOOP_FREQ
+        },
+        .pll = {
+                .kp = 100,
+                .ki = 1000,
+                .delta_t = 1.0 / CURRENT_LOOP_FREQ
+        }
 };
 
 csa_t csa;
@@ -146,6 +159,8 @@ void load_conf(void)
     csa.pid_speed.period = csa_dft.pid_speed.period;
     csa.pid_i_sq.period = csa_dft.pid_i_sq.period;
     csa.pid_i_sd.period = csa_dft.pid_i_sd.period;
+    csa.smo.delta_t = csa_dft.smo.delta_t;
+    csa.pll.delta_t = csa_dft.pll.delta_t;
 }
 
 int save_conf(void)
@@ -324,6 +339,26 @@ void csa_list_show(void)
     CSA_SHOW(0, tc_max_err, "Limit position error");
     d_info("\n");
     while (frame_free_head.len < FRAME_MAX - 5);
+
+    CSA_SHOW_SUB(0, smo, smo_t, v_alpha_real, "");
+    CSA_SHOW_SUB(0, smo, smo_t, v_beta_real, "");
+    CSA_SHOW_SUB(0, smo, smo_t, i_alpha_real, "");
+    CSA_SHOW_SUB(0, smo, smo_t, i_beta_real, "");
+    CSA_SHOW_SUB(0, smo, smo_t, i_alpha, "");
+    CSA_SHOW_SUB(0, smo, smo_t, i_beta, "");
+    CSA_SHOW_SUB(0, smo, smo_t, e_alpha, "");
+    CSA_SHOW_SUB(0, smo, smo_t, e_beta, "");
+    CSA_SHOW_SUB(0, smo, smo_t, l, "");
+    CSA_SHOW_SUB(0, smo, smo_t, r, "");
+    CSA_SHOW_SUB(0, smo, smo_t, gamma, "");
+    CSA_SHOW_SUB(0, smo, smo_t, eps, "");
+    CSA_SHOW_SUB(0, pll, pll_t, theta, "");
+    CSA_SHOW_SUB(0, pll, pll_t, omega, "");
+    CSA_SHOW_SUB(0, pll, pll_t, i_term, "");
+    CSA_SHOW_SUB(0, pll, pll_t, kp, "");
+    CSA_SHOW_SUB(0, pll, pll_t, ki, "");
+    CSA_SHOW_SUB(0, pll, pll_t, _atan2, "");
+    d_info("\n");
 
     CSA_SHOW(0, state, "0: stop, 1: calibrate, 2: cur loop, 3: speed loop, 4: pos loop, 5: t_curve");
     //CSA_SHOW(0, err_flag, "not used");

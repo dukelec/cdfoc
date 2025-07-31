@@ -16,6 +16,7 @@
 #include "cdctl_it.h"
 #include "pid_f.h"
 #include "pid_pos.h"
+#include "sensorless.h"
 
 // printf float value without enable "-u _printf_float"
 // e.g.: printf("%d.%.2d\n", P_2F(2.14));
@@ -114,6 +115,9 @@ typedef struct {
     float           nominal_voltage;
     uint16_t        tc_max_err;
     uint8_t         _reserved4[22];
+    smo_t           smo;
+    pll_t           pll;
+    uint8_t         _reserved5[112];
 
     // end of flash
     #define         _end_save state
@@ -156,7 +160,7 @@ typedef struct {
 
     float           sen_i_sq_avg;
     float           cal_v_sq_avg;
-    uint8_t         _reserved5[8];
+    uint8_t         _reserved6[8];
     float           sen_speed_avg;
     float           sen_rpm_avg;
     float           bus_voltage;
