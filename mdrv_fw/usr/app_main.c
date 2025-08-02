@@ -73,10 +73,10 @@ static void dump_hw_status(void)
     static int t_l = 0;
     if (get_systick() - t_l > 8000) {
         t_l = get_systick();
-        printf("ctl: state %d, t_len %d, r_len %d, irq %d\n",
+        printf("ctl: state %d, t_len %ld, r_len %ld, irq %d\n",
                 r_dev.state, r_dev.tx_head.len, r_dev.rx_head.len,
                 !gpio_get_val(r_dev.int_n));
-        printf("  r_cnt %d (lost %d, err %d, no-free %d), t_cnt %d (cd %d, err %d)\n",
+        printf("  r_cnt %ld (lost %ld, err %ld, no-free %ld), t_cnt %ld (cd %ld, err %ld)\n",
                 r_dev.rx_cnt, r_dev.rx_lost_cnt, r_dev.rx_error_cnt,
                 r_dev.rx_no_free_node_cnt,
                 r_dev.tx_cnt, r_dev.tx_cd_cnt, r_dev.tx_error_cnt);
@@ -272,11 +272,12 @@ void app_main(void)
 #endif
 
     app_motor_init();
-    LL_ADC_SetChannelSamplingTime(hadc1.Instance, LL_ADC_CHANNEL_1, LL_ADC_SAMPLINGTIME_6CYCLES_5);
-    LL_ADC_SetChannelSamplingTime(hadc1.Instance, LL_ADC_CHANNEL_2, LL_ADC_SAMPLINGTIME_6CYCLES_5);
-    LL_ADC_SetChannelSamplingTime(hadc1.Instance, LL_ADC_CHANNEL_3, LL_ADC_SAMPLINGTIME_6CYCLES_5);
-    LL_ADC_SetChannelSamplingTime(hadc2.Instance, LL_ADC_CHANNEL_1, LL_ADC_SAMPLINGTIME_6CYCLES_5);
-    LL_ADC_SetChannelSamplingTime(hadc2.Instance, LL_ADC_CHANNEL_2, LL_ADC_SAMPLINGTIME_6CYCLES_5);
+    // adc 24.5 cycles @ 170M/4 -> 576 nS
+    LL_ADC_SetChannelSamplingTime(hadc1.Instance, LL_ADC_CHANNEL_1, LL_ADC_SAMPLINGTIME_24CYCLES_5);
+    LL_ADC_SetChannelSamplingTime(hadc1.Instance, LL_ADC_CHANNEL_2, LL_ADC_SAMPLINGTIME_24CYCLES_5);
+    LL_ADC_SetChannelSamplingTime(hadc1.Instance, LL_ADC_CHANNEL_3, LL_ADC_SAMPLINGTIME_24CYCLES_5);
+    LL_ADC_SetChannelSamplingTime(hadc2.Instance, LL_ADC_CHANNEL_1, LL_ADC_SAMPLINGTIME_24CYCLES_5);
+    LL_ADC_SetChannelSamplingTime(hadc2.Instance, LL_ADC_CHANNEL_2, LL_ADC_SAMPLINGTIME_24CYCLES_5);
     HAL_ADCEx_Calibration_Start(&hadc1, ADC_SINGLE_ENDED);
     HAL_ADCEx_Calibration_Start(&hadc2, ADC_SINGLE_ENDED);
     HAL_ADC_Start(&hadc1);
@@ -298,9 +299,8 @@ void app_main(void)
     __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, DRV_PWM_HALF);
     __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_2, DRV_PWM_HALF);
     __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_3, DRV_PWM_HALF);
-    __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_4, 500); // >= 1, ```|_|``` trigger on neg-edge, sensor
-    __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_5, 12); // >= 1, ```|_|``` trigger on neg-edge, adc
-    // adc 3.5 cycles @ 170M/4 -> 82.35 nS -> /2 -> 41.2 nS, pwm 12 -> 70.6 nS /1
+    __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_4, 1);    // >= 1, ```|_|``` trigger on neg-edge, sensor
+    __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_5, 490);  // >= 1, ```|_|``` trigger on pos-edge, adc
 
     HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
     HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_2);
