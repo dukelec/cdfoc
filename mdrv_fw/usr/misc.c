@@ -66,10 +66,10 @@ void cali_elec_angle(void)
     static int pole_cnt = -1;
     static int sub_cnt;
     static uint32_t t_last;
-    static uint16_t a0, a1;
+    static uint16_t a0, a180;
     static int amount_f, amount_r;
     static int dir = 1; // -1 or +1
-    static uint16_t m_first;
+    static int32_t a_first;
 
     if (!csa.cali_run)
         return;
@@ -84,7 +84,7 @@ void cali_elec_angle(void)
         pole_cnt = sub_cnt = 0;
         amount_f = amount_r = 0;
         dir = 1;
-        m_first = -1;
+        a_first = -1;
         d_info("cali: init...\n");
         d_info("cali: ----------------\n");
     }
@@ -98,35 +98,33 @@ void cali_elec_angle(void)
 
     if (sub_cnt == 0) {
         a0 = csa.nob_encoder;
-        d_debug_c(" - a0: %04x\n", a0);
+        d_debug_c(" - a0:   %04x\n", a0);
     } else if (sub_cnt == 2) {
-        a1 = csa.nob_encoder;
-        d_debug_c(" - a1: %04x\n", a1);
+        a180 = csa.nob_encoder;
+        d_debug_c(" - a180: %04x\n", a180);
     } else {
         d_debug_c("\n");
     }
 
     if ((dir == 1 && sub_cnt == 3) || (dir == -1 && sub_cnt == 0)) {
-        int16_t delta_a = a1 - a0;
-        uint16_t n = a0 + delta_a / 2;
-        uint16_t m = n - (pole_cnt * 0x10000 / csa.motor_poles);
-        if (m_first < 0)
-            m_first = m;
-        d_info("cali: n: %04x, m: %04x\n", n, m);
+        uint16_t a_shift = a0 - (pole_cnt * 0x10000 / csa.motor_poles);
+        if (a_first < 0)
+            a_first = a_shift;
+        d_info("cali: a0: %04x, a_shift: %04x\n", a0, a_shift);
         d_info("cali: ----------------\n");
-        int16_t delta_m = m - m_first;
+        int16_t delta_a = a_shift - a_first;
         if (dir == 1)
-            amount_f += delta_m;
+            amount_f += delta_a;
         else
-            amount_r += delta_m;
+            amount_r += delta_a;
 
         if (dir == -1 && pole_cnt == 0) {
-            uint16_t avg_cw = m_first + amount_f / csa.motor_poles;
-            uint16_t avg_ccw = m_first + amount_r / csa.motor_poles;
+            uint16_t avg_cw = a_first + amount_f / csa.motor_poles;
+            uint16_t avg_ccw = a_first + amount_r / csa.motor_poles;
             d_info("cali: finished, result:\n");
             d_info("cali:  cw: %02x\n", avg_cw);
             d_info("cali: ccw: %02x\n", avg_ccw);
-            csa.bias_encoder = m_first + (amount_f + amount_r) / csa.motor_poles / 2;
+            csa.bias_encoder = a_first + (amount_f + amount_r) / csa.motor_poles / 2;
             d_info("cali: avg: %02x, updated to bias_encoder\n", csa.bias_encoder);
             uint8_t dat = ST_STOP;
             state_w_hook_before(0, 1, &dat);

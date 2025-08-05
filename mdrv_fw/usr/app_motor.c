@@ -411,12 +411,9 @@ void adc_isr(void)
         if (csa.state >= ST_SPEED) {
             float current = cal_current_bk + (float)(csa.cal_current - cal_current_bk) * (speed_loop_cnt + 1) / 5;
             target_current = lroundf(current);
-        } else if (csa.state == ST_CALI) {
-            target_current = -csa.cali_current;
         } else {
             target_current = csa.cal_current;
         }
-        // sign select direction for cali_current
 
 #ifdef CAL_CURRENT_SMOOTH
         static bool near_limit = false;
@@ -431,8 +428,9 @@ void adc_isr(void)
 #else
         pid_f_set_target(&csa.pid_i_sq, target_current);
 #endif
+        pid_f_set_target(&csa.pid_i_sd, csa.state == ST_CALI ? csa.cali_current : 0);
         csa.cal_v_sq = pid_f_compute(&csa.pid_i_sq, csa.sen_i_sq, csa.sen_i_sq) / voltage_ratio;
-        csa.cal_v_sd = pid_f_compute(&csa.pid_i_sd, csa.sen_i_sd, csa.sen_i_sd) / voltage_ratio; // target default 0
+        csa.cal_v_sd = pid_f_compute(&csa.pid_i_sd, csa.sen_i_sd, csa.sen_i_sd) / voltage_ratio;
 
         if (csa.anticogging_en) {
             int8_t idx_val = *(int8_t *)(ANTICOGGING_TBL + tbl_idx * 2 + 1);
@@ -444,7 +442,7 @@ void adc_isr(void)
         csa.cal_v_sq_avg += err_v_sq * 0.001f;
 
         if (csa.state == ST_CALI)
-            csa.cal_v_sd = 0;
+            csa.cal_v_sq = 0;
 
         // rotate 2d vector, origin: (sd, sq), after: (alpha, beta)
         v_alpha = csa.cal_v_sd * cos_tmp_angle_elec - csa.cal_v_sq * sin_tmp_angle_elec;
