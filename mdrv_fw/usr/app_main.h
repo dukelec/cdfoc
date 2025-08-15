@@ -21,6 +21,7 @@
 // e.g.: printf("%d.%.2d\n", P_2F(2.14));
 #define P_2F(x) (int)(x), abs((int)(((x)-(int)(x))*100))  // "%d.%.2d"
 #define P_3F(x) (int)(x), abs((int)(((x)-(int)(x))*1000)) // "%d.%.3d"
+#define M_PIf   ((float)M_PI)
 
 
 #define BL_ARGS             0x20000000 // first word

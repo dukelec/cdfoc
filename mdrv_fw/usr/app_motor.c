@@ -355,12 +355,13 @@ void adc_isr(void)
 
     speed_loop_compute();
 
-    uint16_t encoder_sub = csa.sen_encoder % lroundf((float)0x10000/csa.motor_poles);
-    csa.sen_angle_elec = encoder_sub*((float)M_PI*2/((float)0x10000/csa.motor_poles));
+    float encoder_sub_range = (float)0x10000 / csa.motor_poles;
+    float encoder_sub = csa.sen_encoder - (int)(csa.sen_encoder / encoder_sub_range) * encoder_sub_range; // fmodf
+    csa.sen_angle_elec = encoder_sub * (M_PIf * 2 / encoder_sub_range);
     if (csa.state == ST_CALI) {
         csa.cali_angle_elec += csa.cali_angle_step;
-        if (csa.cali_angle_elec >= (float)M_PI*2)
-            csa.cali_angle_elec -= (float)M_PI*2;
+        if (csa.cali_angle_elec >= M_PIf * 2)
+            csa.cali_angle_elec -= M_PIf * 2;
         sin_tmp_angle_elec = sinf(csa.cali_angle_elec);
         cos_tmp_angle_elec = cosf(csa.cali_angle_elec);
     } else {
@@ -389,7 +390,7 @@ void adc_isr(void)
         float v_alpha, v_beta;
         int32_t target_current;
         if (csa.state >= ST_SPEED) {
-            float current = cal_current_bk + (float)(csa.cal_current - cal_current_bk) * (speed_loop_cnt + 1) / 5;
+            float current = cal_current_bk + (csa.cal_current - cal_current_bk) * (speed_loop_cnt + 1) / 5.0f;
             target_current = lroundf(current);
         } else {
             target_current = csa.cal_current;
