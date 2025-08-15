@@ -67,7 +67,6 @@ static void device_init(void)
 }
 
 
-#if 0
 static void dump_hw_status(void)
 {
     static int t_l = 0;
@@ -82,7 +81,6 @@ static void dump_hw_status(void)
                 r_dev.tx_cnt, r_dev.tx_cd_cnt, r_dev.tx_error_cnt);
     }
 }
-#endif
 
 
 #if defined(SEN_MA73X)
@@ -332,7 +330,8 @@ void app_main(void)
         cdn_routine(&dft_ns); // handle cdnet
         common_service_routine();
         cali_elec_angle();
-        //dump_hw_status();
+        if (csa.dbg_str_msk & (1 << 0))
+            dump_hw_status();
 
         if (*stack_check != 0xababcdcd12123434) {
             printf("stack overflow\n");

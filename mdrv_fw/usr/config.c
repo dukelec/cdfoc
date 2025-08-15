@@ -80,7 +80,6 @@ const csa_t csa_dft = {
         },
 
         .dbg_str_msk = 0x0, //0 or 0xff,
-        .dbg_str_skip = 0x1fff, // 0x01ff,
 
         .dbg_raw_msk = 0,
         .dbg_raw_th = 200,
@@ -297,7 +296,6 @@ void csa_list_show(void)
     d_info("\n");
 
     CSA_SHOW(1, dbg_str_msk, "Config which debug data to be send");
-    CSA_SHOW(1, dbg_str_skip, "Reduce debug data");
     d_info("\n");
 
     CSA_SHOW(1, dbg_raw_msk, "Config which raw debug data to be send");

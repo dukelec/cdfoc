@@ -88,10 +88,9 @@ typedef struct {
     regr_t          qxchg_ret[5];
     uint8_t         _reserved1[20];
 
-    uint8_t         dbg_str_msk;
-    uint16_t        dbg_str_skip;    // for period string debug
+    uint8_t         dbg_str_msk;    // bit0: dump_hw_status
 
-    uint8_t         _reserved2[6];
+    uint8_t         _reserved2[9];
     uint8_t         dbg_raw_msk;
     uint8_t         dbg_raw_th;     // len threshold (+ 1 samples < frm size)
     regr_t          dbg_raw[4][6];  // for: cur, speed, pos, tcurve

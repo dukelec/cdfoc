@@ -98,7 +98,7 @@ void app_motor_routine(void)
 {
     static uint32_t t_last = 0;
     if (vector_over_limit && (t_last == 0 || get_systick() - t_last > 500)) {
-        d_debug("\n\n!~!~ %d ~!~!\n\n", vector_over_limit);
+        d_debug("!~!~ %d ~!~!\n", vector_over_limit);
         vector_over_limit = 0;
         t_last = get_systick();
     }
@@ -263,7 +263,45 @@ void adc_isr(void)
 
     float sin_tmp_angle_elec, cos_tmp_angle_elec; // reduce the amount of calculations
     int16_t out_pwm_u = 0, out_pwm_v = 0, out_pwm_w = 0;
-    bool dbg_str = csa.dbg_str_msk && (csa.loop_cnt % csa.dbg_str_skip) == 0;
+
+    int32_t adc1_val = HAL_ADCEx_InjectedGetValue(&hadc1, ADC_INJECTED_RANK_1);
+    int32_t adc2_val = HAL_ADCEx_InjectedGetValue(&hadc2, ADC_INJECTED_RANK_1);
+    int32_t ia, ib, ic;
+
+    if (csa.adc_sel == 0) {
+        ia = adc1_val - adc_ofs[0][0];
+        ib = adc2_val - adc_ofs[0][1];
+        ic = -ia - ib;
+    } else if (csa.adc_sel == 1) {
+        ic = adc1_val - adc_ofs[1][0];
+        ia = adc2_val - adc_ofs[1][1];
+        ib = -ia - ic;
+    } else {
+        ic = adc1_val - adc_ofs[2][0];
+        ib = adc2_val - adc_ofs[2][1];
+        ia = -ic - ib;
+    }
+
+    if (csa.state == ST_STOP && adc_cali_st) {
+        adc_ofs[csa.adc_sel][0] += adc1_val;
+        adc_ofs[csa.adc_sel][1] += adc2_val;
+        if (++adc_cali_cnt >= ADC_CALI_LEN) {
+            adc_cali_cnt = 0;
+            adc_ofs[csa.adc_sel][0] = DIV_ROUND_CLOSEST(adc_ofs[csa.adc_sel][0], ADC_CALI_LEN);
+            adc_ofs[csa.adc_sel][1] = DIV_ROUND_CLOSEST(adc_ofs[csa.adc_sel][1], ADC_CALI_LEN);
+            if (++csa.adc_sel == 3) {
+                csa.adc_sel = 0;
+                adc_cali_st = 0;
+            }
+        }
+    }
+
+    csa.dbg_ia = ia;
+    csa.dbg_ib = ib;
+    if (csa.motor_wire_swap)
+        swap(ia, ib);
+    float i_alpha = ia;
+    float i_beta = (ia + ib * 2) / 1.732050808f; // √3
 
     csa.ori_encoder = encoder_read();
     uint16_t cali_encoder = csa.ori_encoder;
@@ -277,8 +315,6 @@ void adc_isr(void)
             idx_next_val += 0x10000;
         cali_encoder = lroundf(idx_val + (idx_next_val - idx_val) * tbl_percent);
     }
-
-    //gpio_set_val(&dbg_out2, 1);
 
     for (int i = 0; i < 4; i++)
         pos_rec[i] = pos_rec[i+1];
@@ -314,16 +350,11 @@ void adc_isr(void)
     int16_t pos_speed_comp = lroundf(csa.sen_speed_avg * (2.0f / CURRENT_LOOP_FREQ + 0.000019f));
     csa.sen_encoder = csa.nob_encoder - csa.bias_encoder + pos_speed_comp;
 
-    //gpio_set_val(&dbg_out2, 0);
-
     csa.ori_pos += (int16_t)(csa.sen_encoder - (uint16_t)csa.ori_pos);
     csa.sen_pos = csa.ori_pos - csa.bias_pos;
 
-    if (dbg_str)
-            d_debug("%04x %04x %08lx", csa.ori_encoder, csa.sen_encoder, csa.sen_pos);
     speed_loop_compute();
 
-    float angle_mech = csa.sen_encoder*((float)M_PI*2/0x10000);
     uint16_t encoder_sub = csa.sen_encoder % lroundf((float)0x10000/csa.motor_poles);
     csa.sen_angle_elec = encoder_sub*((float)M_PI*2/((float)0x10000/csa.motor_poles));
     if (csa.state == ST_CALI) {
@@ -337,72 +368,21 @@ void adc_isr(void)
         cos_tmp_angle_elec = cosf(csa.sen_angle_elec);
     }
 
-    if (dbg_str)
-        d_debug_c(" a %d.%.2d %d.%.2d %d.%.2d", P_2F(angle_mech), P_2F(csa.sen_angle_elec), P_2F(csa.cali_angle_elec));
+    csa.sen_i_sq = -i_alpha * sin_tmp_angle_elec + i_beta * cos_tmp_angle_elec;
+    csa.sen_i_sd = i_alpha * cos_tmp_angle_elec + i_beta * sin_tmp_angle_elec;
 
-    {
-        int32_t adc1_val = HAL_ADCEx_InjectedGetValue(&hadc1, ADC_INJECTED_RANK_1); // change ADC_SMPR1 sample time register
-        int32_t adc2_val = HAL_ADCEx_InjectedGetValue(&hadc2, ADC_INJECTED_RANK_1);
-        int32_t ia, ib, ic;
-
-        if (csa.adc_sel == 0) {
-            ia = adc1_val - adc_ofs[0][0];
-            ib = adc2_val - adc_ofs[0][1];
-            ic = -ia - ib;
-        } else if (csa.adc_sel == 1) {
-            ic = adc1_val - adc_ofs[1][0];
-            ia = adc2_val - adc_ofs[1][1];
-            ib = -ia - ic;
-        } else {
-            ic = adc1_val - adc_ofs[2][0];
-            ib = adc2_val - adc_ofs[2][1];
-            ia = -ic - ib;
-        }
-
-        if (csa.state == ST_STOP && adc_cali_st) {
-            adc_ofs[csa.adc_sel][0] += adc1_val;
-            adc_ofs[csa.adc_sel][1] += adc2_val;
-            if (++adc_cali_cnt >= ADC_CALI_LEN) {
-                adc_cali_cnt = 0;
-                adc_ofs[csa.adc_sel][0] = DIV_ROUND_CLOSEST(adc_ofs[csa.adc_sel][0], ADC_CALI_LEN);
-                adc_ofs[csa.adc_sel][1] = DIV_ROUND_CLOSEST(adc_ofs[csa.adc_sel][1], ADC_CALI_LEN);
-                if (++csa.adc_sel == 3) {
-                    csa.adc_sel = 0;
-                    adc_cali_st = 0;
-                }
-            }
-        }
-
-        csa.dbg_ia = ia;
-        csa.dbg_ib = ib;
-        if (csa.motor_wire_swap)
-            swap(ia, ib);
-
-        float i_alpha = ia;
-        float i_beta = (ia + ib * 2) / 1.732050808f; // √3
-
-        csa.sen_i_sq = -i_alpha * sin_tmp_angle_elec + i_beta * cos_tmp_angle_elec;
-        csa.sen_i_sd = i_alpha * cos_tmp_angle_elec + i_beta * sin_tmp_angle_elec;
-
-        if (csa.anticogging_en) {
-            uint16_t pos = csa.nob_encoder + pos_speed_comp;
-            tbl_idx = pos >> 4;
-            tbl_idx_next = (tbl_idx == 4095) ? 0 : (tbl_idx + 1);
-            tbl_percent = (float)(pos & 0xf) / 0x10;
-            int8_t idx_val = *(int8_t *)(ANTICOGGING_TBL + tbl_idx * 2);
-            int8_t idx_next_val = *(int8_t *)(CALI_ENCODER_TBL + tbl_idx_next * 2);
-            float val = idx_val + (idx_next_val - idx_val) * tbl_percent;
-            csa.sen_i_sq -= csa.anticogging_max_val[0] * val / 100.0f;
-        }
-        float err_i_sq = csa.sen_i_sq - csa.sen_i_sq_avg;
-        csa.sen_i_sq_avg += err_i_sq * 0.001f;
-
-        if (dbg_str)
-            //d_debug_c(", i %5d %5d %5d", ia, ib, ic);
-            d_debug_c(", i %5ld %5ld", adc1_val, adc2_val);
-        if (dbg_str)
-            d_debug_c(" (q %5d.%.2d, d %5d.%.2d)", P_2F(csa.sen_i_sq), P_2F(csa.sen_i_sd));
+    if (csa.anticogging_en) {
+        uint16_t pos = csa.nob_encoder + pos_speed_comp;
+        tbl_idx = pos >> 4;
+        tbl_idx_next = (tbl_idx == 4095) ? 0 : (tbl_idx + 1);
+        tbl_percent = (float)(pos & 0xf) / 0x10;
+        int8_t idx_val = *(int8_t *)(ANTICOGGING_TBL + tbl_idx * 2);
+        int8_t idx_next_val = *(int8_t *)(CALI_ENCODER_TBL + tbl_idx_next * 2);
+        float val = idx_val + (idx_next_val - idx_val) * tbl_percent;
+        csa.sen_i_sq -= csa.anticogging_max_val[0] * val / 100.0f;
     }
+    float err_i_sq = csa.sen_i_sq - csa.sen_i_sq_avg;
+    csa.sen_i_sq_avg += err_i_sq * 0.001f;
 
     // current --> pwm
     if (csa.state != ST_STOP) {
@@ -444,19 +424,18 @@ void adc_isr(void)
         if (csa.state == ST_CALI)
             csa.cal_v_sq = 0;
 
-        // rotate 2d vector, origin: (sd, sq), after: (alpha, beta)
         v_alpha = csa.cal_v_sd * cos_tmp_angle_elec - csa.cal_v_sq * sin_tmp_angle_elec;
         v_beta =  csa.cal_v_sd * sin_tmp_angle_elec + csa.cal_v_sq * cos_tmp_angle_elec;
         // limit vector magnitude
         float norm = sqrtf(v_alpha * v_alpha + v_beta * v_beta);
-        float limit = (2047 * 0.8f) * 1.15f; // 80% pwm max duty, deliver 15% more power by svpwm
+        float limit = 2047 * 0.8f * 1.15f; // 80% pwm max duty, deliver 15% more power by svpwm
         if (norm > limit) {
             v_alpha *= limit / norm;
             v_beta *= limit / norm;
             vector_over_limit = norm; // for debug
         }
 #ifdef CAL_CURRENT_SMOOTH
-        near_limit = norm > (limit * 0.97f); // 0.96
+        near_limit = norm > (limit * 0.97f);
 #endif
 
         out_pwm_u = lroundf(v_alpha);
@@ -470,13 +449,6 @@ void adc_isr(void)
         out_pwm_v = clip(out_pwm_v - out_mid, -2047, 2047);
         out_pwm_w = clip(out_pwm_w - out_mid, -2047, 2047);
 
-        /*
-        append_dprintf(DBG_CURRENT, "u:%.2f %.2f %d ", pid_cur_u.target, pid_cur_u.i_term, out_pwm_u);
-        append_dprintf(DBG_CURRENT, "v:%.2f %.2f %d ", pid_cur_v.target, pid_cur_v.i_term, out_pwm_v);
-        append_dprintf(DBG_CURRENT, "w:%d", out_pwm_w);
-        */
-        if (dbg_str)
-            d_debug_c(", o %5d.%.2d %5d %5d %5d\n", P_2F(csa.cal_v_sq), out_pwm_u, out_pwm_v, out_pwm_w);
         if (csa.motor_wire_swap)
             swap(out_pwm_u, out_pwm_v);
 
@@ -497,9 +469,6 @@ void adc_isr(void)
         pid_f_set_target(&csa.pid_i_sd, 0);
         pid_f_reset(&csa.pid_i_sq, 0, 0);
         pid_f_reset(&csa.pid_i_sd, 0, 0);
-
-        if (dbg_str)
-            d_debug_c("\n");
     }
 
     if (csa.adc_sel == 0) {
@@ -513,11 +482,9 @@ void adc_isr(void)
         hadc2.Instance->JSQR = (hadc2.Instance->JSQR & 0x1ff) | (2 << 9); // b
     }
 
-    //gpio_set_val(&led_r, !gpio_get_val(&led_r)); // debug for hw config
     csa.dbg_u = out_pwm_u;
     csa.dbg_v = out_pwm_v;
 
-    // write 4095 to all pwm channel for brake (set A, B, C to zero)
     // pwm range: [1, 4095]
     __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_3, DRV_PWM_HALF - out_pwm_u); // TIM1_CH3: A
     __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_2, DRV_PWM_HALF - out_pwm_v); // TIM1_CH2: B
