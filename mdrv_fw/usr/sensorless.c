@@ -65,7 +65,7 @@ void pll_update(pll_t *pll, float e_alpha, float e_beta)
     float sin_theta = sinf(pll->theta);
     float cos_theta = cosf(pll->theta);
 
-    if (csa.sen_speed_avg < 0) {
+    if (csa.sl_start < 0) { // ccw
         e_alpha *= -1;
         e_beta *= -1;
     }
@@ -88,3 +88,45 @@ void pll_update(pll_t *pll, float e_alpha, float e_beta)
     if (pll->_atan2 < 0)
         pll->_atan2 += 2 * M_PIf;
 }
+
+
+void sl_routine(void)
+{
+    float theta_err = csa.pll.theta - csa.cali_angle_elec;
+
+    if (csa.state == ST_STOP && csa.sl_state) {
+        csa.sl_state = 0;
+        csa.sl_start = 0;
+        d_info("sl: stop\n");
+        return;
+    }
+
+    if (!csa.sl_state && csa.sl_start) {
+        csa.cali_angle_speed_tgt = 800 * csa.sl_start;
+        csa.cali_current = 400 * csa.sl_start;
+        state_w_hook_before(0, 0, (uint8_t []){ST_CALI});
+        csa.state = ST_CALI;
+        csa.sl_state = 1; // speed inc
+        d_info("sl: inc speed...\n");
+        return;
+    }
+
+    if (csa.sl_state == 1) {
+        if (fabsf(csa.cali_angle_speed - csa.cali_angle_speed_tgt) < 0.001f) {
+            csa.cali_current = 10 * csa.sl_start;
+            csa.sl_state = 2; // current dec
+            d_info("sl: dec speed...\n");
+        }
+        return;
+    }
+
+    if (csa.sl_state == 2) {
+        if (fabsf(theta_err) < (10 / 180.0f) * M_PIf) {
+            csa.sl_state = 3;
+            csa.cal_current = 500 * csa.sl_start;
+            csa.state = ST_CURRENT; // or ST_SPEED
+            d_info("sl: closeloop...\n");
+        }
+    }
+}
+

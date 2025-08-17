@@ -48,4 +48,7 @@ typedef struct {
 void pll_init(pll_t *pll, bool reset);
 void pll_update(pll_t *pll, float e_alpha, float e_beta);
 
+
+void sl_routine(void);
+
 #endif

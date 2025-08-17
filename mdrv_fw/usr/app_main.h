@@ -117,7 +117,9 @@ typedef struct {
     uint8_t         _reserved4[22];
     smo_t           smo;
     pll_t           pll;
-    uint8_t         _reserved5[112];
+    int8_t          sl_start; // 0: idle, 1: cw, -1: ccw
+    int8_t          sl_state; // 0: idle, 1: speed inc, 2: current dec, 3: closeloop, -1: err
+    uint8_t         _reserved5[110];
 
     // end of flash
     #define         _end_save state

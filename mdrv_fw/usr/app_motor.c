@@ -233,11 +233,18 @@ static inline void speed_loop_compute(void)
         return;
     speed_loop_cnt = 0;
     position_loop_compute();
+    float sl_speed = (csa.pll.omega / csa.motor_poles) / (2 * M_PIf) * 0x10000;
 
     if (csa.state < ST_SPEED) {
-        pid_f_reset(&csa.pid_speed, csa.sen_speed_avg, csa.cal_current);
-        pid_f_set_target(&csa.pid_speed, csa.sen_speed_avg);
-        csa.cal_speed = csa.sen_speed_avg;
+        if (csa.sl_state) {
+            pid_f_reset(&csa.pid_speed, sl_speed, csa.cal_current);
+            pid_f_set_target(&csa.pid_speed, sl_speed);
+            csa.cal_speed = sl_speed;
+        } else {
+            pid_f_reset(&csa.pid_speed, csa.sen_speed_avg, csa.cal_current);
+            pid_f_set_target(&csa.pid_speed, csa.sen_speed_avg);
+            csa.cal_speed = csa.sen_speed_avg;
+        }
         if (csa.state == ST_STOP) {
             csa.cal_current = 0;
             csa.cal_speed = 0;
@@ -255,7 +262,11 @@ static inline void speed_loop_compute(void)
             pid_f_set_target(&csa.pid_speed, speed);
         }
         cal_current_bk = csa.cal_current;
-        csa.cal_current = lroundf(pid_f_compute(&csa.pid_speed, csa.sen_speed_avg, csa.sen_speed));
+        if (csa.sl_state) {
+            csa.cal_current = lroundf(pid_f_compute(&csa.pid_speed, sl_speed, sl_speed));
+        } else {
+            csa.cal_current = lroundf(pid_f_compute(&csa.pid_speed, csa.sen_speed_avg, csa.sen_speed));
+        }
     }
 
     raw_dbg(1);
@@ -392,6 +403,9 @@ void adc_isr(void)
             csa.cali_angle_elec += M_PIf * 2;
         sin_tmp_angle_elec = sinf(csa.cali_angle_elec);
         cos_tmp_angle_elec = cosf(csa.cali_angle_elec);
+    } else if (csa.sl_state) {
+        sin_tmp_angle_elec = sinf(csa.pll.theta); // todo: add compensation
+        cos_tmp_angle_elec = cosf(csa.pll.theta);
     } else {
         csa.cali_angle_speed = 0;
         sin_tmp_angle_elec = sinf(csa.sen_angle_elec);

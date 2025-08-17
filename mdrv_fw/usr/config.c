@@ -161,6 +161,7 @@ void load_conf(void)
     csa.pid_i_sd.period = csa_dft.pid_i_sd.period;
     csa.smo.delta_t = csa_dft.smo.delta_t;
     csa.pll.delta_t = csa_dft.pll.delta_t;
+    csa.sl_state = 0;
 }
 
 int save_conf(void)
@@ -340,24 +341,26 @@ void csa_list_show(void)
     d_info("\n");
     while (frame_free_head.len < FRAME_MAX - 5);
 
-    CSA_SHOW_SUB(0, smo, smo_t, v_alpha_real, "");
+    CSA_SHOW_SUB(0, smo, smo_t, v_alpha_real, "Motor voltage [V]");
     CSA_SHOW_SUB(0, smo, smo_t, v_beta_real, "");
-    CSA_SHOW_SUB(0, smo, smo_t, i_alpha_real, "");
+    CSA_SHOW_SUB(0, smo, smo_t, i_alpha_real, "Real current [A]");
     CSA_SHOW_SUB(0, smo, smo_t, i_beta_real, "");
-    CSA_SHOW_SUB(0, smo, smo_t, i_alpha, "");
+    CSA_SHOW_SUB(0, smo, smo_t, i_alpha, "Estimated current [A]");
     CSA_SHOW_SUB(0, smo, smo_t, i_beta, "");
-    CSA_SHOW_SUB(0, smo, smo_t, e_alpha, "");
+    CSA_SHOW_SUB(0, smo, smo_t, e_alpha, "Back-EMF [V]");
     CSA_SHOW_SUB(0, smo, smo_t, e_beta, "");
-    CSA_SHOW_SUB(0, smo, smo_t, l, "");
-    CSA_SHOW_SUB(0, smo, smo_t, r, "");
+    CSA_SHOW_SUB(0, smo, smo_t, l, "Winding inductance [H]");
+    CSA_SHOW_SUB(0, smo, smo_t, r, "Winding resistance [Ohm]");
     CSA_SHOW_SUB(0, smo, smo_t, gamma, "");
     CSA_SHOW_SUB(0, smo, smo_t, eps, "");
-    CSA_SHOW_SUB(0, pll, pll_t, theta, "");
-    CSA_SHOW_SUB(0, pll, pll_t, omega, "");
+    CSA_SHOW_SUB(0, pll, pll_t, theta, "[rad]");
+    CSA_SHOW_SUB(0, pll, pll_t, omega, "[rad/s]");
     CSA_SHOW_SUB(0, pll, pll_t, i_term, "");
     CSA_SHOW_SUB(0, pll, pll_t, kp, "");
     CSA_SHOW_SUB(0, pll, pll_t, ki, "");
-    CSA_SHOW_SUB(0, pll, pll_t, _atan2, "");
+    CSA_SHOW_SUB(0, pll, pll_t, _atan2, "[rad]");
+    CSA_SHOW(0, sl_start, "0: idle, 1: cw, -1: ccw");
+    CSA_SHOW(0, sl_state, "0: idle, 1: speed inc, 2: current dec, 3: closeloop, -1: err");
     d_info("\n");
 
     CSA_SHOW(0, state, "0: stop, 1: calibrate, 2: cur loop, 3: speed loop, 4: pos loop, 5: t_curve");

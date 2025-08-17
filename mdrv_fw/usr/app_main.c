@@ -330,6 +330,7 @@ void app_main(void)
         cdn_routine(&dft_ns); // handle cdnet
         common_service_routine();
         cali_elec_angle();
+        sl_routine();
         if (csa.dbg_str_msk & (1 << 0))
             dump_hw_status();
 
