@@ -104,7 +104,7 @@ typedef struct {
 
     float           cali_angle_elec;
     float           cali_current;
-    float           cali_angle_step; // increase cali_angle_elec
+    float           cali_angle_speed_tgt; // target speed [rad/s]
     bool            cali_run;
 
     bool            cali_encoder_en;
@@ -162,6 +162,7 @@ typedef struct {
     float           bus_voltage;
     float           temperature;
     float           tc_vc_avg;
+    float           cali_angle_speed;
 
 } csa_t; // config status area
 

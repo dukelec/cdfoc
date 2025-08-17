@@ -313,7 +313,7 @@ void csa_list_show(void)
 
     CSA_SHOW(0, cali_angle_elec, "Calibration mode angle");
     CSA_SHOW(0, cali_current, "Calibration mode current");
-    CSA_SHOW(0, cali_angle_step, "Calibration mode speed");
+    CSA_SHOW(0, cali_angle_speed_tgt, "Calibration mode speed");
     CSA_SHOW(0, cali_run, "0: stopped, write 1 start calibration");
     d_info("\n");
 
@@ -373,6 +373,7 @@ void csa_list_show(void)
     CSA_SHOW(0, bus_voltage, "");
     CSA_SHOW(0, temperature, "");
     CSA_SHOW(0, tc_vc_avg, "");
+    CSA_SHOW(0, cali_angle_speed, "");
     d_info("\n");
 
     while (frame_free_head.len < FRAME_MAX - 5);

@@ -78,7 +78,7 @@ void cali_elec_angle(void)
         csa.cali_encoder_en = false;
         csa.anticogging_en = false;
         csa.cali_angle_elec = 0;
-        csa.cali_angle_step = 0;
+        csa.cali_angle_speed = 0;
         csa.state = ST_CALI;
         t_last = get_systick();
         pole_cnt = sub_cnt = 0;

@@ -366,7 +366,15 @@ void adc_isr(void)
     float encoder_sub = csa.sen_encoder - (int)(csa.sen_encoder / encoder_sub_range) * encoder_sub_range; // fmodf
     csa.sen_angle_elec = encoder_sub * (M_PIf * 2 / encoder_sub_range);
     if (csa.state == ST_CALI) {
-        csa.cali_angle_elec += csa.cali_angle_step;
+        if (fabsf(csa.cali_angle_speed - csa.cali_angle_speed_tgt) >= 0.01f) {
+            if (csa.cali_angle_speed < csa.cali_angle_speed_tgt)
+                csa.cali_angle_speed += 0.01f;
+            else
+                csa.cali_angle_speed -= 0.01f;
+        } else {
+            csa.cali_angle_speed = csa.cali_angle_speed_tgt;
+        }
+        csa.cali_angle_elec += csa.cali_angle_speed * (1.0f / CURRENT_LOOP_FREQ);
         if (csa.cali_angle_elec >= M_PIf * 2)
             csa.cali_angle_elec -= M_PIf * 2;
         else if (csa.cali_angle_elec < 0)
@@ -374,6 +382,7 @@ void adc_isr(void)
         sin_tmp_angle_elec = sinf(csa.cali_angle_elec);
         cos_tmp_angle_elec = cosf(csa.cali_angle_elec);
     } else {
+        csa.cali_angle_speed = 0;
         sin_tmp_angle_elec = sinf(csa.sen_angle_elec);
         cos_tmp_angle_elec = cosf(csa.sen_angle_elec);
     }
