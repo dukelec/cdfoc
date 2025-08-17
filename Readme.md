@@ -57,8 +57,6 @@ Plots:
 
 ## Operating
 
-When switching between different modes, you need to write 0 to `state` first to return to idle mode.
-
 ### Calibration mode (state = 1)
 
 Do not connect any loads to the motor during calibration.

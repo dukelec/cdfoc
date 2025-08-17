@@ -135,6 +135,9 @@ static inline void t_curve_compute(void)
         return;
     } else if (p64f == (double)INFINITY) {
         p64f = csa.cal_pos;
+        csa.tc_vc = csa.sen_speed_avg;
+        csa.tc_vc_avg = csa.sen_speed_avg;
+        csa.tc_state = 1;
     }
 
     if (csa.tc_state) {
@@ -194,9 +197,12 @@ static inline void position_loop_compute(void)
     pos_loop_cnt = 0;
 
     if (csa.state < ST_POSITION) {
-        pid_i_reset(&csa.pid_pos, csa.sen_pos, 0);
+        csa.pid_pos.out_min = csa.sen_speed_avg - 65536;
+        csa.pid_pos.out_max = csa.sen_speed_avg + 65536;
+        pid_i_reset(&csa.pid_pos, csa.sen_pos, csa.sen_speed_avg);
         pid_i_set_target(&csa.pid_pos, csa.sen_pos);
         csa.cal_pos = csa.sen_pos;
+        cal_speed_bk = csa.sen_speed_avg;
         if (csa.state == ST_STOP) {
             csa.cal_speed = 0;
             cal_speed_bk = 0;
@@ -225,14 +231,15 @@ static inline void speed_loop_compute(void)
     position_loop_compute();
 
     if (csa.state < ST_SPEED) {
-        pid_f_reset(&csa.pid_speed, 0, 0);
-        pid_f_set_target(&csa.pid_speed, 0);
+        pid_f_reset(&csa.pid_speed, csa.sen_speed_avg, csa.cal_current);
+        pid_f_set_target(&csa.pid_speed, csa.sen_speed_avg);
+        csa.cal_speed = csa.sen_speed_avg;
         if (csa.state == ST_STOP) {
             csa.cal_current = 0;
-            cal_current_bk = 0;
             csa.cal_speed = 0;
             cal_speed_bk = 0;
         }
+        cal_current_bk = csa.cal_current;
     } else {
         if (csa.state == ST_SPEED) {
             float v_step = (float)csa.tc_accel / (CURRENT_LOOP_FREQ / 5.0f);
@@ -362,6 +369,8 @@ void adc_isr(void)
         csa.cali_angle_elec += csa.cali_angle_step;
         if (csa.cali_angle_elec >= M_PIf * 2)
             csa.cali_angle_elec -= M_PIf * 2;
+        else if (csa.cali_angle_elec < 0)
+            csa.cali_angle_elec += M_PIf * 2;
         sin_tmp_angle_elec = sinf(csa.cali_angle_elec);
         cos_tmp_angle_elec = cosf(csa.cali_angle_elec);
     } else {
@@ -412,6 +421,10 @@ void adc_isr(void)
         pid_f_set_target(&csa.pid_i_sd, csa.state == ST_CALI ? csa.cali_current : 0);
         csa.cal_v_sq = pid_f_compute(&csa.pid_i_sq, csa.sen_i_sq, csa.sen_i_sq) / voltage_ratio;
         csa.cal_v_sd = pid_f_compute(&csa.pid_i_sd, csa.sen_i_sd, csa.sen_i_sd) / voltage_ratio;
+        if (csa.state == ST_CALI) {
+            pid_f_reset(&csa.pid_i_sq, target_current, csa.cal_v_sd);
+            csa.cal_v_sq = 0;
+        }
 
         if (csa.anticogging_en) {
             int8_t idx_val = *(int8_t *)(ANTICOGGING_TBL + tbl_idx * 2 + 1);
@@ -421,9 +434,6 @@ void adc_isr(void)
         }
         float err_v_sq = csa.cal_v_sq - csa.cal_v_sq_avg;
         csa.cal_v_sq_avg += err_v_sq * 0.001f;
-
-        if (csa.state == ST_CALI)
-            csa.cal_v_sq = 0;
 
         v_alpha = csa.cal_v_sd * cos_tmp_angle_elec - csa.cal_v_sq * sin_tmp_angle_elec;
         v_beta =  csa.cal_v_sd * sin_tmp_angle_elec + csa.cal_v_sq * cos_tmp_angle_elec;

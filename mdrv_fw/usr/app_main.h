@@ -143,7 +143,7 @@ typedef struct {
     int32_t         peak_cur_cnt;
 
     // for t_curve
-    uint8_t         tc_state; // 0: stop, 1: run, 2: tailer
+    uint8_t         tc_state; // 0: stop, 1: run
     float           tc_vc;    // cur speed
     float           tc_ac;    // cur accel
 
