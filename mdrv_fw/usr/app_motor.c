@@ -410,6 +410,8 @@ void adc_isr(void)
         if (csa.state >= ST_SPEED) {
             float current = cal_current_bk + (csa.cal_current - cal_current_bk) * (speed_loop_cnt + 1) / 5.0f;
             target_current = lroundf(current);
+        } else if (csa.state == ST_CALI) {
+            target_current = csa.cali_current;
         } else {
             target_current = csa.cal_current;
         }
@@ -427,12 +429,11 @@ void adc_isr(void)
 #else
         pid_f_set_target(&csa.pid_i_sq, target_current);
 #endif
-        pid_f_set_target(&csa.pid_i_sd, csa.state == ST_CALI ? csa.cali_current : 0);
         csa.cal_v_sq = pid_f_compute(&csa.pid_i_sq, csa.sen_i_sq, csa.sen_i_sq) / voltage_ratio;
         csa.cal_v_sd = pid_f_compute(&csa.pid_i_sd, csa.sen_i_sd, csa.sen_i_sd) / voltage_ratio;
         if (csa.state == ST_CALI) {
-            pid_f_reset(&csa.pid_i_sq, target_current, csa.cal_v_sd);
-            csa.cal_v_sq = 0;
+            pid_f_reset(&csa.pid_i_sd, 0, 0);
+            csa.cal_v_sd = 0;
         }
 
         if (csa.anticogging_en) {

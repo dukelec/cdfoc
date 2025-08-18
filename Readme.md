@@ -61,19 +61,6 @@ Plots:
 
 Do not connect any loads to the motor during calibration.
 
-#### Determining `motor_poles`
-
-First, set the appropriate value to `cali_current`. It is recommended to set the value a little bit smaller to prevent the motor from overheating.
-
-Then write 1 to `state` to enter the drag mode, where a constant current is continuously passed through some of the motor's coils
-(please complete the subsequent operations as soon as possible, and then write 0 to `state` to prevent the motor from overheating).
-
-Remember the initial position of the motor, then rotate the motor by hand, see how many times the motor jumps back to the initial position,
-write the number of jumps to `motor_poles`, then write 1 to `save_conf` to save it.
-
-
-#### Calibration Encoder
-
 Write 1 to `dbg_en` to ensure that you can see the debug print in the GUI interface.
 
 Start by setting the appropriate value for `cali_current`, it is recommended to set the value a little higher to allow the motor to lock more accurately.
@@ -86,9 +73,6 @@ Write 1 to `cali_run` to start the calibration. The motor coils will be energize
 Afterward, the calculated encoder offset value will be printed and written to `bias_encoder`. Be sure to save it to flash.
 
 Write 1 to `cali_run` as soon as possible after writing 1 to `state`, so that the coils can be energized in turn, sharing the strain on individual coils.
-
-If the motor does not rotate clockwise first during calibration (the encoder value not increases),
-you will need to swap any two wires of the motor to change the direction of motor rotation.
 
 
 ### Torque Mode (state = 2)

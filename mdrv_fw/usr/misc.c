@@ -66,7 +66,7 @@ void cali_elec_angle(void)
     static int pole_cnt = -1;
     static int sub_cnt;
     static uint32_t t_last;
-    static uint16_t a0, a180;
+    static uint16_t a90, a270;
     static int amount_f, amount_r;
     static int dir = 1; // -1 or +1
     static int32_t a_first;
@@ -78,6 +78,7 @@ void cali_elec_angle(void)
         csa.cali_encoder_en = false;
         csa.anticogging_en = false;
         csa.cali_angle_elec = 0;
+        csa.cali_angle_speed_tgt = 0;
         csa.cali_angle_speed = 0;
         csa.state = ST_CALI;
         t_last = get_systick();
@@ -97,20 +98,36 @@ void cali_elec_angle(void)
     d_debug("cali [%d, %d]", pole_cnt, sub_cnt);
 
     if (sub_cnt == 0) {
-        a0 = csa.nob_encoder;
-        d_debug_c(" - a0:   %04x\n", a0);
+        d_debug_c(" - a0:   %04x\n", csa.nob_encoder);
+    } else if (sub_cnt == 1) {
+        a90 = csa.nob_encoder;
+        d_debug_c(" - a90:  %04x\n", a90);
     } else if (sub_cnt == 2) {
-        a180 = csa.nob_encoder;
-        d_debug_c(" - a180: %04x\n", a180);
+        d_debug_c(" - a180: %04x\n", csa.nob_encoder);
+    } else if (sub_cnt == 3) {
+        a270 = csa.nob_encoder;
+        d_debug_c(" - a270: %04x\n", a270);
     } else {
         d_debug_c("\n");
     }
 
     if ((dir == 1 && sub_cnt == 3) || (dir == -1 && sub_cnt == 0)) {
-        uint16_t a_shift = a0 - (pole_cnt * 0x10000 / csa.motor_poles);
-        if (a_first < 0)
-            a_first = a_shift;
-        d_info("cali: a0: %04x, a_shift: %04x\n", a0, a_shift);
+        uint16_t a_shift;
+        if (a_first < 0) {
+            if ((int16_t)(a270 - a90) < 0) { // motor_poles should >= 2
+                pole_cnt = -1;
+                csa.motor_wire_swap = !csa.motor_wire_swap;
+                d_info("cali: wrong direction, toggle motor_wire_swap...\n");
+                return;
+            }
+            a_first = a_shift = a270;
+            float poles = (float)0x10000 / ((a270 - a90) * 2);
+            csa.motor_poles = lroundf(poles);
+            d_info("cali: update to motor_poles: %d (%d.%.2d)\n", csa.motor_poles, P_2F(poles));
+        } else {
+            a_shift = a270 - (pole_cnt * 0x10000 / csa.motor_poles);
+        }
+        d_info("cali: a270: %04x, a_shift: %04x\n", a270, a_shift);
         d_info("cali: ----------------\n");
         int16_t delta_a = a_shift - a_first;
         if (dir == 1)
