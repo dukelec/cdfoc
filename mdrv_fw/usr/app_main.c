@@ -297,8 +297,8 @@ void app_main(void)
     __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, DRV_PWM_HALF);
     __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_2, DRV_PWM_HALF);
     __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_3, DRV_PWM_HALF);
-    __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_4, 1);    // >= 1, ```|_|``` trigger on neg-edge, sensor
-    __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_5, 490);  // >= 1, ```|_|``` trigger on pos-edge, adc
+    __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_4, 300); // >= 1, ```|_|``` trigger on neg-edge, sensor
+    __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_5, 190); // >= 1, ```|_|``` trigger on pos-edge, adc
 
     HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
     HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_2);

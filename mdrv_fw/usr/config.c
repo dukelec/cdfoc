@@ -58,8 +58,8 @@ const csa_t csa_dft = {
         },
         .pid_i_sq =  {
                 .kp = 0.2, .ki = 50,
-                .out_min = -1883,
-                .out_max = 1883,
+                .out_min = -2165,
+                .out_max = 2165,
                 .period = 1.0 / CURRENT_LOOP_FREQ
         },
         .pid_i_sd =  {

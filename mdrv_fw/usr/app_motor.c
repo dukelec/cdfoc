@@ -46,8 +46,8 @@ uint8_t state_w_hook_before(uint16_t sub_offset, uint8_t len, uint8_t *dat)
         d_debug("drv 05: %04x\n", drv_read_reg(0x05)); // default 0x0159, 100ns dead time
         d_debug("drv 03: %04x\n", drv_read_reg(0x03)); // default 0x03ff
         d_debug("drv 04: %04x\n", drv_read_reg(0x04)); // default 0x07ff
-        drv_write_reg(0x03, 0x0300); // 10mA, 20mA
-        drv_write_reg(0x04, 0x0700); // 10mA, 20mA
+        drv_write_reg(0x03, 0x0388); // 260mA, 520mA
+        drv_write_reg(0x04, 0x0788); // 260mA, 520mA
         d_debug("drv 03: %04x\n", drv_read_reg(0x03));
         d_debug("drv 04: %04x\n", drv_read_reg(0x04));
 
@@ -449,7 +449,7 @@ void adc_isr(void)
         v_beta =  csa.cal_v_sd * sin_tmp_angle_elec + csa.cal_v_sq * cos_tmp_angle_elec;
         // limit vector magnitude
         float norm = sqrtf(v_alpha * v_alpha + v_beta * v_beta);
-        float limit = 2047 * 0.8f * 1.15f; // 80% pwm max duty, deliver 15% more power by svpwm
+        float limit = 2047 * 0.92f * 1.15f; // 92% pwm max duty, deliver 15% more power by svpwm
         if (norm > limit) {
             v_alpha *= limit / norm;
             v_beta *= limit / norm;
@@ -464,16 +464,15 @@ void adc_isr(void)
         out_pwm_w = -out_pwm_u - out_pwm_v;
         // avoid over range again
         int16_t out_min = min(out_pwm_u, min(out_pwm_v, out_pwm_w));
-        int16_t out_max = max(out_pwm_u, max(out_pwm_v, out_pwm_w));
-        int16_t out_mid = (out_max + out_min) / 2;
-        out_pwm_u = clip(out_pwm_u - out_mid, -2047, 2047);
-        out_pwm_v = clip(out_pwm_v - out_mid, -2047, 2047);
-        out_pwm_w = clip(out_pwm_w - out_mid, -2047, 2047);
+        int16_t out_ofs = -out_min - 2047 + 40; // svpwm, bottom margin: 1.95% (40/2047)
+        out_pwm_u = clip(out_pwm_u + out_ofs, -2047, 2047);
+        out_pwm_v = clip(out_pwm_v + out_ofs, -2047, 2047);
+        out_pwm_w = clip(out_pwm_w + out_ofs, -2047, 2047);
 
         if (csa.motor_wire_swap)
             swap(out_pwm_u, out_pwm_v);
 
-#ifdef CURRENT_ADC_3CH // useless for svpwm, better for spwm
+#ifdef CURRENT_ADC_3CH
         if (csa.state != ST_STOP && norm >= 2048/2) {
             if (out_pwm_w > max(out_pwm_u, out_pwm_v)) {
                 csa.adc_sel = 0;
