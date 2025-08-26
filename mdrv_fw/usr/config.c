@@ -82,7 +82,6 @@ const csa_t csa_dft = {
         .dbg_str_msk = 0x0, //0 or 0xff,
 
         .dbg_raw_msk = 0,
-        .dbg_raw_th = 200,
         .dbg_raw = {
                 { // cur
                         { .offset = offsetof(csa_t, sen_i_sq), .size = 4 * 2 }, // sen_i_sq, sen_i_sd
@@ -120,7 +119,13 @@ const csa_t csa_dft = {
         //.cali_angle_step = 0
 
         .nominal_voltage = 24.0f,
-        .tc_max_err = 0x1000
+        .tc_max_err = 0x1000,
+        .ntc_b = 3970,
+        .ntc_r25 = 100000, // 100k
+        .temperature_warn = 90,
+        .temperature_err = 100,
+        .voltage_min = 7,
+        .voltage_max = 38
 };
 
 csa_t csa;
@@ -172,6 +177,11 @@ int flash_erase(uint32_t addr, uint32_t len)
     FLASH_EraseInitTypeDef f;
 
     uint32_t ofs = addr & ~0x08000000;
+    if (ofs <= 0x6000 && 0x6000 < ofs + len) {
+        d_error("nvm erase: avoid erasing self\n");
+        return ret;
+    }
+
     f.TypeErase = FLASH_TYPEERASE_PAGES;
     f.Banks = FLASH_BANK_1;
     f.Page = ofs / 2048;
@@ -299,7 +309,6 @@ void csa_list_show(void)
     d_info("\n");
 
     CSA_SHOW(1, dbg_raw_msk, "Config which raw debug data to be send");
-    CSA_SHOW(0, dbg_raw_th, "Config raw debug data package size");
     CSA_SHOW(1, dbg_raw[0], "Config raw debug for current loop");
     CSA_SHOW(1, dbg_raw[1], "Config raw debug for speed loop");
     CSA_SHOW(1, dbg_raw[2], "Config raw debug for position loop");
@@ -322,11 +331,17 @@ void csa_list_show(void)
     CSA_SHOW(0, anticogging_max_val, "");
     CSA_SHOW(0, nominal_voltage, "");
     CSA_SHOW(0, tc_max_err, "Limit position error");
+    CSA_SHOW(0, ntc_b, "");
+    CSA_SHOW(0, ntc_r25, "");
+    CSA_SHOW(0, temperature_warn, "");
+    CSA_SHOW(0, temperature_err, "");
+    CSA_SHOW(0, voltage_min, "");
+    CSA_SHOW(0, voltage_max, "");
     d_info("\n");
     while (frame_free_head.len < FRAME_MAX - 5);
 
     CSA_SHOW(0, state, "0: stop, 1: calibrate, 2: cur loop, 3: speed loop, 4: pos loop, 5: t_curve");
-    //CSA_SHOW(0, err_flag, "not used");
+    CSA_SHOW(1, err_flag, "");
     d_info("\n");
 
     CSA_SHOW(1, cal_pos, "pos loop target");

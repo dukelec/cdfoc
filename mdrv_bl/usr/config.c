@@ -58,6 +58,11 @@ int flash_erase(uint32_t addr, uint32_t len)
     FLASH_EraseInitTypeDef f;
 
     uint32_t ofs = addr & ~0x08000000;
+    if (ofs == 0) {
+        d_error("nvm erase: avoid erasing self\n");
+        return ret;
+    }
+
     f.TypeErase = FLASH_TYPEERASE_PAGES;
     f.Banks = FLASH_BANK_1;
     f.Page = ofs / 2048;

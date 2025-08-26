@@ -110,14 +110,25 @@ void app_motor_routine(void)
 
     if (adc_has_new) {
         float v_dc = (adc_dc / 4095.0f * 3.3f) / 4.7f * (4.7f + 75);
-        csa.bus_voltage += (v_dc - csa.bus_voltage) * 0.01f;
+        csa.bus_voltage += (v_dc - csa.bus_voltage) * 0.05f;
 
-        #define _B 3970
+        //    pull-up: 10K
         float r_ntc = (10000.0f * adc_temperature) / (4095 - adc_temperature);
-        //    pull-up: 10K                              r_ntc = 100K  ->          @ 25°C
-        float temperature = (1.0f / ((1.0f / _B) * logf(r_ntc / 100000) + (1.0f / (25 + 273.15f))) - 273.15f);
-        csa.temperature += (temperature - csa.temperature) * 0.01f;
+        float temperature = (1.0f / ((1.0f / csa.ntc_b) * logf(r_ntc / csa.ntc_r25) + (1.0f / (25 + 273.15f))) - 273.15f);
+        csa.temperature += (temperature - csa.temperature) * 0.02f;
         adc_has_new = false;
+
+        if (csa.temperature > csa.temperature_err) {
+            csa.err_flag_.motor_otsd = 1;
+            state_w_hook_before(0, 0, (uint8_t []){ST_STOP});
+            csa.state = ST_STOP;
+        } else if (csa.temperature > csa.temperature_warn) {
+            csa.err_flag_.motor_otw = 1;
+        }
+        if (csa.bus_voltage < csa.voltage_min)
+            csa.err_flag_.motor_uvlo = 1;
+        if (csa.bus_voltage > csa.voltage_max)
+            csa.err_flag_.motor_ovlo = 1;
     }
 }
 

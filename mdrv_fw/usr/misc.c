@@ -45,6 +45,7 @@ void raw_dbg(int idx)
     if (!frm_raw[idx])
         return;
 
+    uint8_t len_bk = frm_raw[idx]->dat[2];
     for (int i = 0; i < 6; i++) {
         regr_t *regr = &csa.dbg_raw[idx][i];
         if (!regr->size)
@@ -54,7 +55,8 @@ void raw_dbg(int idx)
         frm_raw[idx]->dat[2] += regr->size;
     }
 
-    if (frm_raw[idx]->dat[2] >= csa.dbg_raw_th) {
+    uint8_t len_delta = frm_raw[idx]->dat[2] - len_bk;
+    if (frm_raw[idx]->dat[2] + len_delta > 253) {
         cdctl_put_tx_frame(&r_dev.cd_dev, frm_raw[idx]);
         frm_raw[idx] = NULL;
     }

@@ -93,7 +93,7 @@ typedef struct {
 
     uint8_t         _reserved2[9];
     uint8_t         dbg_raw_msk;
-    uint8_t         dbg_raw_th;     // len threshold (+ 1 samples < frm size)
+    uint8_t         _reserved21;
     regr_t          dbg_raw[4][6];  // for: cur, speed, pos, tcurve
 
     int32_t         tc_pos;
@@ -113,13 +113,37 @@ typedef struct {
 
     float           nominal_voltage;
     uint16_t        tc_max_err;
-    uint8_t         _reserved4[22];
+    uint16_t        ntc_b;
+    uint32_t        ntc_r25; // ntc resistor @ 25°C
+    uint8_t         temperature_warn;
+    uint8_t         temperature_err;
+    uint8_t         voltage_min;
+    uint8_t         voltage_max;
+    uint8_t         _reserved4[12];
 
     // end of flash
     #define         _end_save state
 
     state_t         state;
-    uint16_t        err_flag;
+    union {
+        uint16_t err_flag;
+        struct {
+            uint16_t motor_otw     : 1; // [0]  motor overtemperature warning
+            uint16_t motor_otsd    : 1; // [1]  motor overtemperature shutdown
+            uint16_t motor_uvlo    : 1; // [2]  motor undervoltage
+            uint16_t motor_ovlo    : 1; // [3]  motor overvoltage
+            uint16_t               : 3; // [6:4]
+            uint16_t drv_fault     : 1; // [7]  indicates any error listed below
+            uint16_t drv_gdf       : 1; // [8]  gate drive fault
+            uint16_t drv_otw       : 1; // [9]  overtemperature warning
+            uint16_t drv_otsd      : 1; // [10] overtemperature shutdown
+            uint16_t drv_uvlo      : 1; // [11] undervoltage lockout fault
+            uint16_t drv_cpuv      : 1; // [12] charge pump undervoltage fault
+            uint16_t drv_oc        : 1; // [13] sense amplifier overcurrent
+            uint16_t drv_vds_ocp   : 1; // [14] vds monitor overcurrent fault
+            uint16_t               : 1; // [15]
+        } err_flag_;
+    };
 
     int32_t         cal_pos;
     float           cal_speed;

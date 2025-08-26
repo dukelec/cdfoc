@@ -312,18 +312,37 @@ void app_main(void)
     uint32_t last_fault_val = 0xffffffff;
 
     while (true) {
-        //encoder_read();
-        //d_debug("drv: %08x\n", drv_read_reg(0x01) << 16 | drv_read_reg(0x00));
-
         if (csa.state != ST_STOP && !gpio_get_val(&drv_fault)) {
             uint32_t cur_fault_val = (drv_read_reg(0x00) << 16) | drv_read_reg(0x01);
-            gpio_set_val(&led_r, 1);
-            gpio_set_val(&led_g, 0);
             csa.cali_run = false;
             if (cur_fault_val != last_fault_val) {
                 d_error("drv status: %08lx\n", cur_fault_val);
                 last_fault_val = cur_fault_val;
             }
+            if (cur_fault_val != 0) {
+                csa.err_flag_.drv_fault = 1;
+                if (cur_fault_val & (1 << (8+16)))
+                    csa.err_flag_.drv_gdf = 1;
+                if (cur_fault_val & (1 << 7))
+                    csa.err_flag_.drv_otw = 1;
+                if (cur_fault_val & (1 << (6+16)))
+                    csa.err_flag_.drv_otsd = 1;
+                if (cur_fault_val & (1 << (7+16)))
+                    csa.err_flag_.drv_uvlo = 1;
+                if (cur_fault_val & (1 << 6))
+                    csa.err_flag_.drv_cpuv = 1;
+                if (cur_fault_val & (7 << 8))
+                    csa.err_flag_.drv_oc = 1;
+                if (cur_fault_val & (1 << (9+16)))
+                    csa.err_flag_.drv_vds_ocp = 1;
+            }
+        }
+        if (csa.err_flag) {
+            gpio_set_val(&led_r, 1);
+            gpio_set_val(&led_g, 0);
+        } else {
+            gpio_set_val(&led_r, 0);
+            gpio_set_val(&led_g, 1);
         }
 
         app_motor_routine();
