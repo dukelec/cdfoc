@@ -215,6 +215,28 @@ void drv_write_reg(uint8_t reg, uint16_t val)
 }
 
 
+void pendsv_user(uint32_t *sp)
+{
+    if (csa.magic_code == 0x8910) {
+        csa.magic_code = 0xcdcd;
+        printf("lr: 0x%08lx, pc: 0x%08lx\n", sp[5], sp[6]);
+    }
+
+    cdn_routine(&dft_ns); // handle cdnet
+    common_service_routine();
+}
+
+__attribute__((naked)) void PendSV_Handler(void)
+{
+    __asm volatile (
+        "mrs r0, msp                        \n"
+        "ldr r1, pendsv_address             \n"
+        "bx  r1                             \n"
+        "pendsv_address: .word pendsv_user  \n"
+    );
+}
+
+
 void app_main(void)
 {
     uint64_t *stack_check = (uint64_t *)((uint32_t)&end + 256);
@@ -222,13 +244,13 @@ void app_main(void)
     gpio_set_val(&led_r, 1);
     gpio_set_val(&led_g, 1);
 
-    HAL_NVIC_SetPriority(ADC1_2_IRQn, 2, 1);
+    HAL_NVIC_SetPriority(ADC1_2_IRQn, 1, 0);
     HAL_NVIC_EnableIRQ(ADC1_2_IRQn);
     HAL_NVIC_SetPriority(TIM1_CC_IRQn, 0, 0);
     HAL_NVIC_EnableIRQ(TIM1_CC_IRQn);
-    HAL_NVIC_SetPriority(DMA2_Channel1_IRQn, 3, 2);
+    HAL_NVIC_SetPriority(DMA2_Channel1_IRQn, 2, 2);
     HAL_NVIC_EnableIRQ(DMA2_Channel1_IRQn);
-    HAL_NVIC_SetPriority(EXTI9_5_IRQn, 3, 1);
+    HAL_NVIC_SetPriority(EXTI9_5_IRQn, 2, 1);
 
     printf("\nstart app_main (mdrv)...\n");
     *stack_check = 0xababcdcd12123434;
@@ -345,9 +367,8 @@ void app_main(void)
             gpio_set_val(&led_g, 1);
         }
 
+        SCB->ICSR = SCB_ICSR_PENDSVSET_Msk;
         app_motor_routine();
-        cdn_routine(&dft_ns); // handle cdnet
-        common_service_routine();
         cali_elec_angle();
         if (csa.dbg_str_msk & (1 << 0))
             dump_hw_status();
@@ -359,6 +380,11 @@ void app_main(void)
     }
 }
 
+
+void cdctl_rx_cb(cdctl_dev_t *dev, cd_frame_t *frame)
+{
+    SCB->ICSR = SCB_ICSR_PENDSVSET_Msk;
+}
 
 void EXTI9_5_IRQHandler(void)
 {
