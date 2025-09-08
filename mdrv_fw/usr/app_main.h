@@ -105,7 +105,7 @@ typedef struct {
     float           cali_angle_elec;
     float           cali_current;
     float           cali_angle_speed_tgt; // target speed [rad/s]
-    bool            cali_run;
+    uint8_t         cali_run;
 
     bool            cali_encoder_en;
     bool            anticogging_en;

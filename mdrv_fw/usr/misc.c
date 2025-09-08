@@ -115,7 +115,7 @@ void cali_elec_angle(void)
 
     if ((dir == 1 && sub_cnt == 3) || (dir == -1 && sub_cnt == 0)) {
         uint16_t a_shift;
-        if (a_first < 0) {
+        if (csa.cali_run == 1 && a_first < 0) {
             if ((int16_t)(a270 - a90) < 0) { // motor_poles should >= 2
                 pole_cnt = -1;
                 csa.motor_wire_swap = !csa.motor_wire_swap;
@@ -123,7 +123,7 @@ void cali_elec_angle(void)
                 return;
             }
             a_first = a_shift = a270;
-            float poles = (float)0x10000 / ((a270 - a90) * 2);
+            float poles = (float)0x10000 / ((int16_t)(a270 - a90) * 2);
             csa.motor_poles = lroundf(poles);
             d_info("cali: update to motor_poles: %d (%d.%.2d)\n", csa.motor_poles, P_2F(poles));
         } else {
@@ -148,7 +148,7 @@ void cali_elec_angle(void)
             uint8_t dat = ST_STOP;
             state_w_hook_before(0, 1, &dat);
             csa.state = ST_STOP;
-            csa.cali_run = false;
+            csa.cali_run = 0;
             pole_cnt = -1;
         }
     }
