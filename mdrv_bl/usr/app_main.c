@@ -59,8 +59,9 @@ static void device_init(void)
 
 static void jump_to_app(void)
 {
+    static uint32_t func; // not on stack (MSP switches before use)
     uint32_t stack = *(uint32_t*)APP_ADDR;
-    uint32_t func = *(uint32_t*)(APP_ADDR + 4);
+    func = *(uint32_t*)(APP_ADDR + 4);
 
     gpio_set_val(&led_g, 0);
     printf("jump app...\n");

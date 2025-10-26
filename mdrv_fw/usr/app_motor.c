@@ -21,10 +21,12 @@ static uint16_t pos_rec[5] = {0};
 static int32_t pos_tmp[5];
 static float speed_rec[5] = {0};
 
+static int16_t pos_speed_comp; // position compensation
 static uint8_t pos_loop_cnt = 0;
 static uint8_t speed_loop_cnt = 0;
 static float cal_speed_bk = 0;
 static int32_t cal_current_bk = 0;
+static int16_t out_pwm_u, out_pwm_v, out_pwm_w;
 
 static volatile bool adc_has_new;
 static volatile uint32_t adc_temperature;
@@ -269,19 +271,8 @@ static inline void speed_loop_compute(void)
 }
 
 
-void adc_isr(void)
+static inline void read_ia_ib(int32_t *a, int32_t *b)
 {
-    gpio_set_val(&dbg_out1, 1);
-    gpio_set_val(&s_cs, 1);
-
-    uint16_t tbl_idx = 0;
-    uint16_t tbl_idx_next = 0;
-    float tbl_percent = 0;
-    float voltage_ratio = csa.bus_voltage / csa.nominal_voltage;
-
-    float sin_tmp_angle_elec, cos_tmp_angle_elec; // reduce the amount of calculations
-    int16_t out_pwm_u = 0, out_pwm_v = 0, out_pwm_w = 0;
-
     int32_t adc1_val = HAL_ADCEx_InjectedGetValue(&hadc1, ADC_INJECTED_RANK_1);
     int32_t adc2_val = HAL_ADCEx_InjectedGetValue(&hadc2, ADC_INJECTED_RANK_1);
     int32_t ia, ib, ic;
@@ -318,15 +309,18 @@ void adc_isr(void)
     csa.dbg_ib = ib;
     if (csa.motor_wire_swap)
         swap(ia, ib);
-    float i_alpha = ia;
-    float i_beta = (ia + ib * 2) / 1.732050808f; // √3
+    *a = ia;
+    *b = ib;
+}
 
+static inline void encoder_update(void)
+{
     csa.ori_encoder = encoder_read();
     uint16_t cali_encoder = csa.ori_encoder;
     if (csa.cali_encoder_en) {
         uint16_t idx = csa.ori_encoder >> 4;
         uint16_t idx_next = (idx == 4095) ? 0 : (idx + 1);
-        tbl_percent = (float)(csa.ori_encoder & 0xf) / 0x10;
+        float tbl_percent = (float)(csa.ori_encoder & 0xf) / 0x10;
         uint16_t idx_val = *(uint16_t *)(CALI_ENCODER_TBL + idx * 2);
         uint32_t idx_next_val = *(uint16_t *)(CALI_ENCODER_TBL + idx_next * 2);
         if (idx == 4095)
@@ -365,12 +359,124 @@ void adc_isr(void)
     csa.sen_rpm_avg += (csa.sen_speed_avg / 0x10000 * 60 - csa.sen_rpm_avg) * 0.01f;
 
     // position compensation: step/sec * (2 loop period + 0.000019 sec)
-    int16_t pos_speed_comp = lroundf(csa.sen_speed_avg * (2.0f / CURRENT_LOOP_FREQ + 0.000019f));
+    pos_speed_comp = lroundf(csa.sen_speed_avg * (2.0f / CURRENT_LOOP_FREQ + 0.000019f));
     csa.sen_encoder = csa.nob_encoder - csa.bias_encoder + pos_speed_comp;
 
     csa.ori_pos += (int16_t)(csa.sen_encoder - (uint16_t)csa.ori_pos);
     csa.sen_pos = csa.ori_pos - csa.bias_pos;
+}
 
+static inline void voltage2pwm(float v_alpha, float v_beta)
+{
+    // limit vector magnitude
+    float norm = sqrtf(v_alpha * v_alpha + v_beta * v_beta);
+    float limit = 2047 * 0.92f * 1.15f; // 92% pwm max duty, deliver 15% more power by svpwm
+    if (norm > limit) {
+        v_alpha *= limit / norm;
+        v_beta *= limit / norm;
+        vector_over_limit = norm; // for debug
+    }
+#ifdef CAL_CURRENT_SMOOTH
+    near_limit = norm > (limit * 0.97f);
+#endif
+
+    out_pwm_u = lroundf(v_alpha);
+    out_pwm_v = lroundf(-v_alpha / 2 + v_beta * 0.866025404f); // (√3÷2)
+    out_pwm_w = -out_pwm_u - out_pwm_v;
+    // avoid over range again
+    int16_t out_min = min(out_pwm_u, min(out_pwm_v, out_pwm_w));
+    int16_t out_ofs = -out_min - 2047 + 40; // svpwm, bottom margin: 1.95% (40/2047)
+    out_pwm_u = clip(out_pwm_u + out_ofs, -2047, 2047);
+    out_pwm_v = clip(out_pwm_v + out_ofs, -2047, 2047);
+    out_pwm_w = clip(out_pwm_w + out_ofs, -2047, 2047);
+
+    if (csa.motor_wire_swap)
+        swap(out_pwm_u, out_pwm_v);
+
+#ifdef CURRENT_ADC_3CH
+    if (csa.state != ST_STOP && norm >= 2048/2) {
+        if (out_pwm_w > max(out_pwm_u, out_pwm_v)) {
+            csa.adc_sel = 0;
+        } else if (out_pwm_v > max(out_pwm_w, out_pwm_u)) {
+            csa.adc_sel = 1;
+        } else {
+            csa.adc_sel = 2;
+        }
+    }
+#endif
+}
+
+static inline void anticogging_current(void)
+{
+    if (csa.anticogging_en) {
+        uint16_t pos = csa.nob_encoder + pos_speed_comp;
+        uint16_t tbl_idx = pos >> 4;
+        uint16_t tbl_idx_next = (tbl_idx == 4095) ? 0 : (tbl_idx + 1);
+        float tbl_percent = (float)(pos & 0xf) / 0x10;
+        int8_t idx_val = *(int8_t *)(ANTICOGGING_TBL + tbl_idx * 2);
+        int8_t idx_next_val = *(int8_t *)(CALI_ENCODER_TBL + tbl_idx_next * 2);
+        float val = idx_val + (idx_next_val - idx_val) * tbl_percent;
+        csa.sen_i_sq -= csa.anticogging_max_val[0] * val / 100.0f;
+    }
+}
+
+static inline void anticogging_voltage(float voltage_ratio)
+{
+    if (csa.anticogging_en) {
+        uint16_t pos = csa.nob_encoder + pos_speed_comp;
+        uint16_t tbl_idx = pos >> 4;
+        uint16_t tbl_idx_next = (tbl_idx == 4095) ? 0 : (tbl_idx + 1);
+        int8_t idx_val = *(int8_t *)(ANTICOGGING_TBL + tbl_idx * 2 + 1);
+        int8_t idx_next_val = *(int8_t *)(CALI_ENCODER_TBL + tbl_idx_next * 2 + 1);
+        float tbl_percent = (float)(pos & 0xf) / 0x10;
+        float val = idx_val + (idx_next_val - idx_val) * tbl_percent;
+        csa.cal_v_sq += (csa.anticogging_max_val[1] * val / 100.0f) / voltage_ratio;
+    }
+}
+
+static inline void adc_ch_update(void)
+{
+    if (csa.adc_sel == 0) {
+        hadc1.Instance->JSQR = (hadc1.Instance->JSQR & 0x1ff) | (1 << 9); // a
+        hadc2.Instance->JSQR = (hadc2.Instance->JSQR & 0x1ff) | (2 << 9); // b
+    } else if (csa.adc_sel == 1) {
+        hadc1.Instance->JSQR = (hadc1.Instance->JSQR & 0x1ff) | (3 << 9); // c
+        hadc2.Instance->JSQR = (hadc2.Instance->JSQR & 0x1ff) | (1 << 9); // a
+    } else {
+        hadc1.Instance->JSQR = (hadc1.Instance->JSQR & 0x1ff) | (3 << 9); // c
+        hadc2.Instance->JSQR = (hadc2.Instance->JSQR & 0x1ff) | (2 << 9); // b
+    }
+}
+
+static inline void adc_regular_read(void)
+{
+    if ((csa.loop_cnt & 0x3f) == 0 && !LL_ADC_REG_IsConversionOngoing(hadc1.Instance)) {
+        uint32_t adc1_val = HAL_ADC_GetValue(&hadc1); // clear flag by read
+        uint32_t adc2_val = HAL_ADC_GetValue(&hadc2);
+        LL_ADC_REG_StartConversion(hadc1.Instance);
+        if (!adc_has_new) {
+            adc_temperature = adc1_val;
+            adc_dc = adc2_val;
+            adc_has_new = true;
+        }
+    }
+}
+
+
+void adc_isr(void)
+{
+    gpio_set_val(&dbg_out1, 1);
+    gpio_set_val(&s_cs, 1);
+
+    float voltage_ratio = csa.bus_voltage / csa.nominal_voltage;
+    float sin_tmp_angle_elec, cos_tmp_angle_elec; // reduce the amount of calculations
+
+    int32_t ia, ib;
+    read_ia_ib(&ia, &ib);
+    float i_alpha = ia;
+    float i_beta = (ia + ib * 2) / 1.732050808f; // √3
+
+    encoder_update();
     speed_loop_compute();
 
     float encoder_sub_range = (float)0x10000 / csa.motor_poles;
@@ -401,16 +507,7 @@ void adc_isr(void)
     csa.sen_i_sq = -i_alpha * sin_tmp_angle_elec + i_beta * cos_tmp_angle_elec;
     csa.sen_i_sd = i_alpha * cos_tmp_angle_elec + i_beta * sin_tmp_angle_elec;
 
-    if (csa.anticogging_en) {
-        uint16_t pos = csa.nob_encoder + pos_speed_comp;
-        tbl_idx = pos >> 4;
-        tbl_idx_next = (tbl_idx == 4095) ? 0 : (tbl_idx + 1);
-        tbl_percent = (float)(pos & 0xf) / 0x10;
-        int8_t idx_val = *(int8_t *)(ANTICOGGING_TBL + tbl_idx * 2);
-        int8_t idx_next_val = *(int8_t *)(CALI_ENCODER_TBL + tbl_idx_next * 2);
-        float val = idx_val + (idx_next_val - idx_val) * tbl_percent;
-        csa.sen_i_sq -= csa.anticogging_max_val[0] * val / 100.0f;
-    }
+    anticogging_current();
     float err_i_sq = csa.sen_i_sq - csa.sen_i_sq_avg;
     csa.sen_i_sq_avg += err_i_sq * 0.001f;
 
@@ -447,53 +544,13 @@ void adc_isr(void)
             csa.cal_v_sd = 0;
         }
 
-        if (csa.anticogging_en) {
-            int8_t idx_val = *(int8_t *)(ANTICOGGING_TBL + tbl_idx * 2 + 1);
-            int8_t idx_next_val = *(int8_t *)(CALI_ENCODER_TBL + tbl_idx_next * 2 + 1);
-            float val = idx_val + (idx_next_val - idx_val) * tbl_percent;
-            csa.cal_v_sq += (csa.anticogging_max_val[1] * val / 100.0f) / voltage_ratio;
-        }
+        anticogging_voltage(voltage_ratio);
         float err_v_sq = csa.cal_v_sq - csa.cal_v_sq_avg;
         csa.cal_v_sq_avg += err_v_sq * 0.001f;
 
         v_alpha = csa.cal_v_sd * cos_tmp_angle_elec - csa.cal_v_sq * sin_tmp_angle_elec;
         v_beta =  csa.cal_v_sd * sin_tmp_angle_elec + csa.cal_v_sq * cos_tmp_angle_elec;
-        // limit vector magnitude
-        float norm = sqrtf(v_alpha * v_alpha + v_beta * v_beta);
-        float limit = 2047 * 0.92f * 1.15f; // 92% pwm max duty, deliver 15% more power by svpwm
-        if (norm > limit) {
-            v_alpha *= limit / norm;
-            v_beta *= limit / norm;
-            vector_over_limit = norm; // for debug
-        }
-#ifdef CAL_CURRENT_SMOOTH
-        near_limit = norm > (limit * 0.97f);
-#endif
-
-        out_pwm_u = lroundf(v_alpha);
-        out_pwm_v = lroundf(-v_alpha / 2 + v_beta * 0.866025404f); // (√3÷2)
-        out_pwm_w = -out_pwm_u - out_pwm_v;
-        // avoid over range again
-        int16_t out_min = min(out_pwm_u, min(out_pwm_v, out_pwm_w));
-        int16_t out_ofs = -out_min - 2047 + 40; // svpwm, bottom margin: 1.95% (40/2047)
-        out_pwm_u = clip(out_pwm_u + out_ofs, -2047, 2047);
-        out_pwm_v = clip(out_pwm_v + out_ofs, -2047, 2047);
-        out_pwm_w = clip(out_pwm_w + out_ofs, -2047, 2047);
-
-        if (csa.motor_wire_swap)
-            swap(out_pwm_u, out_pwm_v);
-
-#ifdef CURRENT_ADC_3CH
-        if (csa.state != ST_STOP && norm >= 2048/2) {
-            if (out_pwm_w > max(out_pwm_u, out_pwm_v)) {
-                csa.adc_sel = 0;
-            } else if (out_pwm_v > max(out_pwm_w, out_pwm_u)) {
-                csa.adc_sel = 1;
-            } else {
-                csa.adc_sel = 2;
-            }
-        }
-#endif
+        voltage2pwm(v_alpha, v_beta);
     } else {
         csa.cal_v_sq = 0;
         pid_f_set_target(&csa.pid_i_sq, 0);
@@ -502,17 +559,7 @@ void adc_isr(void)
         pid_f_reset(&csa.pid_i_sd, 0, 0);
     }
 
-    if (csa.adc_sel == 0) {
-        hadc1.Instance->JSQR = (hadc1.Instance->JSQR & 0x1ff) | (1 << 9); // a
-        hadc2.Instance->JSQR = (hadc2.Instance->JSQR & 0x1ff) | (2 << 9); // b
-    } else if (csa.adc_sel == 1) {
-        hadc1.Instance->JSQR = (hadc1.Instance->JSQR & 0x1ff) | (3 << 9); // c
-        hadc2.Instance->JSQR = (hadc2.Instance->JSQR & 0x1ff) | (1 << 9); // a
-    } else {
-        hadc1.Instance->JSQR = (hadc1.Instance->JSQR & 0x1ff) | (3 << 9); // c
-        hadc2.Instance->JSQR = (hadc2.Instance->JSQR & 0x1ff) | (2 << 9); // b
-    }
-
+    adc_ch_update();
     csa.dbg_u = out_pwm_u;
     csa.dbg_v = out_pwm_v;
 
@@ -521,17 +568,7 @@ void adc_isr(void)
     __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_2, DRV_PWM_HALF - out_pwm_v); // TIM1_CH2: B
     __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, DRV_PWM_HALF - out_pwm_w); // TIM1_CH1: C
 
-    if ((csa.loop_cnt & 0x3f) == 0 && !LL_ADC_REG_IsConversionOngoing(hadc1.Instance)) {
-        uint32_t adc1_val = HAL_ADC_GetValue(&hadc1); // clear flag by read
-        uint32_t adc2_val = HAL_ADC_GetValue(&hadc2);
-        LL_ADC_REG_StartConversion(hadc1.Instance);
-        if (!adc_has_new) {
-            adc_temperature = adc1_val;
-            adc_dc = adc2_val;
-            adc_has_new = true;
-        }
-    }
-
+    adc_regular_read();
     raw_dbg(0);
     csa.loop_cnt++;
 
