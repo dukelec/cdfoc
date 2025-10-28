@@ -173,10 +173,10 @@ typedef struct {
 
     uint8_t         adc_sel;  // cur adc channel group
 
-    int16_t         dbg_ia;
-    int16_t         dbg_ib;
-    int16_t         dbg_u;
-    int16_t         dbg_v;
+    int16_t         sen_i[3];
+    int16_t         pwm_dbg0[3]; // before deadtime compensate
+    int16_t         pwm_dbg1[3]; // after deadtime compensate
+    int16_t         pwm_uvw[3];
 
     float           sen_i_sq_avg;
     float           cal_v_sq_avg;

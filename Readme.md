@@ -66,9 +66,6 @@ Write 1 to `dbg_en` to ensure that you can see the debug print in the GUI interf
 Start by setting the appropriate value for `cali_current`, it is recommended to set the value a little higher to allow the motor to lock more accurately.
 Also be careful to prevent the motor from overheating.
 
-Then write 1 to `state` to enter the drag mode, where a constant current is continuously passed through some of the motor's coils
-(please complete the subsequent operations as soon as possible to prevent the motor from overheating).
-
 Write 1 to `cali_run` to start the calibration. The motor coils will be energized sequentially, causing the motor to turn clockwise first, then counterclockwise.
 Afterward, the calculated encoder offset value will be printed and written to `bias_encoder`. Be sure to save it to flash.
 

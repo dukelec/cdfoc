@@ -375,10 +375,10 @@ void csa_list_show(void)
     d_info("\n");
 
     CSA_SHOW(0, adc_sel, "");
-    CSA_SHOW(0, dbg_ia, "");
-    CSA_SHOW(0, dbg_ib, "");
-    CSA_SHOW(0, dbg_u, "");
-    CSA_SHOW(0, dbg_v, "");
+    CSA_SHOW(0, sen_i, "");
+    CSA_SHOW(0, pwm_dbg0, "");
+    CSA_SHOW(0, pwm_dbg1, "");
+    CSA_SHOW(0, pwm_uvw, "");
     d_info("\n");
 
     CSA_SHOW(0, sen_i_sq_avg, "");

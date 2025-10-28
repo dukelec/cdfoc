@@ -82,7 +82,11 @@ void cali_elec_angle(void)
         csa.cali_angle_elec = 0;
         csa.cali_angle_speed_tgt = 0;
         csa.cali_angle_speed = 0;
-        csa.state = ST_CALI;
+        if (csa.state != ST_CALI) {
+            uint8_t dat = ST_CALI;
+            state_w_hook_before(0, 1, &dat);
+            csa.state = ST_CALI;
+        }
         t_last = get_systick();
         pole_cnt = sub_cnt = 0;
         amount_f = amount_r = 0;
