@@ -41,7 +41,7 @@ The payload is encoded using the CDNET protocol. For detailed information, pleas
 
 CDBUS GUI Tool: https://github.com/dukelec/cdbus_gui
 
-After power on, first write 5 to `state`, then write the target position to `tc_pos`, then the motor will rotate.
+Example: Upon power-on, first write 5 to `state`, then write the target position to `tc_pos` to rotate the motor.
 
 <img src="doc/cdbus_gui.avif">
 
@@ -61,7 +61,7 @@ Plots:
 
 Do not connect any loads to the motor during calibration.
 
-Write 1 to `dbg_en` to ensure that you can see the debug print in the GUI interface.
+Write 1 to `dbg_en` to enable debug prints in the GUI.
 
 Start by setting the appropriate value for `cali_current`, it is recommended to set the value a little higher to allow the motor to lock more accurately.
 Also be careful to prevent the motor from overheating.
@@ -69,7 +69,7 @@ Also be careful to prevent the motor from overheating.
 Write 1 to `cali_run` to start the calibration. The motor coils will be energized sequentially, causing the motor to turn clockwise first, then counterclockwise.
 Afterward, the calculated encoder offset value will be printed and written to `bias_encoder`. Be sure to save it to flash.
 
-Write 1 to `cali_run` as soon as possible after writing 1 to `state`, so that the coils can be energized in turn, sharing the strain on individual coils.
+Writing 1 to `cali_run` automatically sets `state` to 1.
 
 
 ### Torque Mode (state = 2)
@@ -124,7 +124,7 @@ The complete response package is:
 fe 00 03  05 40  00  crc_l crc_h
 ```
 
-Where `0x00` means no error, for more information please refer to the description of CDSTEP and CDNET.
+The last `0x00` means no error.
 
 
 ### Quick Exchange Commands

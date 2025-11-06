@@ -36,10 +36,10 @@ void raw_dbg(int idx)
             frm_raw[idx] = cd_list_get(&frame_free_head);
             frm_raw[idx]->dat[0] = csa.bus_cfg.mac;
             frm_raw[idx]->dat[1] = 0x0;
-            frm_raw[idx]->dat[2] = 6;
+            frm_raw[idx]->dat[2] = 4;
             frm_raw[idx]->dat[3] = 0x40 | idx;
             frm_raw[idx]->dat[4] = 0xa;
-            put_unaligned32(csa.loop_cnt, frm_raw[idx]->dat + 5);
+            put_unaligned16(csa.loop_cnt, frm_raw[idx]->dat + 5);
         }
     }
     if (!frm_raw[idx])
