@@ -288,18 +288,17 @@ static void p6_service_routine(void)
 
     for (int i = 0; !ret_val && i < 5; i++) {
         regr_t *regr = csa.qxchg_set + i;
-        if (!regr->size)
+        uint16_t lim_size = min(pkt->len - (src_dat - pkt->dat), regr->size);
+        if (!lim_size)
             break;
-        if (src_dat + regr->size > pkt->dat + pkt->len)
-            break;
-        ret_val = csa_hook_exec(false, regr->offset, regr->size, src_dat);
+        ret_val = csa_hook_exec(false, regr->offset, lim_size, src_dat);
         if (!ret_val) {
             NVIC_DisableIRQ(ADC1_2_IRQn);
-            memcpy(((void *) &csa) + regr->offset, src_dat, regr->size);
+            memcpy(((void *) &csa) + regr->offset, src_dat, lim_size);
             NVIC_EnableIRQ(ADC1_2_IRQn);
-            ret_val = csa_hook_exec(true, regr->offset, regr->size, src_dat);
+            ret_val = csa_hook_exec(true, regr->offset, lim_size, src_dat);
         }
-        src_dat += regr->size;
+        src_dat += lim_size;
     }
 
     for (int i = 0; !ret_val && i < 5; i++) {
