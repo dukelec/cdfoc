@@ -36,15 +36,16 @@ void raw_dbg(int idx)
             frm_raw[idx] = cd_list_get(&frame_free_head);
             frm_raw[idx]->dat[0] = csa.bus_cfg.mac;
             frm_raw[idx]->dat[1] = 0x0;
-            frm_raw[idx]->dat[2] = 6;
+            frm_raw[idx]->dat[2] = 4;
             frm_raw[idx]->dat[3] = 0x40 | idx;
             frm_raw[idx]->dat[4] = 0xa;
-            put_unaligned32(csa.loop_cnt, frm_raw[idx]->dat + 5);
+            put_unaligned16(csa.loop_cnt, frm_raw[idx]->dat + 5);
         }
     }
     if (!frm_raw[idx])
         return;
 
+    uint8_t len_bk = frm_raw[idx]->dat[2];
     for (int i = 0; i < 6; i++) {
         regr_t *regr = &csa.dbg_raw[idx][i];
         if (!regr->size)
@@ -54,7 +55,8 @@ void raw_dbg(int idx)
         frm_raw[idx]->dat[2] += regr->size;
     }
 
-    if (frm_raw[idx]->dat[2] >= csa.dbg_raw_th) {
+    uint8_t len_delta = frm_raw[idx]->dat[2] - len_bk;
+    if (frm_raw[idx]->dat[2] + len_delta > 253) {
         cdctl_put_tx_frame(&r_dev.cd_dev, frm_raw[idx]);
         frm_raw[idx] = NULL;
     }
@@ -80,7 +82,11 @@ void cali_elec_angle(void)
         csa.cali_angle_elec = 0;
         csa.cali_angle_speed_tgt = 0;
         csa.cali_angle_speed = 0;
-        csa.state = ST_CALI;
+        if (csa.state != ST_CALI) {
+            uint8_t dat = ST_CALI;
+            state_w_hook_before(0, 1, &dat);
+            csa.state = ST_CALI;
+        }
         t_last = get_systick();
         pole_cnt = sub_cnt = 0;
         amount_f = amount_r = 0;
@@ -113,7 +119,7 @@ void cali_elec_angle(void)
 
     if ((dir == 1 && sub_cnt == 3) || (dir == -1 && sub_cnt == 0)) {
         uint16_t a_shift;
-        if (a_first < 0) {
+        if (csa.cali_run == 1 && a_first < 0) {
             if ((int16_t)(a270 - a90) < 0) { // motor_poles should >= 2
                 pole_cnt = -1;
                 csa.motor_wire_swap = !csa.motor_wire_swap;
@@ -121,7 +127,7 @@ void cali_elec_angle(void)
                 return;
             }
             a_first = a_shift = a270;
-            float poles = (float)0x10000 / ((a270 - a90) * 2);
+            float poles = (float)0x10000 / ((int16_t)(a270 - a90) * 2);
             csa.motor_poles = lroundf(poles);
             d_info("cali: update to motor_poles: %d (%d.%.2d)\n", csa.motor_poles, P_2F(poles));
         } else {
@@ -146,7 +152,7 @@ void cali_elec_angle(void)
             uint8_t dat = ST_STOP;
             state_w_hook_before(0, 1, &dat);
             csa.state = ST_STOP;
-            csa.cali_run = false;
+            csa.cali_run = 0;
             pole_cnt = -1;
         }
     }

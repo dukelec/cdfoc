@@ -215,6 +215,28 @@ void drv_write_reg(uint8_t reg, uint16_t val)
 }
 
 
+void pendsv_user(uint32_t *sp)
+{
+    if (csa.magic_code == 0x8910) {
+        csa.magic_code = 0xcdcd;
+        printf("lr: 0x%08lx, pc: 0x%08lx\n", sp[5], sp[6]);
+    }
+
+    cdn_routine(&dft_ns); // handle cdnet
+    common_service_routine();
+}
+
+__attribute__((naked)) void PendSV_Handler(void)
+{
+    __asm volatile (
+        "mrs r0, msp                        \n"
+        "ldr r1, pendsv_address             \n"
+        "bx  r1                             \n"
+        "pendsv_address: .word pendsv_user  \n"
+    );
+}
+
+
 void app_main(void)
 {
     uint64_t *stack_check = (uint64_t *)((uint32_t)&end + 256);
@@ -222,13 +244,13 @@ void app_main(void)
     gpio_set_val(&led_r, 1);
     gpio_set_val(&led_g, 1);
 
-    HAL_NVIC_SetPriority(ADC1_2_IRQn, 2, 1);
+    HAL_NVIC_SetPriority(ADC1_2_IRQn, 1, 0);
     HAL_NVIC_EnableIRQ(ADC1_2_IRQn);
     HAL_NVIC_SetPriority(TIM1_CC_IRQn, 0, 0);
     HAL_NVIC_EnableIRQ(TIM1_CC_IRQn);
-    HAL_NVIC_SetPriority(DMA2_Channel1_IRQn, 3, 2);
+    HAL_NVIC_SetPriority(DMA2_Channel1_IRQn, 2, 2);
     HAL_NVIC_EnableIRQ(DMA2_Channel1_IRQn);
-    HAL_NVIC_SetPriority(EXTI9_5_IRQn, 3, 1);
+    HAL_NVIC_SetPriority(EXTI9_5_IRQn, 2, 1);
 
     printf("\nstart app_main (mdrv)...\n");
     *stack_check = 0xababcdcd12123434;
@@ -312,23 +334,41 @@ void app_main(void)
     uint32_t last_fault_val = 0xffffffff;
 
     while (true) {
-        //encoder_read();
-        //d_debug("drv: %08x\n", drv_read_reg(0x01) << 16 | drv_read_reg(0x00));
-
         if (csa.state != ST_STOP && !gpio_get_val(&drv_fault)) {
             uint32_t cur_fault_val = (drv_read_reg(0x00) << 16) | drv_read_reg(0x01);
-            gpio_set_val(&led_r, 1);
-            gpio_set_val(&led_g, 0);
             csa.cali_run = false;
             if (cur_fault_val != last_fault_val) {
                 d_error("drv status: %08lx\n", cur_fault_val);
                 last_fault_val = cur_fault_val;
             }
+            if (cur_fault_val != 0) {
+                csa.err_flag_.drv_fault = 1;
+                if (cur_fault_val & (1 << (8+16)))
+                    csa.err_flag_.drv_gdf = 1;
+                if (cur_fault_val & (1 << 7))
+                    csa.err_flag_.drv_otw = 1;
+                if (cur_fault_val & (1 << (6+16)))
+                    csa.err_flag_.drv_otsd = 1;
+                if (cur_fault_val & (1 << (7+16)))
+                    csa.err_flag_.drv_uvlo = 1;
+                if (cur_fault_val & (1 << 6))
+                    csa.err_flag_.drv_cpuv = 1;
+                if (cur_fault_val & (7 << 8))
+                    csa.err_flag_.drv_oc = 1;
+                if (cur_fault_val & (1 << (9+16)))
+                    csa.err_flag_.drv_vds_ocp = 1;
+            }
+        }
+        if (csa.err_flag) {
+            gpio_set_val(&led_r, 1);
+            gpio_set_val(&led_g, 0);
+        } else {
+            gpio_set_val(&led_r, 0);
+            gpio_set_val(&led_g, 1);
         }
 
+        SCB->ICSR = SCB_ICSR_PENDSVSET_Msk;
         app_motor_routine();
-        cdn_routine(&dft_ns); // handle cdnet
-        common_service_routine();
         cali_elec_angle();
         sl_routine();
         if (csa.dbg_str_msk & (1 << 0))
@@ -341,6 +381,11 @@ void app_main(void)
     }
 }
 
+
+void cdctl_rx_cb(cdctl_dev_t *dev, cd_frame_t *frame)
+{
+    SCB->ICSR = SCB_ICSR_PENDSVSET_Msk;
+}
 
 void EXTI9_5_IRQHandler(void)
 {
