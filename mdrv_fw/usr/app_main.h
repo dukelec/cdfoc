@@ -28,7 +28,7 @@
 #define CALI_ENCODER_TBL    0x0801b800 // 8k, 2bytes x 4096
 #define ANTICOGGING_TBL     0x0801d800 // 8k, 2bytes x 4096
 #define APP_CONF_ADDR       0x0801f800 // page 63, the last page
-#define APP_CONF_VER        0x0106
+#define APP_CONF_VER        0x0200
 
 #define CURRENT_LOOP_FREQ   (170000000 / 4096 / 2)
 #define DRV_PWM_HALF        2048
