@@ -230,9 +230,8 @@ __attribute__((naked)) void PendSV_Handler(void)
 {
     __asm volatile (
         "mrs r0, msp                        \n"
-        "ldr r1, pendsv_address             \n"
+        "ldr r1, =pendsv_user               \n"
         "bx  r1                             \n"
-        "pendsv_address: .word pendsv_user  \n"
     );
 }
 
