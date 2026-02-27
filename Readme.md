@@ -41,7 +41,7 @@ The payload is encoded using the CDNET protocol. For detailed information, pleas
 
 CDBUS GUI Tool: https://github.com/dukelec/cdbus_gui
 
-Example: Upon power-on, first write 5 to `state`, then write the target position to `tc_pos` to rotate the motor.
+Example: Upon power-on, first write 5 to `state`, then write the target position to `tp_pos` to rotate the motor.
 
 <img src="doc/cdbus_gui.avif">
 
@@ -95,7 +95,7 @@ The unit of speed is: how many position-units / second.
 
 Write 5 to `state` to enter position mode.
 
-Then just write the appropriate values to `tc_pos`, `tc_speed`, `tc_accel`.
+Then just write the appropriate values to `tp_pos`, `tp_speed`, `tp_accel`.
 
 Alternatively these parameters can be updated using the quick-exchange command by default.
 
@@ -129,8 +129,8 @@ The last `0x00` means no error.
 
 ### Quick Exchange Commands
 
-`qxchg_set` uses only one element by default, pointing to the area where the table entries `tc_pos`, `tc_speed` and `tc_accel` are located.  
-If you want to change the target position parameter `tc_pos` to 0, you can write data `00 00 00 00` to port 6.  
+`qxchg_set` uses only one element by default, pointing to the area where the table entries `tp_pos`, `tp_speed` and `tp_accel` are located.  
+If you want to change the target position parameter `tp_pos` to 0, you can write data `00 00 00 00` to port 6.  
 
 If you need to change both the target position and the target speed, e.g. position to 0x00010000 and speed to 0x00005000, writes: `00 00 01 00  00 50 00 00`.
 

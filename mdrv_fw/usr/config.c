@@ -25,7 +25,7 @@ csa_hook_t csa_w_hook[] = {
             .range = { .offset = offsetof(csa_t, state), .size = 1 },
             .before = state_w_hook_before
         }, {
-            .range = { .offset = offsetof(csa_t, tc_pos), .size = offsetof(csa_t, tc_state) - offsetof(csa_t, tc_pos) },
+            .range = { .offset = offsetof(csa_t, tp_pos), .size = offsetof(csa_t, tp_state) - offsetof(csa_t, tp_pos) },
             .after = motor_w_hook_after
         }
 };
@@ -45,35 +45,35 @@ const csa_t csa_dft = {
         .dbg_en = false,
 
         .pid_pos = { // motor must have enough power to follow the target position
-                .kp = 50, .ki = 500,
+                .kp = 50,
                 .out_min = -65536*100,
-                .out_max = 65536*100, // limit output speed, override by t_curve module
-                .period = 25.0 / CURRENT_LOOP_FREQ
+                .out_max = 65536*100,
+                .dt = 25.0f / CURRENT_LOOP_FREQ
         },
         .pid_speed = {
                 .kp = 0.02, .ki = 2,
                 .out_min = -3000,
                 .out_max = 3000, // limit output current
-                .period = 5.0 / CURRENT_LOOP_FREQ
+                .dt = 5.0f / CURRENT_LOOP_FREQ
         },
         .pid_i_sq =  {
-                .kp = 0.16, .ki = 50,
+                .kp = 0.1, .ki = 50,
                 .out_min = -2165,
                 .out_max = 2165,
-                .period = 1.0 / CURRENT_LOOP_FREQ
+                .dt = 1.0f / CURRENT_LOOP_FREQ
         },
         .pid_i_sd =  {
                 .kp = 0.07, .ki = 50,
                 .out_min = -1600,
                 .out_max = 1600,
-                .period = 1.0 / CURRENT_LOOP_FREQ
+                .dt = 1.0f / CURRENT_LOOP_FREQ
         },
 
         .motor_poles = 7,
         .bias_encoder = 0x1234,
 
         .qxchg_set = {
-                { .offset = offsetof(csa_t, tc_pos), .size = 4 * 3 }
+                { .offset = offsetof(csa_t, tp_pos), .size = 4 * 3 }
         },
         .qxchg_ret = {
                 { .offset = offsetof(csa_t, cal_pos), .size = 8 }
@@ -99,27 +99,25 @@ const csa_t csa_dft = {
                         { .offset = offsetof(csa_t, sen_pos), .size = 4 },
                         { .offset = offsetof(csa_t, pid_pos) + offsetof(pid_i_t, target), .size = 4 * 2 }, // target, i_term
                         { .offset = offsetof(csa_t, cal_speed), .size = 4 },
-                        { .offset = offsetof(csa_t, tc_vc_avg), .size = 4 },
+                        { .offset = offsetof(csa_t, tp_vel_out), .size = 4 },
                         { .offset = offsetof(csa_t, sen_speed_avg), .size = 4 }
                 }, { // t_curve
-                        { .offset = offsetof(csa_t, tc_state), .size = 1 },
-                        { .offset = offsetof(csa_t, tc_pos), .size = 4 },
+                        { .offset = offsetof(csa_t, tp_state), .size = 1 },
+                        { .offset = offsetof(csa_t, tp_pos), .size = 4 },
                         { .offset = offsetof(csa_t, cal_pos), .size = 4 },
-                        { .offset = offsetof(csa_t, tc_vc), .size = 4 },
-                        { .offset = offsetof(csa_t, tc_ac), .size = 4 }
+                        { .offset = offsetof(csa_t, tp_vel_out), .size = 4 },
+                        { .offset = offsetof(csa_t, tp_acc_brake), .size = 4 }
                 }
         },
 
-        .tc_speed = 65536*20,
-        .tc_accel = 65536*5,
+        .tp_speed = 65536*20,
+        .tp_accel = 65536*5,
 
         .cali_angle_elec = (float)M_PI/2,
         .cali_current = 200,
-        //.cali_angle_step = 0.003179136f // @ ic-MU3 25KHz spi
-        //.cali_angle_step = 0
 
         .nominal_voltage = 24.0f,
-        .tc_max_err = 0x1000,
+        .tp_max_err = 0x1000,
         .ntc_b = 3970,
         .ntc_r25 = 100000, // 100k
         .temperature_warn = 90,
@@ -147,10 +145,10 @@ void load_conf(void)
     }
     if (csa.conf_from)
         memset(&csa.do_reboot, 0, 3);
-    csa.pid_pos.period = csa_dft.pid_pos.period;
-    csa.pid_speed.period = csa_dft.pid_speed.period;
-    csa.pid_i_sq.period = csa_dft.pid_i_sq.period;
-    csa.pid_i_sd.period = csa_dft.pid_i_sd.period;
+    csa.pid_pos.dt = csa_dft.pid_pos.dt;
+    csa.pid_speed.dt = csa_dft.pid_speed.dt;
+    csa.pid_i_sq.dt = csa_dft.pid_i_sq.dt;
+    csa.pid_i_sd.dt = csa_dft.pid_i_sd.dt;
 }
 
 int save_conf(void)
@@ -271,7 +269,6 @@ void csa_list_show(void)
     d_info("\n");
 
     CSA_SHOW_SUB(0, pid_pos, pid_i_t, kp, "");
-    CSA_SHOW_SUB(0, pid_pos, pid_i_t, ki, "");
     CSA_SHOW_SUB(0, pid_pos, pid_i_t, out_min, "");
     CSA_SHOW_SUB(0, pid_pos, pid_i_t, out_max, "");
     d_info("\n");
@@ -315,9 +312,9 @@ void csa_list_show(void)
     CSA_SHOW(1, dbg_raw[3], "Config raw debug for position plan");
     d_info("\n");
 
-    CSA_SHOW(1, tc_pos, "Set target position");
-    CSA_SHOW(1, tc_speed, "Set target speed");
-    CSA_SHOW(1, tc_accel, "Set target accel");
+    CSA_SHOW(1, tp_pos, "Set target position");
+    CSA_SHOW(1, tp_speed, "Set target speed");
+    CSA_SHOW(1, tp_accel, "Set target accel");
     d_info("\n");
 
     CSA_SHOW(0, cali_angle_elec, "Calibration mode angle");
@@ -326,11 +323,13 @@ void csa_list_show(void)
     CSA_SHOW(0, cali_run, "0: stopped, write 1 start calibration");
     d_info("\n");
 
-    CSA_SHOW(0, cali_encoder_en, "");
-    CSA_SHOW(0, anticogging_en, "");
-    CSA_SHOW(0, anticogging_max_val, "");
+    CSA_SHOW(0, encoder_linearizer_en, "");
+    CSA_SHOW(0, encoder_linearizer_max, "");
+    CSA_SHOW(0, anticog_en, "");
+    CSA_SHOW(0, anticog_max_iq, "");
+    CSA_SHOW(0, anticog_max_vq, "");
     CSA_SHOW(0, nominal_voltage, "");
-    CSA_SHOW(0, tc_max_err, "Limit position error");
+    CSA_SHOW(0, tp_max_err, "Limit position error");
     CSA_SHOW(0, ntc_b, "");
     CSA_SHOW(0, ntc_r25, "");
     CSA_SHOW(0, temperature_warn, "");
@@ -352,14 +351,15 @@ void csa_list_show(void)
     d_info("\n");
 
     CSA_SHOW(1, ori_encoder, "Origin encoder value");
-    CSA_SHOW(1, ori_pos, "sen_pos before add offset");
     d_info("\n");
 
-    CSA_SHOW(1, delta_encoder, "Encoder value delta");
     CSA_SHOW(1, nob_encoder, "Encoder value before add bias");
+    CSA_SHOW(1, nob_pos, "sen_pos before add offset");
     CSA_SHOW(1, sen_encoder, "Encoder value filtered");
-    CSA_SHOW(1, sen_pos, "multiturn + sen_encoder data");
     CSA_SHOW(1, sen_speed, "delta_encoder filtered");
+    CSA_SHOW(1, sen_pos, "multiturn + sen_encoder data");
+    CSA_SHOW(0, sen_speed_avg, "");
+    CSA_SHOW(0, sen_rpm_avg, "");
     CSA_SHOW(0, sen_i_sq, "i_sq from adc");
     CSA_SHOW(0, sen_i_sd, "i_sd from adc");
     CSA_SHOW(0, sen_angle_elec, "Get electric angle from sen_encoder");
@@ -369,9 +369,9 @@ void csa_list_show(void)
     d_info("\n");
 
     d_debug("   //--------------- Follows are not writable: -------------------\n");
-    CSA_SHOW(0, tc_state, "t_curve: 0: stop, 1: run, 2: tailer");
-    CSA_SHOW(0, tc_vc, "Motor current speed");
-    CSA_SHOW(0, tc_ac, "Motor current accel");
+    CSA_SHOW(0, tp_state, "trap_planner: -1: disable, 0: idle, 1: planning");
+    CSA_SHOW(0, tp_vel_out, "Current planned velocity");
+    CSA_SHOW(0, tp_acc_brake, "Required braking acceleration");
     d_info("\n");
 
     CSA_SHOW(0, adc_sel, "");
@@ -383,11 +383,8 @@ void csa_list_show(void)
 
     CSA_SHOW(0, sen_i_sq_avg, "");
     CSA_SHOW(0, cal_v_sq_avg, "");
-    CSA_SHOW(0, sen_speed_avg, "");
-    CSA_SHOW(0, sen_rpm_avg, "");
     CSA_SHOW(0, bus_voltage, "");
     CSA_SHOW(0, temperature, "");
-    CSA_SHOW(0, tc_vc_avg, "");
     CSA_SHOW(0, cali_angle_speed, "");
     d_info("\n");
 

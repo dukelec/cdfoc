@@ -41,7 +41,7 @@ static void init_info_str(void)
 
 
 // device info
-static void p1_service_routine(void)
+static void p1_service_poll(void)
 {
     cdn_pkt_t *pkt = cdn_sock_recvfrom(&sock1);
     if (!pkt)
@@ -61,7 +61,7 @@ static void p1_service_routine(void)
 
 
 // csa manipulation
-static void p5_service_routine(void)
+static void p5_service_poll(void)
 {
     // read:        0x00, offset_16, len_8   | return [0x00, data]
     // read_dft:    0x01, offset_16, len_8   | return [0x00, data]
@@ -122,7 +122,7 @@ static void p5_service_routine(void)
 
 
 // flash memory manipulation
-static void p8_service_routine(void)
+static void p8_service_poll(void)
 {
     // erase:   0x2f, addr_32, len_32  | return [0x00] on success
     // write:   0x20, addr_32 + [data] | return [0x00] on success
@@ -183,7 +183,7 @@ static void p8_service_routine(void)
 }
 
 
-void common_service_init(void)
+void comm_service_init(void)
 {
     cdn_sock_bind(&sock8);
     cdn_sock_bind(&sock5);
@@ -191,7 +191,7 @@ void common_service_init(void)
     init_info_str();
 }
 
-void common_service_routine(void)
+void comm_service_poll(void)
 {
     if (csa.save_conf) {
         csa.save_conf = false;
@@ -202,9 +202,9 @@ void common_service_routine(void)
         NVIC_SystemReset();
     }
 
-    p1_service_routine();
-    p5_service_routine();
-    p8_service_routine();
+    p1_service_poll();
+    p5_service_poll();
+    p8_service_poll();
 }
 
 

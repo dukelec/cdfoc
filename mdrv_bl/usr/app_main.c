@@ -91,7 +91,7 @@ void app_main(void)
         csa.dbg_en = false; // silence
     delay_systick(50);
     device_init();
-    common_service_init();
+    comm_service_init();
     printf("conf: %s, args: %08lx\n", csa.conf_from ? "flash" : "dft", *bl_args);
     gpio_set_val(&led_g, 1);
 
@@ -116,9 +116,9 @@ void app_main(void)
         if (!csa.keep_in_bl && get_systick() > 2000000 / CD_SYSTICK_US_DIV)
             jump_to_app();
 
-        cdctl_routine(&r_dev);
-        cdn_routine(&dft_ns); // handle cdnet
-        common_service_routine();
+        cdctl_poll(&r_dev);
+        cdn_poll(&dft_ns); // handle cdnet
+        comm_service_poll();
     }
 }
 

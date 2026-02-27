@@ -92,11 +92,12 @@ cdnet/utils/cd_list.c \
 cdnet/utils/hex_dump.c \
 usr/misc.c \
 usr/config.c \
-usr/common_services.c \
+usr/comm_services.c \
 usr/app_main.c \
 usr/app_motor.c \
-usr/pid_pos.c \
-usr/pid_f.c
+utils/pid_i.c \
+utils/pid_f.c \
+utils/trap_planner.c
 
 # ASM sources
 ASM_SOURCES =  \
@@ -168,7 +169,8 @@ C_INCLUDES =  \
 -Icdnet/utils \
 -Icdnet/dev \
 -Icdnet/arch/stm32 \
--Iusr
+-Iusr \
+-Iutils
 
 
 # compile gcc flags

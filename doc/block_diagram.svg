@@ -2,12 +2,12 @@
 <!-- Created with Inkscape (http://www.inkscape.org/) -->
 
 <svg
-   width="240.02267mm"
+   width="246.94456mm"
    height="295.74539mm"
-   viewBox="-1 -1 240.02267 295.7454"
+   viewBox="-1 -1 246.94456 295.7454"
    version="1.1"
    id="svg1"
-   inkscape:version="1.3.2 (091e20ef0f, 2023-11-25)"
+   inkscape:version="1.4 (e7c3feb100, 2024-10-09)"
    sodipodi:docname="block_diagram.svg"
    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
    xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
@@ -24,20 +24,20 @@
      inkscape:deskcolor="#d1d1d1"
      inkscape:document-units="mm"
      showgrid="false"
-     inkscape:zoom="2.1682288"
-     inkscape:cx="645.68832"
-     inkscape:cy="808.72462"
+     inkscape:zoom="1.9680685"
+     inkscape:cx="213.66127"
+     inkscape:cy="88.919671"
      inkscape:window-width="1594"
      inkscape:window-height="940"
-     inkscape:window-x="283"
-     inkscape:window-y="99"
+     inkscape:window-x="316"
+     inkscape:window-y="84"
      inkscape:window-maximized="0"
      inkscape:current-layer="layer1"
      showguides="false">
     <inkscape:grid
        id="grid1"
        units="px"
-       originx="-25.399539"
+       originx="-25.39954"
        originy="-59.856506"
        spacingx="0.26458333"
        spacingy="0.26458334"
@@ -645,6 +645,70 @@
        apply_with_weight="true"
        only_selected="false"
        uniform="false" />
+    <marker
+       style="overflow:visible"
+       id="marker8-7-6-5-3-7"
+       refX="0"
+       refY="0"
+       orient="auto-start-reverse"
+       inkscape:stockid="Wide arrow"
+       markerWidth="1"
+       markerHeight="0.5"
+       viewBox="0 0 1 1"
+       inkscape:isstock="true"
+       inkscape:collect="always"
+       preserveAspectRatio="none">
+      <path
+         style="fill:none;stroke:context-stroke;stroke-width:1;stroke-linecap:butt"
+         d="M 3,-3 0,0 3,3"
+         transform="rotate(180,0.125,0)"
+         sodipodi:nodetypes="ccc"
+         id="path8-8-1-2-3-5" />
+    </marker>
+    <inkscape:path-effect
+       effect="bspline"
+       id="path-effect1-4-5-5-8-3"
+       is_visible="true"
+       lpeversion="1.3"
+       weight="33.333333"
+       steps="2"
+       helper_size="0"
+       apply_no_weight="true"
+       apply_with_weight="true"
+       only_selected="false"
+       uniform="false" />
+    <marker
+       style="overflow:visible"
+       id="marker8-7-6-5-9-1-8-6-8-88-1"
+       refX="0"
+       refY="0"
+       orient="auto-start-reverse"
+       inkscape:stockid="Wide arrow"
+       markerWidth="1"
+       markerHeight="0.5"
+       viewBox="0 0 1 1"
+       inkscape:isstock="true"
+       inkscape:collect="always"
+       preserveAspectRatio="none">
+      <path
+         style="fill:none;stroke:context-stroke;stroke-width:1;stroke-linecap:butt"
+         d="M 3,-3 0,0 3,3"
+         transform="rotate(180,0.125,0)"
+         sodipodi:nodetypes="ccc"
+         id="path8-8-1-2-4-5-7-1-8-9-2" />
+    </marker>
+    <inkscape:path-effect
+       effect="bspline"
+       id="path-effect1-4-5-5-7-5-1-5-5-7-7"
+       is_visible="true"
+       lpeversion="1.3"
+       weight="33.333333"
+       steps="2"
+       helper_size="0"
+       apply_no_weight="true"
+       apply_with_weight="true"
+       only_selected="false"
+       uniform="false" />
   </defs>
   <g
      inkscape:label="Layer 1"
@@ -711,14 +775,14 @@
     <text
        xml:space="preserve"
        style="font-size:3.7932px;line-height:125%;font-family:'Liberation Mono';-inkscape-font-specification:'Liberation Mono';letter-spacing:0px;word-spacing:0px;fill:none;stroke:#000000;stroke-width:0.711226px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
-       x="56.02932"
-       y="84.602623"
+       x="49.679314"
+       y="84.073456"
        id="text8-0"><tspan
          sodipodi:role="line"
          id="tspan8-9"
          style="font-size:3.7932px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.711226px"
-         x="56.02932"
-         y="84.602623">Speed Planning</tspan></text>
+         x="49.679314"
+         y="84.073456">Trapezoidal Planner</tspan></text>
     <text
        xml:space="preserve"
        style="font-size:3.7932px;line-height:125%;font-family:'Liberation Mono';-inkscape-font-specification:'Liberation Mono';letter-spacing:0px;word-spacing:0px;fill:none;stroke:#000000;stroke-width:0.711226px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
@@ -763,7 +827,7 @@
          style="font-size:3.7932px;text-align:center;text-anchor:middle;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.711226px"
          x="71.90966"
          y="66.346588"
-         id="tspan10">(tc_pos) tc: Trapezoidal-Curve</tspan></text>
+         id="tspan10">(tp_pos)</tspan></text>
     <path
        style="opacity:0.9;fill:none;stroke:#000000;stroke-width:0.2;stroke-linecap:round;stroke-dasharray:none;stroke-opacity:1;marker-end:url(#marker8-7)"
        d="m 21.166666,37.484252 c 0,1.175388 0,2.350776 0,3.526164"
@@ -1333,5 +1397,26 @@
          x="189.24518"
          y="204.78984"
          id="tspan23-3-6-6-4-8-9-5">(sen_i_sq)</tspan></text>
+    <path
+       style="opacity:0.9;fill:none;stroke:#000000;stroke-width:0.2;stroke-linecap:round;stroke-dasharray:none;stroke-opacity:1;marker-end:url(#marker8-7-6-5-3-7)"
+       d="m 21.166666,35.179878 c 0,6.275711 0,12.551419 0,18.82713"
+       id="path1-0-4-3-0-6"
+       inkscape:path-effect="#path-effect1-4-5-5-8-3"
+       inkscape:original-d="m 21.166666,35.179878 c 0,6.275711 0,12.551419 0,18.82713"
+       transform="matrix(0,-2.688101,2.688101,0,-69.898715,310.31189)"
+       sodipodi:nodetypes="cc" />
+    <path
+       style="opacity:0.9;fill:none;stroke:#000000;stroke-width:0.2;stroke-linecap:round;stroke-dasharray:none;stroke-opacity:1;marker-end:url(#marker8-7-6-5-9-1-8-6-8-88-1)"
+       d="m 21.166666,26.320685 c 0,4.896577 0,9.793154 0,14.689731"
+       id="path1-0-4-3-4-7-2-9-9-6-9"
+       inkscape:path-effect="#path-effect1-4-5-5-7-5-1-5-5-7-7"
+       inkscape:original-d="m 21.166666,26.320685 c 0,4.896577 0,9.793154 0,14.689731"
+       transform="matrix(0,-2.688101,-2.688101,0,341.82777,309.07076)"
+       sodipodi:nodetypes="cc" />
+    <path
+       style="opacity:0.9;fill:none;stroke:#000000;stroke-width:0.538;stroke-linecap:round;stroke-dasharray:none"
+       d="m 271.07511,252.17262 -0.0235,99.76233 -10.52962,-0.0314"
+       id="path5-6"
+       sodipodi:nodetypes="ccc" />
   </g>
 </svg>

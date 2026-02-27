@@ -222,8 +222,8 @@ void pendsv_user(uint32_t *sp)
         printf("lr: 0x%08lx, pc: 0x%08lx\n", sp[5], sp[6]);
     }
 
-    cdn_routine(&dft_ns); // handle cdnet
-    common_service_routine();
+    cdn_poll(&dft_ns); // handle cdnet
+    comm_service_poll();
 }
 
 __attribute__((naked)) void PendSV_Handler(void)
@@ -256,7 +256,7 @@ void app_main(void)
 
     load_conf();
     device_init();
-    common_service_init();
+    comm_service_init();
     d_info("conf (mdrv): %s\n", csa.conf_from ? "load from flash" : "use default");
     HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
     csa_list_show();
@@ -367,7 +367,7 @@ void app_main(void)
         }
 
         SCB->ICSR = SCB_ICSR_PENDSVSET_Msk;
-        app_motor_routine();
+        app_motor_maintain();
         cali_elec_angle();
         if (csa.dbg_str_msk & (1 << 0))
             dump_hw_status();
@@ -406,5 +406,5 @@ void TIM1_CC_IRQHandler(void)
 void ADC1_2_IRQHandler(void)
 {
     // reading register JDRx automatically clears ADC_FLAG_JEOC
-    adc_isr();
+    current_loop_update();
 }

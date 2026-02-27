@@ -67,8 +67,8 @@ void app_main(void);
 void load_conf(void);
 int save_conf(void);
 
-void common_service_init(void);
-void common_service_routine(void);
+void comm_service_init(void);
+void comm_service_poll(void);
 
 extern gpio_t led_r;
 extern gpio_t led_g;
