@@ -26,8 +26,8 @@
 
 
 #define BL_ARGS             0x20000000 // first word
-#define CALI_ENCODER_TBL    0x0801c800 // 4k, 4096
-#define ANTICOGGING_TBL     0x0801d800 // 8k, 4096 x2
+#define ENC_LIN_TBL         0x0801d800 // 4k
+#define ANTICOG_TBL         0x0801e800 // 4k
 #define APP_CONF_ADDR       0x0801f800 // page 63, the last page
 #define APP_CONF_VER        0x0201
 
@@ -116,7 +116,7 @@ typedef struct {
     int16_t         encoder_linearizer_max;
     bool            anticog_en;
     int16_t         anticog_max_iq;
-    int16_t         anticog_max_vq;
+    int16_t         anticog_ratio_vq;
 
     float           nominal_voltage;
     uint16_t        tp_max_err;

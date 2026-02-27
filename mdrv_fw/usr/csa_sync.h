@@ -48,7 +48,7 @@ static inline void csa2encoder_linearizer_mt(encoder_linearizer_t *el)
 static inline void csa2anticog_mt(anticog_t *ac)
 {
     ac->max_iq = csa.anticog_max_iq;
-    ac->max_vq = csa.anticog_max_vq;
+    ac->ratio_vq = csa.anticog_ratio_vq;
 }
 
 

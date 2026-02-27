@@ -82,7 +82,7 @@ cdnet/dev/cdctl_pll_cal.c \
 cdnet/dev/cdctl.c \
 cdnet/utils/cd_list.c \
 usr/config.c \
-usr/comm_services.c \
+usr/comm_service.c \
 usr/app_main.c
 
 # ASM sources

@@ -92,7 +92,7 @@ cdnet/utils/cd_list.c \
 cdnet/utils/hex_dump.c \
 usr/misc.c \
 usr/config.c \
-usr/comm_services.c \
+usr/comm_service.c \
 usr/app_main.c \
 usr/app_motor.c \
 utils/pid_i.c \

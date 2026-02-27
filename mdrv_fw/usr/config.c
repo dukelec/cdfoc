@@ -327,7 +327,7 @@ void csa_list_show(void)
     CSA_SHOW(0, encoder_linearizer_max, "");
     CSA_SHOW(0, anticog_en, "");
     CSA_SHOW(0, anticog_max_iq, "");
-    CSA_SHOW(0, anticog_max_vq, "");
+    CSA_SHOW(0, anticog_ratio_vq, "");
     CSA_SHOW(0, nominal_voltage, "");
     CSA_SHOW(0, tp_max_err, "Limit position error");
     CSA_SHOW(0, ntc_b, "");

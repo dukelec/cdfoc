@@ -36,6 +36,7 @@ import struct
 import _thread
 import re
 import json
+import math
 from time import sleep
 from argparse import ArgumentParser
 from pathlib import Path
@@ -106,60 +107,32 @@ print('start motor in position mode ...')
 csa_write(R_state, b'\x05')
 sleep(1)
 
-print(f'goto 0 pos...')
-csa_write(R_tp_pos, struct.pack("<i", 0))
+print(f'goto init pos...')
+csa_write(R_tp_pos, struct.pack("<i", -100 << 4))
 while True:
     sleep(0.5)
     if csa_read(R_tp_state, 1)[1] == 0:
-        print('goto 0 pos ready.')
+        print('goto init pos ready.')
         sleep(2)
         break
 
-
 origin_val = []
-for i in range(4096):
+for i in range(-100, 4096):
     pos = i << 4
     print(f'i: {i}, pos: {pos}')
     csa_write(R_tp_pos, struct.pack("<i", pos))
-    sleep(0.5) # 0.2
+    sleep(0.05)
     d = struct.unpack("<ff", csa_read(R_sen_i_sq_avg, 8)[1:])
-    origin_val.append(d)
+    if i >= 0:
+        origin_val.append(d)
+    print(f'  {d[0]} {d[1]}')
 
 
 print('disable motor ...')
 csa_write(R_state, b'\x00')
 
-max_val = [0, 0]
-for i in range(4096):
-    max_val[0] = max(abs(origin_val[i][0]), max_val[0])
-    max_val[1] = max(abs(origin_val[i][1]), max_val[1])
-print('max_val origin:', max_val)
-max_val[0] = round(max_val[0] * 128 / 127)
-max_val[1] = round(max_val[1] * 128 / 127)
-
-flash_iq = b''
-flash_vq = b''
-for i in range(4096):
-    v0 = round(origin_val[i][0] * 128 / max_val[0])
-    v1 = round(origin_val[i][1] * 128 / max_val[1])
-    flash_iq += struct.pack("<b", v0)
-    flash_vq += struct.pack("<b", v0)
-
-flash_val = flash_iq + flash_vq
-
-print(f'write anticog data to file: anticog_dat.bin, data len: {len(flash_val)} ...')
-with open('anticog_dat.bin', 'wb') as f:
-    f.write(flash_val)
 
 print(f'write anticog data to file: anticog_dat.txt')
 with open('anticog_dat.txt', 'w') as f:
     f.write(json.dumps(origin_val))
-
-print(f'anticog_max_iq: {max_val[0]}, max_vq: {max_val[1]}')
-
-
-print('done, please save to flash by yourself.')
-
-# cdbus_gui/tools:
-# ./cdg_iap.py --baud 10000000 --cfg ../configs/cdfoc-xxx.json --in-file anticog_dat.bin --addr=0x0801d800
 

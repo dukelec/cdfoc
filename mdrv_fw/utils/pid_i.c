@@ -34,6 +34,7 @@ float pid_i_update(pid_i_t *pid, int32_t input_p, int32_t input_i)
     return clip(output, pid->out_min, pid->out_max);
 }
 
+
 float pid_i_update_p_only(pid_i_t *pid, int32_t input_p)
 {
     int32_t error_p = pid->target - input_p;

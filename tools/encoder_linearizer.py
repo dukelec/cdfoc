@@ -6,6 +6,7 @@ import math
 import struct
 import umsgpack
 import _thread
+import math
 #import numpy as np
 import matplotlib.pyplot as plt
 
@@ -121,7 +122,7 @@ for i in range(4096):
 max_val = 0
 for i in range(4096):
     max_val = max(abs(delta_table[i]), max_val)
-max_val = round(max_val / 127 * 128)
+max_val = math.ceil(max_val / 127 * 128)
 print('max_val final:', max_val)
 
 flash_val = b''
@@ -145,5 +146,5 @@ plt.grid()
 plt.show()
 
 # cdbus_gui/tools:
-# ./cdg_iap.py --baud 10000000 --cfg ../configs/cdfoc-xxx.json --in-file enc_lin_dat.bin --addr=0x0801c800
+# ./cdg_iap.py --baud 10000000 --cfg ../configs/cdfoc-xxx.json --in-file enc_lin_dat.bin --addr=0x0801d800
 
