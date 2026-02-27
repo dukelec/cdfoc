@@ -14,12 +14,11 @@ static adc_samp_t adc_samp = {0};
 static encoder_filter_t enc_filter = {0};
 
 static encoder_linearizer_t enc_lin = {
-        .lut = (int8_t *)CALI_ENCODER_TBL
+        .lut = (int8_t *)ENC_LIN_TBL
 };
 
 static anticog_t anticog = {
-        .lut_iq = (int8_t *)ANTICOGGING_TBL,
-        .lut_vq = (int8_t *)ANTICOGGING_TBL + (1 << ANTICOG_LUT_BITS)
+        .lut = (int8_t *)ENC_LIN_TBL
 };
 
 static trap_planner_t trap_planner = {
