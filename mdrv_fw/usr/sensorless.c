@@ -90,7 +90,7 @@ void pll_update(pll_t *pll, float e_alpha, float e_beta)
 }
 
 
-void sl_routine(void)
+void sl_maintain(void)
 {
     float theta_err = csa.pll.theta - csa.cali_angle_elec;
 
