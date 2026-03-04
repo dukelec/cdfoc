@@ -6,6 +6,7 @@ import math
 import struct
 import umsgpack
 import _thread
+import math
 #import numpy as np
 import matplotlib.pyplot as plt
 
@@ -112,12 +113,25 @@ for i in range(4096):
 
 print(f'cali len: {len(cali_table)}')
 
+
+delta_table = []
+for i in range(4096):
+    delta_table.append(cali_table[i] - i * 16)
+#print('delta_table:', delta_table)
+
+max_val = 0
+for i in range(4096):
+    max_val = max(abs(delta_table[i]), max_val)
+max_val = math.ceil(max_val / 127 * 128)
+print('max_val final:', max_val)
+
 flash_val = b''
 for i in range(4096):
-    flash_val += struct.pack("<H", cali_table[i])
+    val = round(delta_table[i] * 128 / max_val)
+    flash_val += struct.pack("<b", val)
 
-print(f'write cali_encoder data to file: cali_encoder_data.bin, data len: {len(flash_val)} ...')
-with open('cali_encoder_data.bin', 'wb') as f:
+print(f'write enc_lin_dat data to file: enc_lin_dat.bin, data len: {len(flash_val)} ...')
+with open('enc_lin_dat.bin', 'wb') as f:
     f.write(flash_val)
 
 
@@ -132,5 +146,5 @@ plt.grid()
 plt.show()
 
 # cdbus_gui/tools:
-# ./cdg_iap.py --baud 10000000 --cfg ../configs/cdfoc-xxx.json --in-file cali_encoder_data.bin --addr=0x0801b800
+# ./cdg_iap.py --baud 10000000 --cfg ../configs/cdfoc-xxx.json --in-file enc_lin_dat.bin --addr=0x0801d800
 

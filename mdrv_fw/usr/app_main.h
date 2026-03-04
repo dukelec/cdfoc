@@ -10,12 +10,13 @@
 #ifndef __APP_MAIN_H__
 #define __APP_MAIN_H__
 
+#include <math.h>
 #include "cdnet_core.h"
 #include "cd_debug.h"
 #include "cdbus_uart.h"
 #include "cdctl_it.h"
 #include "pid_f.h"
-#include "pid_pos.h"
+#include "pid_i.h"
 #include "sensorless.h"
 
 // printf float value without enable "-u _printf_float"
@@ -26,12 +27,12 @@
 
 
 #define BL_ARGS             0x20000000 // first word
-#define CALI_ENCODER_TBL    0x0801b800 // 8k, 2bytes x 4096
-#define ANTICOGGING_TBL     0x0801d800 // 8k, 2bytes x 4096
+#define ENC_LIN_TBL         0x0801d800 // 4k
+#define ANTICOG_TBL         0x0801e800 // 4k
 #define APP_CONF_ADDR       0x0801f800 // page 63, the last page
-#define APP_CONF_VER        0x0280
+#define APP_CONF_VER        0x0281
 
-#define CURRENT_LOOP_FREQ   (170000000 / 4096 / 2)
+#define CURRENT_LOOP_FREQ   (170000000.f / (4096 * 2))
 #define DRV_PWM_HALF        2048
 
 #define FRAME_MAX           60
@@ -44,7 +45,7 @@ typedef enum {
     ST_CURRENT,
     ST_SPEED,
     ST_POSITION,
-    ST_POS_TC
+    ST_POS_TP
 } state_t;
 
 typedef struct {
@@ -73,9 +74,13 @@ typedef struct {
     #define         _end_common pid_pos
 
     pid_i_t         pid_pos;
+    uint32_t        _reserved01[9];
     pid_f_t         pid_speed;
+    uint32_t        _reserved02[9];
     pid_f_t         pid_i_sq;
+    uint32_t        _reserved03[9];
     pid_f_t         pid_i_sd;
+    uint32_t        _reserved04[9];
 
     float           peak_cur_threshold;
     int32_t         peak_cur_duration;
@@ -95,11 +100,11 @@ typedef struct {
     uint8_t         _reserved2[9];
     uint8_t         dbg_raw_msk;
     uint8_t         _reserved21;
-    regr_t          dbg_raw[4][6];  // for: cur, speed, pos, tcurve
+    regr_t          dbg_raw[4][6];  // for: cur, speed, pos, trap_planner
 
-    int32_t         tc_pos;
-    uint32_t        tc_speed;
-    uint32_t        tc_accel;
+    int32_t         tp_pos;
+    uint32_t        tp_speed;
+    uint32_t        tp_accel;
 
     uint8_t         _reserved3[8];
 
@@ -108,12 +113,14 @@ typedef struct {
     float           cali_angle_speed_tgt; // target speed [rad/s]
     uint8_t         cali_run;
 
-    bool            cali_encoder_en;
-    bool            anticogging_en;
-    float           anticogging_max_val[2];
+    bool            encoder_linearizer_en;
+    int16_t         encoder_linearizer_max;
+    bool            anticog_en;
+    int16_t         anticog_max_iq;
+    int16_t         anticog_ratio_vq;
 
     float           nominal_voltage;
-    uint16_t        tc_max_err;
+    uint16_t        tp_max_err;
     uint16_t        ntc_b;
     uint32_t        ntc_r25; // ntc resistor @ 25°C
     uint8_t         temperature_warn;
@@ -122,10 +129,12 @@ typedef struct {
     uint8_t         voltage_max;
     uint8_t         _reserved4[12];
     smo_t           smo;
+    int32_t         _reserve41[9];
     pll_t           pll;
+    int32_t         _reserve42[4];
     int8_t          sl_start; // 0: idle, 1: cw, -1: ccw
     int8_t          sl_state; // 0: idle, 1: speed inc, 2: current dec, 3: closeloop, -1: err
-    uint8_t         _reserved5[110];
+    uint8_t         _reserved43[110];
 
     // end of flash
     #define         _end_save state
@@ -158,13 +167,15 @@ typedef struct {
     float           cal_v_sd;
 
     uint16_t        ori_encoder;
-    int32_t         ori_pos;
 
-    float           delta_encoder;
     uint16_t        nob_encoder; // no bias
+    int32_t         nob_pos;
     uint16_t        sen_encoder;
-    int32_t         sen_pos;
     float           sen_speed;
+    int32_t         sen_pos;
+    float           sen_speed_avg;
+    float           sen_rpm_avg;
+
     float           sen_i_sq;
     float           sen_i_sd;
     float           sen_angle_elec;
@@ -172,10 +183,10 @@ typedef struct {
     uint32_t        loop_cnt;
     int32_t         peak_cur_cnt;
 
-    // for t_curve
-    uint8_t         tc_state; // 0: stop, 1: run
-    float           tc_vc;    // cur speed
-    float           tc_ac;    // cur accel
+    // for trap_planner
+    int8_t          tp_state; // -1: disable, 0: idle, 1: planning
+    float           tp_vel_out;
+    float           tp_acc_brake;
 
     uint8_t         adc_sel;  // cur adc channel group
 
@@ -186,12 +197,9 @@ typedef struct {
 
     float           sen_i_sq_avg;
     float           cal_v_sq_avg;
-    uint8_t         _reserved6[8];
-    float           sen_speed_avg;
-    float           sen_rpm_avg;
+    uint8_t         _reserved5[8];
     float           bus_voltage;
     float           temperature;
-    float           tc_vc_avg;
     float           cali_angle_speed;
 
 } csa_t; // config status area
@@ -232,26 +240,23 @@ void load_conf(void);
 int save_conf(void);
 void csa_list_show(void);
 
-void common_service_init(void);
-void common_service_routine(void);
+void comm_service_init(void);
+void comm_service_poll(void);
 
 uint8_t state_w_hook_before(uint16_t sub_offset, uint8_t len, uint8_t *dat);
 uint8_t motor_w_hook_after(uint16_t sub_offset, uint8_t len, uint8_t *dat);
 uint16_t drv_read_reg(uint8_t reg);
 void drv_write_reg(uint8_t reg, uint16_t val);
 void app_motor_init(void);
-void app_motor_routine(void);
-void adc_isr(void);
+void app_motor_maintain(void);
+void current_loop_update(void);
 
 uint16_t encoder_read(void);
 void encoder_isr_prepare(void);
 
-void raw_dbg(int idx);
-void cali_elec_angle(void);
-
-extern SPI_HandleTypeDef hspi1;
 extern ADC_HandleTypeDef hadc1;
 extern ADC_HandleTypeDef hadc2;
+extern SPI_HandleTypeDef hspi1;
 extern TIM_HandleTypeDef htim1;
 
 extern gpio_t drv_en;
@@ -267,10 +272,12 @@ extern cdctl_dev_t r_dev;
 
 extern uint32_t end; // end of bss
 
-
-inline void encoder_isr(void)
-{
-    __HAL_DMA_ENABLE(hspi1.hdmatx);
-}
-
+#include "adc_samp.h"
+#include "encoder_linearizer.h"
+#include "encoder_filter.h"
+#include "anticog.h"
+#include "svpwm.h"
+#include "trap_planner.h"
+#include "csa_sync.h"
+#include "misc.h"
 #endif

@@ -41,7 +41,7 @@ static void init_info_str(void)
 
 
 // device info
-static void p1_service_routine(void)
+static void p1_service_poll(void)
 {
     cdn_pkt_t *pkt = cdn_sock_recvfrom(&sock1);
     if (!pkt)
@@ -89,7 +89,7 @@ static void p1_service_routine(void)
 
 
 // flash memory manipulation
-static void p8_service_routine(void)
+static void p8_service_poll(void)
 {
     // erase:   0x2f, addr_32, len_32  | return [0x00] on success
     // write:   0x20, addr_32 + [data] | return [0x00] on success
@@ -170,7 +170,7 @@ static uint8_t csa_hook_exec(bool after, uint16_t offset, uint8_t len, uint8_t *
 
 
 // csa manipulation
-static void p5_service_routine(void)
+static void p5_service_poll(void)
 {
     uint8_t ret_val = 0;
     // read:        0x00, offset_16, len_8   | return [0x00, data]
@@ -197,7 +197,7 @@ static void p5_service_routine(void)
 
         ret_val = csa_hook_exec(false, offset, len, NULL);
         if (!ret_val) {
-            // not use local_irq_save, avoid delay encoder spi read
+            // not use cd_irq_save, avoid delay encoder spi read
             NVIC_DisableIRQ(ADC1_2_IRQn);
             memcpy(pkt->dat + 1, ((void *) &csa) + offset, len);
             NVIC_EnableIRQ(ADC1_2_IRQn);
@@ -262,7 +262,7 @@ static void p5_service_routine(void)
 }
 
 // qxchg
-static void p6_service_routine(void)
+static void p6_service_poll(void)
 {
     uint8_t ret_val = 0;
     cdn_pkt_t *pkt = cdn_sock_recvfrom(&sock6);
@@ -324,7 +324,7 @@ static void p6_service_routine(void)
 }
 
 
-void common_service_init(void)
+void comm_service_init(void)
 {
     cdn_sock_bind(&sock6);
     cdn_sock_bind(&sock5);
@@ -335,7 +335,7 @@ void common_service_init(void)
     srand(u_id[0] + u_id[1] + u_id[2] + get_systick());
 }
 
-void common_service_routine(void)
+void comm_service_poll(void)
 {
     if (csa.save_conf) {
         csa.save_conf = false;
@@ -346,10 +346,10 @@ void common_service_routine(void)
         gpio_set_val(&drv_en, 0);
         NVIC_SystemReset();
     }
-    p1_service_routine();
-    p5_service_routine();
-    p6_service_routine();
-    p8_service_routine();
+    p1_service_poll();
+    p5_service_poll();
+    p6_service_poll();
+    p8_service_poll();
 }
 
 

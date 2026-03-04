@@ -41,7 +41,7 @@ The payload is encoded using the CDNET protocol. For detailed information, pleas
 
 CDBUS GUI Tool: https://github.com/dukelec/cdbus_gui
 
-Example: Upon power-on, first write 5 to `state`, then write the target position to `tc_pos` to rotate the motor.
+Example: Upon power-on, first write 5 to `state`, then write the target position to `tp_pos` to rotate the motor.
 
 <img src="doc/cdbus_gui.avif">
 

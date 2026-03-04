@@ -26,7 +26,6 @@ typedef struct {
     float delta_t;
     float _f;
     float _g;
-    int32_t _reserved[9];
 } smo_t;
 
 void smo_init(smo_t *smo, bool reset);
@@ -42,13 +41,12 @@ typedef struct {
     float delta_t; // control period [s]
     float _ki;
     float _atan2;  // debug
-    int32_t _reserved[4];
 } pll_t;
 
 void pll_init(pll_t *pll, bool reset);
 void pll_update(pll_t *pll, float e_alpha, float e_beta);
 
 
-void sl_routine(void);
+void sl_maintain(void);
 
 #endif
