@@ -76,7 +76,7 @@ Writing 1 to `cali_run` automatically sets `state` to 1.
 
 Write 2 to `state` to enter torque mode, or current mode. 
 
-The motor can then be rotated by writing the appropriate current value to `cal_current`. 
+The motor can then be rotated by writing the appropriate current value to `tgt_current`. 
 
 The unit of current is the LSB value of the 12bits ADC. 
 
@@ -85,7 +85,7 @@ The unit of current is the LSB value of the 12bits ADC.
 
 Write 3 to `state` to enter speed mode.
 
-Then write the appropriate speed value to `cal_speed` to rotate the motor.
+Then write the appropriate speed value to `tgt_speed` to rotate the motor.
 
 One revolution of the motor is divided into 0x10000 units, e.g. from 0 to 0x10000 is one full revolution.  
 The unit of speed is: how many position-units / second.
@@ -156,5 +156,5 @@ Demonstration of return data for the above three commands:
 fe 00 0a  06 40  xx xx xx xx yy yy yy yy  crc_l crc_h
 ```
 
-The `xx` and `yy` are defined by `qxchg_ret` to return 8 bytes of data such as `cal_pos`.
+The `xx` and `yy` are defined by `qxchg_ret` to return 8 bytes of data such as `tgt_pos`.
 

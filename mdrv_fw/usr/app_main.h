@@ -112,8 +112,8 @@ typedef struct {
     float           cali_angle_speed_tgt; // target speed [rad/s]
     uint8_t         cali_run;
 
-    bool            encoder_linearizer_en;
-    int16_t         encoder_linearizer_max;
+    bool            enc_linear_en;
+    int16_t         enc_linear_max;
     bool            anticog_en;
     int16_t         anticog_max_iq;
     int16_t         anticog_ratio_vq;
@@ -122,8 +122,8 @@ typedef struct {
     uint16_t        tp_max_err;
     uint16_t        ntc_b;
     uint32_t        ntc_r25; // ntc resistor @ 25°C
-    uint8_t         temperature_warn;
-    uint8_t         temperature_err;
+    uint8_t         temp_warn;
+    uint8_t         temp_err;
     uint8_t         voltage_min;
     uint8_t         voltage_max;
     uint8_t         _reserved4[12];
@@ -152,25 +152,25 @@ typedef struct {
         } err_flag_;
     };
 
-    int32_t         cal_pos;
-    float           cal_speed;
-    int32_t         cal_current;
-    float           cal_v_sq;
-    float           cal_v_sd;
+    int32_t         tgt_pos;
+    float           tgt_speed;
+    int32_t         tgt_current;
+    float           tgt_v_sq;
+    float           tgt_v_sd;
 
     uint16_t        ori_encoder;
 
     uint16_t        nob_encoder; // no bias
     int32_t         nob_pos;
-    uint16_t        sen_encoder;
-    float           sen_speed;
-    int32_t         sen_pos;
-    float           sen_speed_avg;
-    float           sen_rpm_avg;
+    uint16_t        meas_encoder;
+    float           meas_speed;
+    int32_t         meas_pos;
+    float           meas_speed_avg;
+    float           meas_rpm_avg;
 
-    float           sen_i_sq;
-    float           sen_i_sd;
-    float           sen_angle_elec;
+    float           meas_i_sq;
+    float           meas_i_sd;
+    float           meas_angle_elec;
 
     uint32_t        loop_cnt;
     int32_t         peak_cur_cnt;
@@ -182,16 +182,16 @@ typedef struct {
 
     uint8_t         adc_sel;  // cur adc channel group
 
-    int16_t         sen_i[3];
+    int16_t         meas_i[3];
     int16_t         pwm_dbg0[3]; // before deadtime compensate
     int16_t         pwm_dbg1[3]; // after deadtime compensate
     int16_t         pwm_uvw[3];
 
-    float           sen_i_sq_avg;
-    float           cal_v_sq_avg;
+    float           meas_i_sq_avg;
+    float           tgt_v_sq_avg;
     uint8_t         _reserved5[8];
     float           bus_voltage;
-    float           temperature;
+    float           motor_temp;
     float           cali_angle_speed;
 
 } csa_t; // config status area

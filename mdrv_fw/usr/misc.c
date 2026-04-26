@@ -77,7 +77,7 @@ void cali_elec_angle(void)
         return;
 
     if (pole_cnt == -1) {
-        csa.encoder_linearizer_en = false;
+        csa.enc_linear_en = false;
         csa.anticog_en = false;
         csa.cali_angle_elec = 0;
         csa.cali_angle_speed_tgt = 0;

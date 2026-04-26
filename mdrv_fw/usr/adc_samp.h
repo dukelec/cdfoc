@@ -14,7 +14,7 @@
 
 
 typedef struct {
-    int16_t         sen_i[3];
+    int16_t         meas_i[3];
     int8_t          adc_sel;
 
     int16_t         regular_i[2];
@@ -49,17 +49,17 @@ static inline void adc_samp_inject(adc_samp_t *as, bool motor_idle, bool motor_w
         swap(adc1_val, adc2_val);
 
     if (as->adc_sel == 0) {
-        as->sen_i[0] = adc1_val - as->adc_ofs[0][0];
-        as->sen_i[1] = adc2_val - as->adc_ofs[0][1];
-        as->sen_i[2] = -as->sen_i[0] - as->sen_i[1];
+        as->meas_i[0] = adc1_val - as->adc_ofs[0][0];
+        as->meas_i[1] = adc2_val - as->adc_ofs[0][1];
+        as->meas_i[2] = -as->meas_i[0] - as->meas_i[1];
     } else if (as->adc_sel == 1) {
-        as->sen_i[2] = adc1_val - as->adc_ofs[1][0];
-        as->sen_i[0] = adc2_val - as->adc_ofs[1][1];
-        as->sen_i[1] = -as->sen_i[0] - as->sen_i[2];
+        as->meas_i[2] = adc1_val - as->adc_ofs[1][0];
+        as->meas_i[0] = adc2_val - as->adc_ofs[1][1];
+        as->meas_i[1] = -as->meas_i[0] - as->meas_i[2];
     } else {
-        as->sen_i[2] = adc1_val - as->adc_ofs[2][0];
-        as->sen_i[1] = adc2_val - as->adc_ofs[2][1];
-        as->sen_i[0] = -as->sen_i[2] - as->sen_i[1];
+        as->meas_i[2] = adc1_val - as->adc_ofs[2][0];
+        as->meas_i[1] = adc2_val - as->adc_ofs[2][1];
+        as->meas_i[0] = -as->meas_i[2] - as->meas_i[1];
     }
 
     if (motor_idle && as->cali_st) {

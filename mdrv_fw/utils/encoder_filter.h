@@ -18,12 +18,12 @@ typedef struct {
     uint16_t    nob_encoder;
     int32_t     nob_pos;
 
-    uint16_t    sen_encoder;
-    float       sen_speed;      // encoder steps per sec
+    uint16_t    meas_encoder;
+    float       meas_speed;     // encoder steps per sec
 
-    int32_t     sen_pos;
-    float       sen_speed_avg;
-    float       sen_rpm_avg;
+    int32_t     meas_pos;
+    float       meas_speed_avg;
+    float       meas_rpm_avg;
 
     // internal
     uint16_t    pos_rec[5];
@@ -66,17 +66,17 @@ static inline void encoder_filter(encoder_filter_t *ef, uint16_t input)
     for (int i = 0; i < 5; i++)
         delta_sum += ef->delta_rec[i];
 
-    ef->sen_speed = delta_sum * (CURRENT_LOOP_FREQ / 5.0f);
+    ef->meas_speed = delta_sum * (CURRENT_LOOP_FREQ / 5.0f);
 
-    ef->sen_speed_avg += (ef->sen_speed - ef->sen_speed_avg) * 0.1f;
-    ef->sen_rpm_avg += (ef->sen_speed_avg / 0x10000 * 60 - ef->sen_rpm_avg) * 0.01f;
+    ef->meas_speed_avg += (ef->meas_speed - ef->meas_speed_avg) * 0.1f;
+    ef->meas_rpm_avg += (ef->meas_speed_avg / 0x10000 * 60 - ef->meas_rpm_avg) * 0.01f;
 
     // position compensation: step/sec * (2 loop period + 0.000019 sec)
-    int16_t pos_comp = lroundf(ef->sen_speed_avg * (2.0f / CURRENT_LOOP_FREQ + 0.000019f));
-    ef->sen_encoder = ef->nob_encoder - ef->bias_encoder + pos_comp;
+    int16_t pos_comp = lroundf(ef->meas_speed_avg * (2.0f / CURRENT_LOOP_FREQ + 0.000019f));
+    ef->meas_encoder = ef->nob_encoder - ef->bias_encoder + pos_comp;
 
-    ef->nob_pos += (int16_t)(ef->sen_encoder - (uint16_t)ef->nob_pos);
-    ef->sen_pos = ef->nob_pos - ef->bias_pos;
+    ef->nob_pos += (int16_t)(ef->meas_encoder - (uint16_t)ef->nob_pos);
+    ef->meas_pos = ef->nob_pos - ef->bias_pos;
 }
 
 #endif

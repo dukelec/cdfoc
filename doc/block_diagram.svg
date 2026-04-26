@@ -7,8 +7,31 @@
    viewBox="-1 -1 246.94456 310.03291"
    version="1.1"
    id="svg1"
+   sodipodi:docname="block_diagram.svg"
+   inkscape:version="1.4 (e7c3feb100, 2024-10-09)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
    xmlns="http://www.w3.org/2000/svg"
    xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview1"
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1.0"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:document-units="mm"
+     inkscape:zoom="1.5111025"
+     inkscape:cx="323.60478"
+     inkscape:cy="187.94224"
+     inkscape:window-width="1249"
+     inkscape:window-height="1058"
+     inkscape:window-x="437"
+     inkscape:window-y="168"
+     inkscape:window-maximized="0"
+     inkscape:current-layer="svg1" />
   <defs
      id="defs1">
     <marker
@@ -435,20 +458,6 @@
        style="font-size:3.7932px;text-align:center;text-anchor:middle;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.711226px"
        x="45.438053"
        y="130.81189">Speed PI controller</tspan></text>
-  <text
-     xml:space="preserve"
-     style="font-size:3.7932px;line-height:125%;font-family:'Liberation Mono';-inkscape-font-specification:'Liberation Mono';letter-spacing:0px;word-spacing:0px;fill:none;stroke:#000000;stroke-width:0.711226px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
-     x="46.51012"
-     y="1.7485883"
-     id="text8-0-6-7"><tspan
-       id="tspan8-9-2-9"
-       style="font-size:3.7932px;text-align:center;text-anchor:middle;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.711226px"
-       x="46.51012"
-       y="1.7485883">Destination position</tspan><tspan
-       style="font-size:3.7932px;text-align:center;text-anchor:middle;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.711226px"
-       x="46.51012"
-       y="6.4900894"
-       id="tspan10">(tp_pos)</tspan></text>
   <path
      style="opacity:0.9;fill:none;stroke:#000000;stroke-width:0.53762;stroke-linecap:round;stroke-dasharray:none;stroke-opacity:1;marker-end:url(#marker8-7)"
      d="m 45.573467,8.6636483 c 0,3.1595617 0,6.3191237 0,9.4786847"
@@ -471,22 +480,27 @@
      id="path16" />
   <text
      xml:space="preserve"
-     style="font-size:3.7932px;line-height:125%;font-family:'Liberation Mono';-inkscape-font-specification:'Liberation Mono';text-align:start;letter-spacing:0px;word-spacing:0px;text-anchor:start;fill:none;stroke:#000000;stroke-width:0.711226px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+     style="font-size:3.7932px;line-height:125%;font-family:'Liberation Mono';-inkscape-font-specification:'Liberation Mono';text-align:start;letter-spacing:0px;word-spacing:0px;text-anchor:start;white-space:pre;inline-size:23.4345;display:inline;fill:none;stroke:#000000;stroke-width:0.711226px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
      x="1.6199026"
      y="83.612038"
      id="text8-0-2"><tspan
-       id="tspan8-9-7"
-       style="font-size:3.7932px;text-align:start;text-anchor:start;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.711226px"
        x="1.6199026"
-       y="83.612038">Sensor</tspan><tspan
-       style="font-size:3.7932px;text-align:start;text-anchor:start;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.711226px"
+       y="83.612038"
+       id="tspan14"><tspan
+   style="fill:#000000;stroke:none"
+   id="tspan1">Actual</tspan>
+</tspan><tspan
        x="1.6199026"
-       y="88.353539"
-       id="tspan18">position</tspan><tspan
-       style="font-size:3.7932px;text-align:start;text-anchor:start;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.711226px"
+       y="88.353536"
+       id="tspan17"><tspan
+   style="fill:#000000;stroke:none"
+   id="tspan16">position</tspan>
+</tspan><tspan
        x="1.6199026"
-       y="93.095039"
-       id="tspan19">(sen_pos)</tspan></text>
+       y="93.095037"
+       id="tspan19"><tspan
+         style="fill:#000000;stroke:none"
+         id="tspan18">(meas_pos)</tspan></tspan></text>
   <text
      xml:space="preserve"
      style="font-size:3.7932px;line-height:125%;font-family:'Liberation Mono';-inkscape-font-specification:'Liberation Mono';text-align:center;letter-spacing:0px;word-spacing:0px;text-anchor:middle;fill:none;stroke:#000000;stroke-width:0.711226px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
@@ -500,7 +514,7 @@
        style="font-size:3.7932px;text-align:center;text-anchor:middle;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.711226px"
        x="21.785221"
        y="61.918049"
-       id="tspan15">(cal_pos)</tspan></text>
+       id="tspan15">(tgt_pos)</tspan></text>
   <path
      style="opacity:0.9;fill:none;stroke:#000000;stroke-width:0.53762;stroke-linecap:round;stroke-dasharray:none;stroke-opacity:1;marker-end:url(#marker8-7-6-5-9)"
      d="m 44.671998,140.7106 c 0,0 0,17.78067 0,17.78067"
@@ -518,25 +532,30 @@
        style="font-size:3.7932px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.711226px"
        x="48.170536"
        y="151.73196"
-       id="tspan23-3">(cal_current)</tspan></text>
+       id="tspan23-3">(tgt_current)</tspan></text>
   <text
      xml:space="preserve"
-     style="font-size:3.7932px;line-height:125%;font-family:'Liberation Mono';-inkscape-font-specification:'Liberation Mono';text-align:start;letter-spacing:0px;word-spacing:0px;text-anchor:start;fill:none;stroke:#000000;stroke-width:0.711226px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+     style="font-size:3.7932px;line-height:125%;font-family:'Liberation Mono';-inkscape-font-specification:'Liberation Mono';text-align:start;letter-spacing:0px;word-spacing:0px;text-anchor:start;white-space:pre;inline-size:28.2258;display:inline;fill:none;stroke:#000000;stroke-width:0.711226px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
      x="1.5367708"
      y="136.25299"
      id="text8-0-2-2"><tspan
-       id="tspan8-9-7-3"
-       style="font-size:3.7932px;text-align:start;text-anchor:start;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.711226px"
        x="1.5367708"
-       y="136.25299">Sensor</tspan><tspan
-       style="font-size:3.7932px;text-align:start;text-anchor:start;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.711226px"
+       y="136.25299"
+       id="tspan22"><tspan
+         style="fill:#000000;stroke:none"
+         id="tspan20">Actual
+</tspan></tspan><tspan
        x="1.5367708"
        y="140.99449"
-       id="tspan18-7">speed</tspan><tspan
-       style="font-size:3.7932px;text-align:start;text-anchor:start;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.711226px"
+       id="tspan24"><tspan
+         style="fill:#000000;stroke:none"
+         id="tspan23">speed
+</tspan></tspan><tspan
        x="1.5367708"
        y="145.73599"
-       id="tspan19-5">(sen_speed)</tspan></text>
+       id="tspan26"><tspan
+         style="fill:#000000;stroke:none"
+         id="tspan25">(meas_speed)</tspan></tspan></text>
   <text
      xml:space="preserve"
      style="font-size:3.7932px;line-height:125%;font-family:'Liberation Mono';-inkscape-font-specification:'Liberation Mono';text-align:start;letter-spacing:0px;word-spacing:0px;text-anchor:start;fill:none;stroke:#000000;stroke-width:0.711226px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
@@ -546,7 +565,7 @@
        style="font-size:3.7932px;text-align:start;text-anchor:start;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.711226px"
        x="10.230767"
        y="212.9395"
-       id="tspan19-5-2">(sen_angle_elec)</tspan></text>
+       id="tspan19-5-2">(meas_angle_elec)</tspan></text>
   <rect
      style="opacity:0.9;fill:none;stroke:#000000;stroke-width:0.53762;stroke-linecap:round;stroke-dasharray:none;stroke-opacity:1"
      id="rect1-9-8-6"
@@ -585,7 +604,7 @@
        style="font-size:3.7932px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.711226px"
        x="63.197628"
        y="190.4113"
-       id="tspan23-3-6">for Iq (cal_v_sq)</tspan></text>
+       id="tspan23-3-6">for Iq (tgt_v_sq)</tspan></text>
   <rect
      style="opacity:0.9;fill:none;stroke:#000000;stroke-width:0.53762;stroke-linecap:round;stroke-dasharray:none;stroke-opacity:1"
      id="rect1-9-8-6-5"
@@ -624,7 +643,7 @@
        style="font-size:3.7932px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.711226px"
        x="113.27301"
        y="190.62503"
-       id="tspan23-3-6-0">for Id (cal_v_sd)</tspan></text>
+       id="tspan23-3-6-0">for Id (tgt_v_sd)</tspan></text>
   <path
      style="opacity:0.9;fill:none;stroke:#000000;stroke-width:0.53762;stroke-linecap:round;stroke-dasharray:none;stroke-opacity:1;marker-end:url(#marker8-7-6-5-9-6)"
      d="m 136.30289,150.39108 c 0,2.79761 0,5.59522 0,8.39282"
@@ -855,7 +874,7 @@
        style="font-size:3.7932px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.711226px"
        x="193.29185"
        y="188.59767"
-       id="tspan23-3-6-6-4-8">(sen_i_sq, sen_i_sd)</tspan></text>
+       id="tspan23-3-6-6-4-8">(meas_i_sq, meas_i_sd)</tspan></text>
   <rect
      style="opacity:0.9;fill:none;stroke:#000000;stroke-width:0.53762;stroke-linecap:round;stroke-dasharray:none;stroke-opacity:1"
      id="rect1-9-8-6-9-8"
@@ -898,7 +917,7 @@
        style="font-size:3.7932px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.711226px"
        x="163.84564"
        y="172.0267"
-       id="tspan23-3-6-6-4-8-9">(sen_i_sd)</tspan></text>
+       id="tspan23-3-6-6-4-8-9">(meas_i_sd)</tspan></text>
   <text
      xml:space="preserve"
      style="font-size:3.7932px;line-height:125%;font-family:'Liberation Mono';-inkscape-font-specification:'Liberation Mono';letter-spacing:0px;word-spacing:0px;fill:none;stroke:#000000;stroke-width:0.711226px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
@@ -908,7 +927,7 @@
        style="font-size:3.7932px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.711226px"
        x="163.84564"
        y="159.22086"
-       id="tspan23-3-6-6-4-8-9-5">(sen_i_sq)</tspan></text>
+       id="tspan23-3-6-6-4-8-9-5">(meas_i_sq)</tspan></text>
   <path
      style="opacity:0.9;fill:none;stroke:#000000;stroke-width:0.53762;stroke-linecap:round;stroke-dasharray:none;stroke-opacity:1;marker-end:url(#marker8-7-6-5-3-7)"
      d="m -0.73118877,207.84476 c 16.86974477,0 33.73948177,0 50.60922677,0"
@@ -943,7 +962,7 @@
        style="font-size:3.7932px;text-align:start;text-anchor:start;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.711226px"
        x="48.339985"
        y="116.91305"
-       id="tspan12">(cal_speed)</tspan></text>
+       id="tspan12">(tgt_speed)</tspan></text>
   <text
      xml:space="preserve"
      style="font-size:3.7932px;line-height:125%;font-family:'Liberation Mono';-inkscape-font-specification:'Liberation Mono';letter-spacing:0px;word-spacing:0px;fill:none;stroke:#000000;stroke-width:0.711226px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
@@ -986,11 +1005,29 @@
   <text
      xml:space="preserve"
      style="font-size:3.7932px;line-height:125%;font-family:'Liberation Mono';-inkscape-font-specification:'Liberation Mono';text-align:start;letter-spacing:0px;word-spacing:0px;text-anchor:start;fill:none;stroke:#000000;stroke-width:0.711226px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
-     x="207.98952"
+     x="205.87288"
      y="211.31203"
      id="text8-0-2-2-7-4"><tspan
        style="font-size:3.7932px;text-align:start;text-anchor:start;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.711226px"
-       x="207.98952"
+       x="205.87288"
        y="211.31203"
-       id="tspan19-5-2-4">(sen_angle_elec)</tspan></text>
+       id="tspan19-5-2-4">(meas_angle_elec)</tspan></text>
+  <text
+     xml:space="preserve"
+     style="font-size:3.7932px;line-height:125%;font-family:'Liberation Mono';-inkscape-font-specification:'Liberation Mono';text-align:center;letter-spacing:0px;word-spacing:0px;text-anchor:middle;white-space:pre;inline-size:88.3793;fill:none;stroke:#000000;stroke-width:0.711226px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+     x="91.866829"
+     y="11.802754"
+     id="text8-0-2-1-5"
+     transform="translate(-46.339099,-10.054166)"><tspan
+       x="91.866829"
+       y="11.802754"
+       id="tspan28"><tspan
+   style="fill:#000000;stroke:none"
+   id="tspan27">Destination position / speed / accel</tspan>
+</tspan><tspan
+       x="91.866829"
+       y="16.544255"
+       id="tspan30"><tspan
+         style="fill:#000000;stroke:none"
+         id="tspan29">(tp_pos, tp_speed, tp_accel)</tspan></tspan></text>
 </svg>

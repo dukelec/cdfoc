@@ -15,7 +15,7 @@
 
 static inline void adc_samp2csa(adc_samp_t *as)
 {
-    memcpy(csa.sen_i, as->sen_i, sizeof(csa.sen_i));
+    memcpy(csa.meas_i, as->meas_i, sizeof(csa.meas_i));
 }
 
 
@@ -31,7 +31,7 @@ static inline void encoder_filter2csa(encoder_filter_t *ef)
 {
     csa.nob_encoder = ef->nob_encoder;
     memcpy(&csa.nob_pos, &ef->nob_pos,
-            offsetof(encoder_filter_t, sen_rpm_avg) - offsetof(encoder_filter_t, nob_pos) + 4);
+            offsetof(encoder_filter_t, meas_rpm_avg) - offsetof(encoder_filter_t, nob_pos) + 4);
 }
 
 
@@ -39,7 +39,7 @@ static inline void encoder_filter2csa(encoder_filter_t *ef)
 
 static inline void csa2encoder_linearizer_mt(encoder_linearizer_t *el)
 {
-    el->max_val = csa.encoder_linearizer_max;
+    el->max_val = csa.enc_linear_max;
 }
 
 
@@ -75,7 +75,7 @@ static inline void trap_planner2csa_rst(trap_planner_t *tp)
 
 static inline void trap_planner2csa(trap_planner_t *tp)
 {
-    csa.cal_pos = tp->pos_out;
+    csa.tgt_pos = tp->pos_out;
 
     csa.tp_state = tp->state;
     csa.tp_vel_out = tp->vel_out;

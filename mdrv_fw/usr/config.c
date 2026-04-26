@@ -17,7 +17,7 @@ reg2r_t csa_w_allow[] = {
         { .offset = offsetof(csa_t, pid_i_sq), .size = offsetof(pid_f_t, target) },
         { .offset = offsetof(csa_t, pid_i_sd), .size = offsetof(pid_f_t, target) },
         { .offset = offsetof(csa_t, peak_cur_threshold),
-                .size = offsetof(csa_t, cal_v_sq) - offsetof(csa_t, peak_cur_threshold) }
+                .size = offsetof(csa_t, tgt_v_sq) - offsetof(csa_t, peak_cur_threshold) }
 };
 
 csa_hook_t csa_w_hook[] = {
@@ -76,7 +76,7 @@ const csa_t csa_dft = {
                 { .offset = offsetof(csa_t, tp_pos), .size = 4 * 3 }
         },
         .qxchg_ret = {
-                { .offset = offsetof(csa_t, cal_pos), .size = 8 }
+                { .offset = offsetof(csa_t, tgt_pos), .size = 8 }
         },
 
         .dbg_str_msk = 0x0, //0 or 0xff,
@@ -84,27 +84,27 @@ const csa_t csa_dft = {
         .dbg_raw_msk = 0,
         .dbg_raw = {
                 { // cur
-                        { .offset = offsetof(csa_t, sen_i_sq), .size = 4 * 2 }, // sen_i_sq, sen_i_sd
+                        { .offset = offsetof(csa_t, meas_i_sq), .size = 4 * 2 }, // meas_i_sq, meas_i_sd
                         { .offset = offsetof(csa_t, pid_i_sq) + offsetof(pid_f_t, target), .size = 4 * 2 }, // target, i_term
                         { .offset = offsetof(csa_t, pid_i_sd) + offsetof(pid_f_t, i_term), .size = 4 }, // i_term
-                        { .offset = offsetof(csa_t, cal_v_sq), .size = 4 * 2 }, // sq_cal, sd_cal
-                        { .offset = offsetof(csa_t, sen_encoder), .size = 2 }
+                        { .offset = offsetof(csa_t, tgt_v_sq), .size = 4 * 2 }, // sq_cal, sd_cal
+                        { .offset = offsetof(csa_t, meas_encoder), .size = 2 }
                 }, { // speed
-                        { .offset = offsetof(csa_t, sen_speed), .size = 4 },
+                        { .offset = offsetof(csa_t, meas_speed), .size = 4 },
                         { .offset = offsetof(csa_t, pid_speed) + offsetof(pid_f_t, target), .size = 4 * 2 }, // target, i_term
-                        { .offset = offsetof(csa_t, cal_current), .size = 4 },
-                        { .offset = offsetof(csa_t, sen_encoder), .size = 2 },
-                        { .offset = offsetof(csa_t, sen_speed_avg), .size = 4 }
+                        { .offset = offsetof(csa_t, tgt_current), .size = 4 },
+                        { .offset = offsetof(csa_t, meas_encoder), .size = 2 },
+                        { .offset = offsetof(csa_t, meas_speed_avg), .size = 4 }
                 }, { // pos
-                        { .offset = offsetof(csa_t, sen_pos), .size = 4 },
+                        { .offset = offsetof(csa_t, meas_pos), .size = 4 },
                         { .offset = offsetof(csa_t, pid_pos) + offsetof(pid_i_t, target), .size = 4 * 2 }, // target, i_term
-                        { .offset = offsetof(csa_t, cal_speed), .size = 4 },
+                        { .offset = offsetof(csa_t, tgt_speed), .size = 4 },
                         { .offset = offsetof(csa_t, tp_vel_out), .size = 4 },
-                        { .offset = offsetof(csa_t, sen_speed_avg), .size = 4 }
+                        { .offset = offsetof(csa_t, meas_speed_avg), .size = 4 }
                 }, { // t_curve
                         { .offset = offsetof(csa_t, tp_state), .size = 1 },
                         { .offset = offsetof(csa_t, tp_pos), .size = 4 },
-                        { .offset = offsetof(csa_t, cal_pos), .size = 4 },
+                        { .offset = offsetof(csa_t, tgt_pos), .size = 4 },
                         { .offset = offsetof(csa_t, tp_vel_out), .size = 4 },
                         { .offset = offsetof(csa_t, tp_acc_brake), .size = 4 }
                 }
@@ -120,8 +120,8 @@ const csa_t csa_dft = {
         .tp_max_err = 0x1000,
         .ntc_b = 3970,
         .ntc_r25 = 100000, // 100k
-        .temperature_warn = 90,
-        .temperature_err = 100,
+        .temp_warn = 90,
+        .temp_err = 100,
         .voltage_min = 7,
         .voltage_max = 38
 };
@@ -323,8 +323,8 @@ void csa_list_show(void)
     CSA_SHOW(0, cali_run, "0: stopped, write 1 start calibration");
     d_info("\n");
 
-    CSA_SHOW(0, encoder_linearizer_en, "");
-    CSA_SHOW(0, encoder_linearizer_max, "");
+    CSA_SHOW(0, enc_linear_en, "");
+    CSA_SHOW(0, enc_linear_max, "");
     CSA_SHOW(0, anticog_en, "");
     CSA_SHOW(0, anticog_max_iq, "");
     CSA_SHOW(0, anticog_ratio_vq, "");
@@ -332,8 +332,8 @@ void csa_list_show(void)
     CSA_SHOW(0, tp_max_err, "Limit position error");
     CSA_SHOW(0, ntc_b, "");
     CSA_SHOW(0, ntc_r25, "");
-    CSA_SHOW(0, temperature_warn, "");
-    CSA_SHOW(0, temperature_err, "");
+    CSA_SHOW(0, temp_warn, "");
+    CSA_SHOW(0, temp_err, "");
     CSA_SHOW(0, voltage_min, "");
     CSA_SHOW(0, voltage_max, "");
     d_info("\n");
@@ -343,26 +343,26 @@ void csa_list_show(void)
     CSA_SHOW(1, err_flag, "");
     d_info("\n");
 
-    CSA_SHOW(1, cal_pos, "pos loop target");
-    CSA_SHOW(1, cal_speed, "speed loop target");
-    CSA_SHOW(0, cal_current, "cur loop target");
-    CSA_SHOW(0, cal_v_sq, "v_sq info");
-    CSA_SHOW(0, cal_v_sd, "v_sd info");
+    CSA_SHOW(1, tgt_pos, "pos loop target");
+    CSA_SHOW(1, tgt_speed, "speed loop target");
+    CSA_SHOW(0, tgt_current, "cur loop target");
+    CSA_SHOW(0, tgt_v_sq, "v_sq info");
+    CSA_SHOW(0, tgt_v_sd, "v_sd info");
     d_info("\n");
 
     CSA_SHOW(1, ori_encoder, "Origin encoder value");
     d_info("\n");
 
     CSA_SHOW(1, nob_encoder, "Encoder value before add bias");
-    CSA_SHOW(1, nob_pos, "sen_pos before add offset");
-    CSA_SHOW(1, sen_encoder, "Encoder value filtered");
-    CSA_SHOW(1, sen_speed, "delta_encoder filtered");
-    CSA_SHOW(1, sen_pos, "multiturn + sen_encoder data");
-    CSA_SHOW(0, sen_speed_avg, "");
-    CSA_SHOW(0, sen_rpm_avg, "");
-    CSA_SHOW(0, sen_i_sq, "i_sq from adc");
-    CSA_SHOW(0, sen_i_sd, "i_sd from adc");
-    CSA_SHOW(0, sen_angle_elec, "Get electric angle from sen_encoder");
+    CSA_SHOW(1, nob_pos, "meas_pos before add offset");
+    CSA_SHOW(1, meas_encoder, "Encoder value filtered");
+    CSA_SHOW(1, meas_speed, "delta_encoder filtered");
+    CSA_SHOW(1, meas_pos, "multiturn + meas_encoder data");
+    CSA_SHOW(0, meas_speed_avg, "");
+    CSA_SHOW(0, meas_rpm_avg, "");
+    CSA_SHOW(0, meas_i_sq, "i_sq from adc");
+    CSA_SHOW(0, meas_i_sd, "i_sd from adc");
+    CSA_SHOW(0, meas_angle_elec, "Get electric angle from meas_encoder");
     d_info("\n");
 
     CSA_SHOW(0, loop_cnt, "Increase at current loop, for raw dbg");
@@ -375,16 +375,16 @@ void csa_list_show(void)
     d_info("\n");
 
     CSA_SHOW(0, adc_sel, "");
-    CSA_SHOW(0, sen_i, "");
+    CSA_SHOW(0, meas_i, "");
     CSA_SHOW(0, pwm_dbg0, "");
     CSA_SHOW(0, pwm_dbg1, "");
     CSA_SHOW(0, pwm_uvw, "");
     d_info("\n");
 
-    CSA_SHOW(0, sen_i_sq_avg, "");
-    CSA_SHOW(0, cal_v_sq_avg, "");
+    CSA_SHOW(0, meas_i_sq_avg, "");
+    CSA_SHOW(0, tgt_v_sq_avg, "");
     CSA_SHOW(0, bus_voltage, "");
-    CSA_SHOW(0, temperature, "");
+    CSA_SHOW(0, motor_temp, "");
     CSA_SHOW(0, cali_angle_speed, "");
     d_info("\n");
 
