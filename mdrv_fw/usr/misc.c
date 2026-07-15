@@ -57,7 +57,7 @@ void raw_dbg(int idx)
 
     uint8_t len_delta = frm_raw[idx]->dat[2] - len_bk;
     if (frm_raw[idx]->dat[2] + len_delta > 253) {
-        cdctl_put_tx_frame(&r_dev.cd_dev, frm_raw[idx]);
+        cdctl_send_frame(&r_dev.cd_dev, frm_raw[idx]);
         frm_raw[idx] = NULL;
     }
 }

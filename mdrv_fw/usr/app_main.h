@@ -36,6 +36,7 @@
 
 #define FRAME_MAX           60
 #define PACKET_MAX          60
+#define CDN_MAX_PAYLOAD     251
 
 
 typedef enum {

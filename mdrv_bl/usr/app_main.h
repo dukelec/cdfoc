@@ -27,6 +27,7 @@
 
 #define FRAME_MAX           30
 #define PACKET_MAX          30
+#define CDN_MAX_PAYLOAD     251
 
 
 typedef struct {
