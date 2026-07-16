@@ -23,7 +23,7 @@
 
 #define BL_ARGS             0x20000000 // first word
 #define APP_CONF_ADDR       0x0801f800 // page 63, the last page
-#define APP_CONF_VER        0x0200
+#define APP_CONF_VER        0x0300
 
 #define FRAME_MAX           30
 #define PACKET_MAX          30
@@ -37,23 +37,40 @@ typedef struct {
 
 
 typedef struct {
-    uint16_t        magic_code; // 0xcdcd
+    uint16_t        magic_code;     // 0xcdcd
     uint16_t        conf_ver;
-    uint8_t         conf_from;  // 0: default, 1: load from flash
-    uint8_t         do_reboot;
-    bool            keep_in_bl;
+    uint8_t         conf_from;      // 0: default, 1: load from flash
+    uint8_t         do_reboot;      // 1: reboot to bl, 2: reboot to app
+    bool            keep_bl;
     bool            save_conf;
+    uint8_t         _reserved0[7];
 
-    uint8_t         bus_net;
-    cdctl_cfg_t     bus_cfg;
+    uint8_t         mac;
+    uint32_t        baud_rate_l;
+    uint32_t        baud_rate_h;
+    uint8_t         bus_filter_m[2];
+    uint8_t         _reserved01[2];
+    uint8_t         bus_mode;
+    uint8_t         bus_idle_wait_len;
+    uint16_t        bus_tx_permit_len;
+    uint16_t        bus_max_idle_len;
+    uint8_t         bus_tx_pre_len;
+    uint8_t         _reserved1[13];
+
     bool            dbg_en;
 
-    uint8_t         _keep[1024]; // covers the areas in the app csa that need to be saved
+    uint8_t         _reserved2[975];
 
-    // end of flash
-    uint8_t         _end_save;
+    #define         _end_save _reserved3 // offset: 1 KiB
+    uint8_t         _reserved3;
 
 } csa_t; // config status area
+
+_Static_assert(offsetof(csa_t, mac) == 0x000f, "CSA mac offset");
+_Static_assert(offsetof(csa_t, baud_rate_l) == 0x0010, "CSA baud_rate offset");
+_Static_assert(offsetof(csa_t, bus_mode) == 0x001c, "CSA bus_mode offset");
+_Static_assert(offsetof(csa_t, dbg_en) == 0x0030, "CSA dbg_en offset");
+_Static_assert(offsetof(csa_t, _end_save) == 0x0400, "CSA saved config size");
 
 extern csa_t csa;
 extern const csa_t csa_dft;

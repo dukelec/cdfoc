@@ -11,13 +11,11 @@
 #include "math.h"
 
 reg2r_t csa_w_allow[] = {
-        { .offset = offsetof(csa_t, magic_code), .size = offsetof(csa_t, pid_pos) - offsetof(csa_t, magic_code) },
-        { .offset = offsetof(csa_t, pid_pos), .size = offsetof(pid_i_t, target) },
-        { .offset = offsetof(csa_t, pid_speed), .size = offsetof(pid_f_t, target) },
-        { .offset = offsetof(csa_t, pid_i_sq), .size = offsetof(pid_f_t, target) },
-        { .offset = offsetof(csa_t, pid_i_sd), .size = offsetof(pid_f_t, target) },
-        { .offset = offsetof(csa_t, peak_cur_threshold),
-                .size = offsetof(csa_t, tgt_v_sq) - offsetof(csa_t, peak_cur_threshold) }
+        { .offset = offsetof(csa_t, magic_code), .size = 4 },
+        { .offset = offsetof(csa_t, do_reboot),
+                .size = offsetof(csa_t, tp_max_err) + sizeof(csa.tp_max_err) - offsetof(csa_t, do_reboot) },
+        { .offset = offsetof(csa_t, pid_pos_kp),
+                .size = offsetof(csa_t, _reserved_tgt_elec_angle) - offsetof(csa_t, pid_pos_kp) }
 };
 
 csa_hook_t csa_w_hook[] = {
@@ -25,7 +23,7 @@ csa_hook_t csa_w_hook[] = {
             .range = { .offset = offsetof(csa_t, state), .size = 1 },
             .before = state_w_hook_before
         }, {
-            .range = { .offset = offsetof(csa_t, tp_pos), .size = offsetof(csa_t, tp_state) - offsetof(csa_t, tp_pos) },
+            .range = { .offset = offsetof(csa_t, tp_pos), .size = 0x14 },
             .after = motor_w_hook_after
         }
 };
@@ -41,33 +39,32 @@ const csa_t csa_dft = {
         .magic_code = 0xcdcd,
         .conf_ver = APP_CONF_VER,
 
-        .bus_cfg = CDCTL_CFG_DFT(0xfe),
+        .mac = 0xfe,
+        .baud_rate_l = 115200,
+        .baud_rate_h = 115200,
+        .bus_filter_m = { 0xff, 0xff },
+        .bus_mode = 1,
+        .bus_idle_wait_len = 0x0a,
+        .bus_tx_permit_len = 0x14,
+        .bus_max_idle_len = 0xc8,
+        .bus_tx_pre_len = 0x01,
         .dbg_en = false,
 
-        .pid_pos = { // motor must have enough power to follow the target position
-                .kp = 50,
-                .out_min = -65536*100,
-                .out_max = 65536*100,
-                .dt = 25.0f / CURRENT_LOOP_FREQ
-        },
-        .pid_speed = {
-                .kp = 0.02, .ki = 2,
-                .out_min = -3000,
-                .out_max = 3000, // limit output current
-                .dt = 5.0f / CURRENT_LOOP_FREQ
-        },
-        .pid_i_sq =  {
-                .kp = 0.1, .ki = 50,
-                .out_min = -2165,
-                .out_max = 2165,
-                .dt = 1.0f / CURRENT_LOOP_FREQ
-        },
-        .pid_i_sd =  {
-                .kp = 0.07, .ki = 50,
-                .out_min = -1600,
-                .out_max = 1600,
-                .dt = 1.0f / CURRENT_LOOP_FREQ
-        },
+        .pid_pos_kp = 50,
+        .pid_pos_out_min = -65536*100,
+        .pid_pos_out_max = 65536*100,
+        .pid_speed_kp = 0.16,
+        .pid_speed_ki = 16,
+        .pid_speed_out_min = -15000,
+        .pid_speed_out_max = 15000,
+        .pid_iq_kp = 0.1,
+        .pid_iq_ki = 50,
+        .pid_iq_out_min = -16384,
+        .pid_iq_out_max = 16384,
+        .pid_id_kp = 0.07,
+        .pid_id_ki = 50,
+        .pid_id_out_min = -16384,
+        .pid_id_out_max = 16384,
 
         .motor_poles = 7,
         .bias_encoder = 0x1234,
@@ -81,49 +78,27 @@ const csa_t csa_dft = {
 
         .dbg_str_msk = 0x0, //0 or 0xff,
 
-        .dbg_raw_msk = 0,
+        .dbg_raw_en = 0,
         .dbg_raw = {
-                { // cur
-                        { .offset = offsetof(csa_t, meas_i_sq), .size = 4 * 2 }, // meas_i_sq, meas_i_sd
-                        { .offset = offsetof(csa_t, pid_i_sq) + offsetof(pid_f_t, target), .size = 4 * 2 }, // target, i_term
-                        { .offset = offsetof(csa_t, pid_i_sd) + offsetof(pid_f_t, i_term), .size = 4 }, // i_term
-                        { .offset = offsetof(csa_t, tgt_v_sq), .size = 4 * 2 }, // sq_cal, sd_cal
-                        { .offset = offsetof(csa_t, meas_encoder), .size = 2 }
-                }, { // speed
-                        { .offset = offsetof(csa_t, meas_speed), .size = 4 },
-                        { .offset = offsetof(csa_t, pid_speed) + offsetof(pid_f_t, target), .size = 4 * 2 }, // target, i_term
-                        { .offset = offsetof(csa_t, tgt_current), .size = 4 },
-                        { .offset = offsetof(csa_t, meas_encoder), .size = 2 },
-                        { .offset = offsetof(csa_t, meas_speed_avg), .size = 4 }
-                }, { // pos
-                        { .offset = offsetof(csa_t, meas_pos), .size = 4 },
-                        { .offset = offsetof(csa_t, pid_pos) + offsetof(pid_i_t, target), .size = 4 * 2 }, // target, i_term
-                        { .offset = offsetof(csa_t, tgt_speed), .size = 4 },
-                        { .offset = offsetof(csa_t, tp_vel_out), .size = 4 },
-                        { .offset = offsetof(csa_t, meas_speed_avg), .size = 4 }
-                }, { // t_curve
-                        { .offset = offsetof(csa_t, tp_state), .size = 1 },
-                        { .offset = offsetof(csa_t, tp_pos), .size = 4 },
-                        { .offset = offsetof(csa_t, tgt_pos), .size = 4 },
-                        { .offset = offsetof(csa_t, tp_vel_out), .size = 4 },
-                        { .offset = offsetof(csa_t, tp_acc_brake), .size = 4 }
-                }
+                { .offset = offsetof(csa_t, tgt_vq), .size = 2 },
+                { .offset = offsetof(csa_t, meas_iq), .size = 4 },
+                { .offset = offsetof(csa_t, meas_encoder), .size = 2 }
         },
 
         .tp_speed = 65536*20,
         .tp_accel = 65536*5,
 
         .cali_angle_elec = (float)M_PI/2,
-        .cali_current = 200,
+        .cali_voltage = SVPWM_FULL / 5,
 
-        .nominal_voltage = 24.0f,
+        .nominal_voltage = 240,
         .tp_max_err = 0x1000,
         .ntc_b = 3970,
         .ntc_r25 = 100000, // 100k
-        .temp_warn = 90,
-        .temp_err = 100,
-        .voltage_min = 7,
-        .voltage_max = 38
+        .temp_warn = 900,
+        .temp_err = 1000,
+        .voltage_min = 70,
+        .voltage_max = 380
 };
 
 csa_t csa;
@@ -138,17 +113,15 @@ void load_conf(void)
     if (magic_code == 0xcdcd && conf_ver == APP_CONF_VER) {
         memcpy(&csa, (void *)APP_CONF_ADDR, offsetof(csa_t, _end_save));
         csa.conf_from = 1;
-    } else if (magic_code == 0xcdcd && (conf_ver >> 8) == (APP_CONF_VER >> 8)) {
+    } else if (magic_code == 0xcdcd && (conf_ver >> 12) == (APP_CONF_VER >> 12)) {
         memcpy(&csa, (void *)APP_CONF_ADDR, offsetof(csa_t, _end_common));
         csa.conf_from = 2;
         csa.conf_ver = APP_CONF_VER;
     }
-    if (csa.conf_from)
+    if (csa.conf_from) {
         memset(&csa.do_reboot, 0, 3);
-    csa.pid_pos.dt = csa_dft.pid_pos.dt;
-    csa.pid_speed.dt = csa_dft.pid_speed.dt;
-    csa.pid_i_sq.dt = csa_dft.pid_i_sq.dt;
-    csa.pid_i_sd.dt = csa_dft.pid_i_sd.dt;
+        csa.dbg_raw_en = 0;
+    }
 }
 
 int save_conf(void)
@@ -252,140 +225,113 @@ void csa_list_show(void)
     CSA_SHOW(1, conf_ver, "Config version");
     CSA_SHOW(1, conf_from, "0: default config, 1: all from flash, 2: partly from flash");
     CSA_SHOW(0, do_reboot, "1: reboot to bl, 2: reboot to app");
+    CSA_SHOW(0, keep_bl, "Keep running in bootloader");
     CSA_SHOW(0, save_conf, "Write 1 to save current config to flash");
     d_info("\n");
 
-    CSA_SHOW_SUB(1, bus_cfg, cdctl_cfg_t, mac, "RS-485 port id, range: 0~254");
-    CSA_SHOW_SUB(0, bus_cfg, cdctl_cfg_t, baud_l, "RS-485 baud rate for first byte");
-    CSA_SHOW_SUB(0, bus_cfg, cdctl_cfg_t, baud_h, "RS-485 baud rate for follow bytes");
-    CSA_SHOW_SUB(1, bus_cfg, cdctl_cfg_t, filter_m, "Multicast address");
-    CSA_SHOW_SUB(0, bus_cfg, cdctl_cfg_t, mode, "0: Traditional, 1: Arbitration, 2: Break Sync");
-    CSA_SHOW_SUB(0, bus_cfg, cdctl_cfg_t, tx_permit_len, "Allow send wait time");
-    CSA_SHOW_SUB(0, bus_cfg, cdctl_cfg_t, max_idle_len, "Max idle wait time for BS mode");
-    CSA_SHOW_SUB(0, bus_cfg, cdctl_cfg_t, tx_pre_len, "Active TX_EN before TX");
+    CSA_SHOW(1, mac, "RS-485 port id, range: 0~254");
+    CSA_SHOW(0, baud_rate_l, "RS-485 low baud rate");
+    CSA_SHOW(0, baud_rate_h, "RS-485 high baud rate");
+    CSA_SHOW(1, bus_filter_m, "Multicast address");
+    CSA_SHOW(0, bus_mode, "0: Traditional, 1: Arbitration, 2: Break Sync");
+    CSA_SHOW(0, bus_idle_wait_len, "Idle wait time");
+    CSA_SHOW(0, bus_tx_permit_len, "Allow send wait time");
+    CSA_SHOW(0, bus_max_idle_len, "Max idle wait time for BS mode");
+    CSA_SHOW(0, bus_tx_pre_len, "Active TX_EN before TX");
     d_debug("\n");
 
     CSA_SHOW(0, dbg_en, "1: Report debug message to host, 0: do not report");
+    CSA_SHOW(0, dbg_raw_en, "1: current, 2: speed, 4: position loop");
+    CSA_SHOW(1, dbg_raw, "Config raw debug data sources");
+    CSA_SHOW(1, qxchg_mcast, "Quick-exchange multicast offset and size");
+    CSA_SHOW(1, qxchg_set, "Quick-exchange write data components");
+    CSA_SHOW(1, qxchg_ret, "Quick-exchange return data components");
     d_info("\n");
 
-    CSA_SHOW_SUB(0, pid_pos, pid_i_t, kp, "");
-    CSA_SHOW_SUB(0, pid_pos, pid_i_t, out_min, "");
-    CSA_SHOW_SUB(0, pid_pos, pid_i_t, out_max, "");
-    d_info("\n");
-
-    CSA_SHOW_SUB(0, pid_speed, pid_f_t, kp, "");
-    CSA_SHOW_SUB(0, pid_speed, pid_f_t, ki, "");
-    CSA_SHOW_SUB(0, pid_speed, pid_f_t, out_min, "");
-    CSA_SHOW_SUB(0, pid_speed, pid_f_t, out_max, "");
-    d_info("\n");
-
-    CSA_SHOW_SUB(0, pid_i_sq, pid_f_t, kp, "");
-    CSA_SHOW_SUB(0, pid_i_sq, pid_f_t, ki, "");
-    CSA_SHOW_SUB(0, pid_i_sq, pid_f_t, out_min, "");
-    CSA_SHOW_SUB(0, pid_i_sq, pid_f_t, out_max, "");
-    d_info("\n");
-
-    CSA_SHOW_SUB(0, pid_i_sd, pid_f_t, kp, "");
-    CSA_SHOW_SUB(0, pid_i_sd, pid_f_t, ki, "");
-    CSA_SHOW_SUB(0, pid_i_sd, pid_f_t, out_min, "");
-    CSA_SHOW_SUB(0, pid_i_sd, pid_f_t, out_max, "");
-    d_info("\n");
-
-    CSA_SHOW(0, motor_poles, "Motor poles");
-    CSA_SHOW(0, motor_wire_swap, "Software swaps motor wiring");
-    CSA_SHOW(1, bias_encoder, "Offset for encoder value");
-    CSA_SHOW(0, bias_pos, "Offset for pos value");
-    d_info("\n");
-    
-    CSA_SHOW(1, qxchg_mcast, "Offset and size for quick-exchange multicast");
-    CSA_SHOW(1, qxchg_set, "Config the write data components for quick-exchange channel");
-    CSA_SHOW(1, qxchg_ret, "Config the return data components for quick-exchange channel");
-    d_info("\n");
-
-    CSA_SHOW(1, dbg_str_msk, "Config which debug data to be send");
-    d_info("\n");
-
-    CSA_SHOW(1, dbg_raw_msk, "Config which raw debug data to be send");
-    CSA_SHOW(1, dbg_raw[0], "Config raw debug for current loop");
-    CSA_SHOW(1, dbg_raw[1], "Config raw debug for speed loop");
-    CSA_SHOW(1, dbg_raw[2], "Config raw debug for position loop");
-    CSA_SHOW(1, dbg_raw[3], "Config raw debug for position plan");
-    d_info("\n");
-
-    CSA_SHOW(1, tp_pos, "Set target position");
-    CSA_SHOW(1, tp_speed, "Set target speed");
-    CSA_SHOW(1, tp_accel, "Set target accel");
-    d_info("\n");
-
-    CSA_SHOW(0, cali_angle_elec, "Calibration mode angle");
-    CSA_SHOW(0, cali_current, "Calibration mode current");
-    CSA_SHOW(0, cali_angle_speed_tgt, "Calibration mode speed");
-    CSA_SHOW(0, cali_run, "0: stopped, write 1 start calibration");
-    d_info("\n");
-
+    CSA_SHOW(0, nominal_voltage, "Nominal voltage, 0.1 V");
     CSA_SHOW(0, enc_linear_en, "");
     CSA_SHOW(0, enc_linear_max, "");
     CSA_SHOW(0, anticog_en, "");
     CSA_SHOW(0, anticog_max_iq, "");
     CSA_SHOW(0, anticog_ratio_vq, "");
-    CSA_SHOW(0, nominal_voltage, "");
-    CSA_SHOW(0, tp_max_err, "Limit position error");
+    CSA_SHOW(0, motor_wire_swap, "Software swaps motor wiring");
+    CSA_SHOW(0, motor_poles, "Motor poles");
+    CSA_SHOW(1, bias_encoder, "Offset for encoder value");
+    CSA_SHOW(0, bias_pos, "Offset for position value");
+    CSA_SHOW(0, cali_voltage, "Encoder calibration voltage, counts");
     CSA_SHOW(0, ntc_b, "");
     CSA_SHOW(0, ntc_r25, "");
-    CSA_SHOW(0, temp_warn, "");
-    CSA_SHOW(0, temp_err, "");
-    CSA_SHOW(0, voltage_min, "");
-    CSA_SHOW(0, voltage_max, "");
-    d_info("\n");
-    while (frame_free_head.len < FRAME_MAX - 5);
+    CSA_SHOW(0, voltage_min, "Undervoltage threshold, 0.1 V");
+    CSA_SHOW(0, voltage_max, "Overvoltage threshold, 0.1 V");
+    CSA_SHOW(0, temp_err, "Overtemperature threshold, 0.1 C");
+    CSA_SHOW(0, temp_warn, "Temperature warning threshold, 0.1 C");
 
-    CSA_SHOW(0, state, "0: stop, 1: calibrate, 2: cur loop, 3: speed loop, 4: pos loop, 5: t_curve");
-    CSA_SHOW(1, err_flag, "");
-    d_info("\n");
-
-    CSA_SHOW(1, tgt_pos, "pos loop target");
-    CSA_SHOW(1, tgt_speed, "speed loop target");
-    CSA_SHOW(0, tgt_current, "cur loop target");
-    CSA_SHOW(0, tgt_v_sq, "v_sq info");
-    CSA_SHOW(0, tgt_v_sd, "v_sd info");
-    d_info("\n");
-
-    CSA_SHOW(1, ori_encoder, "Origin encoder value");
-    d_info("\n");
-
-    CSA_SHOW(1, nob_encoder, "Encoder value before add bias");
-    CSA_SHOW(1, nob_pos, "meas_pos before add offset");
-    CSA_SHOW(1, meas_encoder, "Encoder value filtered");
-    CSA_SHOW(1, meas_speed, "delta_encoder filtered");
-    CSA_SHOW(1, meas_pos, "multiturn + meas_encoder data");
-    CSA_SHOW(0, meas_speed_avg, "");
-    CSA_SHOW(0, meas_rpm_avg, "");
-    CSA_SHOW(0, meas_i_sq, "i_sq from adc");
-    CSA_SHOW(0, meas_i_sd, "i_sd from adc");
-    CSA_SHOW(0, meas_angle_elec, "Get electric angle from meas_encoder");
-    d_info("\n");
-
-    CSA_SHOW(0, loop_cnt, "Increase at current loop, for raw dbg");
-    d_info("\n");
-
-    d_debug("   //--------------- Follows are not writable: -------------------\n");
-    CSA_SHOW(0, tp_state, "trap_planner: -1: disable, 0: idle, 1: planning");
+    CSA_SHOW(1, tp_pos, "Set target position");
+    CSA_SHOW(1, tp_speed, "Set target speed");
+    CSA_SHOW(1, tp_accel, "Set target accel");
+    CSA_SHOW(0, tp_max_err, "Limit position error");
+    CSA_SHOW(0, tp_state, "Trap planner state");
     CSA_SHOW(0, tp_vel_out, "Current planned velocity");
-    CSA_SHOW(0, tp_acc_brake, "Required braking acceleration");
     d_info("\n");
 
+    while (frame_free_head.len < FRAME_MAX - 5);
+    CSA_SHOW(0, pid_pos_kp, "");
+    CSA_SHOW(0, pid_pos_out_min, "");
+    CSA_SHOW(0, pid_pos_out_max, "");
+    CSA_SHOW(0, pid_speed_kp, "");
+    CSA_SHOW(0, pid_speed_ki, "");
+    CSA_SHOW(0, pid_speed_out_min, "");
+    CSA_SHOW(0, pid_speed_out_max, "");
+    CSA_SHOW(0, pid_iq_kp, "");
+    CSA_SHOW(0, pid_iq_ki, "");
+    CSA_SHOW(0, pid_iq_out_min, "");
+    CSA_SHOW(0, pid_iq_out_max, "");
+    CSA_SHOW(0, pid_id_kp, "");
+    CSA_SHOW(0, pid_id_ki, "");
+    CSA_SHOW(0, pid_id_out_min, "");
+    CSA_SHOW(0, pid_id_out_max, "");
+
+    CSA_SHOW(0, enc_cali, "Write 1 to calibrate encoder");
+    CSA_SHOW(0, state, "0: stop, 1: voltage, 2: current, 3: speed, 4: position, 5: trap planner");
+    CSA_SHOW(1, error_flag, "");
+    CSA_SHOW(1, warn_flag, "");
+    CSA_SHOW(1, tgt_pos, "Position target");
+    CSA_SHOW(1, tgt_speed, "Speed target");
+    CSA_SHOW(0, tgt_iq, "Iq target");
+    CSA_SHOW(0, tgt_vq, "Vq target");
+    CSA_SHOW(0, tgt_vd, "Vd target");
+    CSA_SHOW(1, meas_encoder, "Encoder value");
+    CSA_SHOW(0, meas_elec_angle, "Measured electrical angle");
+    CSA_SHOW(1, meas_pos, "Measured position");
+    CSA_SHOW(1, meas_speed, "Measured speed");
+    CSA_SHOW(0, meas_iq, "Measured Iq");
+    CSA_SHOW(0, meas_id, "Measured Id");
+    CSA_SHOW(0, bus_voltage, "Bus voltage, 0.1 V");
+    CSA_SHOW(0, motor_temp, "Motor temperature, 0.1 C");
+    CSA_SHOW(1, ori_encoder, "Origin encoder value");
+    CSA_SHOW(0, meas_speed_avg, "");
+    CSA_SHOW(0, meas_iq_avg, "");
+    CSA_SHOW(0, tgt_vq_avg, "");
+
+    CSA_SHOW(0, loop_cnt, "Increase at current loop, for raw debug");
     CSA_SHOW(0, adc_sel, "");
     CSA_SHOW(0, meas_i, "");
     CSA_SHOW(0, pwm_dbg0, "");
     CSA_SHOW(0, pwm_dbg1, "");
     CSA_SHOW(0, pwm_uvw, "");
-    d_info("\n");
-
-    CSA_SHOW(0, meas_i_sq_avg, "");
-    CSA_SHOW(0, tgt_v_sq_avg, "");
-    CSA_SHOW(0, bus_voltage, "");
-    CSA_SHOW(0, motor_temp, "");
+    CSA_SHOW(1, nob_encoder, "Encoder value before adding bias");
+    CSA_SHOW(1, nob_pos, "Position before adding bias");
+    CSA_SHOW(0, meas_rpm_avg, "");
+    CSA_SHOW(0, meas_iq_avg_f, "");
+    CSA_SHOW(0, tgt_vq_avg_f, "");
+    CSA_SHOW(0, tp_acc_brake, "Required braking acceleration");
+    CSA_SHOW(0, bus_voltage_f, "");
+    CSA_SHOW(0, motor_temp_f, "");
+    CSA_SHOW(0, cali_angle_speed_tgt, "Calibration mode speed");
     CSA_SHOW(0, cali_angle_speed, "");
+    CSA_SHOW(0, cali_angle_elec, "Calibration mode angle");
+    CSA_SHOW(0, drv_error_flag, "Detailed gate-driver error flags");
+    CSA_SHOW(1, dbg_str_msk, "Config which debug strings are sent");
     d_info("\n");
 
     while (frame_free_head.len < FRAME_MAX - 5);

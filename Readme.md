@@ -31,6 +31,8 @@ The payload is encoded using the CDNET protocol. For detailed information, pleas
  - https://github.com/dukelec/cdnet
  - https://github.com/dukelec/cdnet/wiki/CDNET-Intro-and-Demo
 
+The bootloader and application use the same common CSA configuration fields. The current configuration magic code is `0xcdcd`, and the configuration version is `0x0300`.
+
 
 ## Block Diagram
 
@@ -57,28 +59,36 @@ Plots:
 
 ## Operating
 
-### Calibration mode (state = 1)
+### Encoder Calibration
 
 Do not connect any loads to the motor during calibration.
 
 Write 1 to `dbg_en` to enable debug prints in the GUI.
 
-Start by setting the appropriate value for `cali_current`, it is recommended to set the value a little higher to allow the motor to lock more accurately.
+Start by setting the appropriate value for `cali_voltage`. A higher value locks the rotor more firmly, but also causes the motor to heat up more quickly.
 Also be careful to prevent the motor from overheating.
 
-Write 1 to `cali_run` to start the calibration. The motor coils will be energized sequentially, causing the motor to turn clockwise first, then counterclockwise.
+Write 1 to `enc_cali` to start the calibration. The firmware automatically enters voltage mode and applies `cali_voltage`, causing the motor to turn clockwise first, then counterclockwise.
 Afterward, the calculated encoder offset value will be printed and written to `bias_encoder`. Be sure to save it to flash.
 
-Writing 1 to `cali_run` automatically sets `state` to 1.
+
+### Voltage Mode (state = 1)
+
+Write 1 to `state` to enter open-loop voltage mode.
+
+Write the output voltage directly to `tgt_vq` and `tgt_vd`. The voltage value is represented as a fraction of the bus voltage:
+`output voltage = target value / 32768 * bus voltage`.
+
+The phase-current samples are still available for monitoring, but they do not participate in the control calculation or affect the motor output in this mode.
 
 
 ### Torque Mode (state = 2)
 
-Write 2 to `state` to enter torque mode, or current mode. 
+Write 2 to `state` to enter torque mode, or current mode.
 
-The motor can then be rotated by writing the appropriate current value to `tgt_current`. 
+The motor can then be rotated by writing the appropriate q-axis current value to `tgt_iq`.
 
-The unit of current is the LSB value of the 12bits ADC. 
+The current-control value uses a signed 16-bit full-scale representation. A raw 12-bit ADC sample is shifted left by 3 before it participates in the control calculation, so one raw ADC count corresponds to 8 current-control counts. The conversion to physical current depends on the board's current-sense circuit and current-scale configuration.
 
 
 ### Speed Mode (state = 3)
@@ -104,19 +114,19 @@ Mode 4 of `state` is a position mode without acceleration or deceleration and is
 
 ## Command Demonstration
 
-The address of the `state` itself is `0x0240` and its length is 1 byte.
+The address of the `state` itself is `0x0400` and its length is 1 byte.
 To lock the motor and enter position mode after power up, send the following data to port 5:
 ```
-20  40 02  05
+20  00 04  05
 ```
-`20` is the subcommand `write`, `40 02` is the little-endian for address 0x0240 (little-endian is used unless otherwise noted),
+`20` is the subcommand `write`, `00 04` is the little-endian for address 0x0400 (little-endian is used unless otherwise noted),
 and `05` is the value to be written.
 
 
 The complete command containing the CRC is (host address defaults to `0`, motor address defaults to `0xfe`, 3rd byte is data length, last two bytes are CRC):
 
 ```
-00 fe 06  40 05  20  40 02  05  eb 8f
+00 fe 06  40 05  20  00 04  05  e9 fb
 ```
 
 The complete response package is:
@@ -157,4 +167,3 @@ fe 00 0a  06 40  xx xx xx xx yy yy yy yy  crc_l crc_h
 ```
 
 The `xx` and `yy` are defined by `qxchg_ret` to return 8 bytes of data such as `tgt_pos`.
-

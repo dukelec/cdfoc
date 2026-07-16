@@ -13,13 +13,13 @@
 
 void raw_dbg(int idx)
 {
-    static cd_frame_t *frm_raw[4] = { NULL };
+    static cd_frame_t *frm_raw = NULL;
     static bool frm_less = false;
 
-    if (!(csa.dbg_raw_msk & (1 << idx))) {
-        if (frm_raw[idx]) {
-            cd_list_put(&frame_free_head, frm_raw[idx]);
-            frm_raw[idx] = NULL;
+    if (!csa.dbg_raw_en) {
+        if (frm_raw) {
+            cd_list_put(&frame_free_head, frm_raw);
+            frm_raw = NULL;
         }
         return;
     }
@@ -27,38 +27,38 @@ void raw_dbg(int idx)
     if (frm_less && frame_free_head.len >= FRAME_MAX - 5)
         frm_less = false;
 
-    if (!frm_less && !frm_raw[idx]) {
+    if (!frm_less && !frm_raw) {
         if (frame_free_head.len < 5) {
             frm_less = true;
             return;
 
         } else {
-            frm_raw[idx] = cd_list_get(&frame_free_head);
-            frm_raw[idx]->dat[0] = csa.bus_cfg.mac;
-            frm_raw[idx]->dat[1] = 0x0;
-            frm_raw[idx]->dat[2] = 4;
-            frm_raw[idx]->dat[3] = 0x40 | idx;
-            frm_raw[idx]->dat[4] = 0xa;
-            put_unaligned16(csa.loop_cnt, frm_raw[idx]->dat + 5);
+            frm_raw = cd_list_get(&frame_free_head);
+            frm_raw->dat[0] = csa.mac;
+            frm_raw->dat[1] = 0x0;
+            frm_raw->dat[2] = 4;
+            frm_raw->dat[3] = 0x40 | idx;
+            frm_raw->dat[4] = 0xa;
+            put_unaligned16(csa.loop_cnt, frm_raw->dat + 5);
         }
     }
-    if (!frm_raw[idx])
+    if (!frm_raw)
         return;
 
-    uint8_t len_bk = frm_raw[idx]->dat[2];
+    uint8_t len_bk = frm_raw->dat[2];
     for (int i = 0; i < 6; i++) {
-        regr_t *regr = &csa.dbg_raw[idx][i];
+        regr_t *regr = &csa.dbg_raw[i];
         if (!regr->size)
             break;
-        uint8_t *dst_dat = frm_raw[idx]->dat + frm_raw[idx]->dat[2] + 3;
+        uint8_t *dst_dat = frm_raw->dat + frm_raw->dat[2] + 3;
         memcpy(dst_dat, ((void *) &csa) + regr->offset, regr->size);
-        frm_raw[idx]->dat[2] += regr->size;
+        frm_raw->dat[2] += regr->size;
     }
 
-    uint8_t len_delta = frm_raw[idx]->dat[2] - len_bk;
-    if (frm_raw[idx]->dat[2] + len_delta > 253) {
-        cdctl_send_frame(&r_dev.cd_dev, frm_raw[idx]);
-        frm_raw[idx] = NULL;
+    uint8_t len_delta = frm_raw->dat[2] - len_bk;
+    if (frm_raw->dat[2] + len_delta > 253) {
+        cdctl_send_frame(&r_dev.cd_dev, frm_raw);
+        frm_raw = NULL;
     }
 }
 
@@ -73,7 +73,7 @@ void cali_elec_angle(void)
     static int dir = 1; // -1 or +1
     static int32_t a_first;
 
-    if (!csa.cali_run)
+    if (!csa.enc_cali)
         return;
 
     if (pole_cnt == -1) {
@@ -82,11 +82,13 @@ void cali_elec_angle(void)
         csa.cali_angle_elec = 0;
         csa.cali_angle_speed_tgt = 0;
         csa.cali_angle_speed = 0;
-        if (csa.state != ST_CALI) {
-            uint8_t dat = ST_CALI;
+        if (csa.state != ST_VOLTAGE) {
+            uint8_t dat = ST_VOLTAGE;
             state_w_hook_before(0, 1, &dat);
-            csa.state = ST_CALI;
+            csa.state = ST_VOLTAGE;
         }
+        csa.tgt_vd = 0;
+        csa.tgt_vq = csa.cali_voltage;
         t_last = get_systick();
         pole_cnt = sub_cnt = 0;
         amount_f = amount_r = 0;
@@ -119,7 +121,7 @@ void cali_elec_angle(void)
 
     if ((dir == 1 && sub_cnt == 3) || (dir == -1 && sub_cnt == 0)) {
         uint16_t a_shift;
-        if (csa.cali_run == 1 && a_first < 0) {
+        if (csa.enc_cali == 1 && a_first < 0) {
             if ((int16_t)(a270 - a90) < 0) { // motor_poles should >= 2
                 pole_cnt = -1;
                 csa.motor_wire_swap = !csa.motor_wire_swap;
@@ -152,12 +154,12 @@ void cali_elec_angle(void)
             uint8_t dat = ST_STOP;
             state_w_hook_before(0, 1, &dat);
             csa.state = ST_STOP;
-            csa.cali_run = 0;
+            csa.enc_cali = 0;
             pole_cnt = -1;
         }
     }
 
-    if (csa.cali_run) {
+    if (csa.enc_cali) {
         if (dir == 1) {
             sub_cnt++;
             if (sub_cnt > 3) {

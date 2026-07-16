@@ -43,8 +43,9 @@ static inline void adc_samp_cali(adc_samp_t *as)
 
 static inline void adc_samp_inject(adc_samp_t *as, bool motor_idle, bool motor_wire_swap)
 {
-    int16_t adc1_val = HAL_ADCEx_InjectedGetValue(&hadc1, ADC_INJECTED_RANK_1);
-    int16_t adc2_val = HAL_ADCEx_InjectedGetValue(&hadc2, ADC_INJECTED_RANK_1);
+    // 32768 counts = 3.3 V; 12-bit ADC max 4095 << 3 = 32760.
+    int16_t adc1_val = HAL_ADCEx_InjectedGetValue(&hadc1, ADC_INJECTED_RANK_1) << 3;
+    int16_t adc2_val = HAL_ADCEx_InjectedGetValue(&hadc2, ADC_INJECTED_RANK_1) << 3;
     if (motor_wire_swap)
         swap(adc1_val, adc2_val);
 

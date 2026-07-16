@@ -64,7 +64,7 @@ static void p1_service_poll(void)
         uint16_t wait_time = rand() / (RAND_MAX / max_time);
         uint8_t mac_start = rx_dat[3];
         uint8_t mac_end = rx_dat[4];
-        uint8_t local_mac = csa.bus_cfg.mac;
+        uint8_t local_mac = csa.mac;
         rx_dat[pkt->len] = '\0';
         char *string = (char *)rx_dat + 5;
         d_debug("p1 search: wait %d (%d), [%02x, %02x] (%02x), str: %s\n",
@@ -360,7 +360,7 @@ int _write(int file, char *data, int len)
         cd_frame_t *frm = cd_list_get(&frame_free_head);
         if (frm) {
             len = min(CDN_MAX_PAYLOAD, len);
-            frm->dat[0] = csa.bus_cfg.mac;
+            frm->dat[0] = csa.mac;
             frm->dat[1] = 0x0;
             frm->dat[2] = 2 + len;
             frm->dat[3] = 64;

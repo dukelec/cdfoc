@@ -30,8 +30,12 @@ static inline void csa2encoder_filter_mt(encoder_filter_t *ef)
 static inline void encoder_filter2csa(encoder_filter_t *ef)
 {
     csa.nob_encoder = ef->nob_encoder;
-    memcpy(&csa.nob_pos, &ef->nob_pos,
-            offsetof(encoder_filter_t, meas_rpm_avg) - offsetof(encoder_filter_t, nob_pos) + 4);
+    csa.nob_pos = ef->nob_pos;
+    csa.meas_encoder = ef->meas_encoder;
+    csa.meas_speed = lroundf(ef->meas_speed);
+    csa.meas_pos = ef->meas_pos;
+    csa.meas_speed_avg = lroundf(ef->meas_speed_avg);
+    csa.meas_rpm_avg = ef->meas_rpm_avg;
 }
 
 
@@ -52,6 +56,28 @@ static inline void csa2anticog_mt(anticog_t *ac)
 }
 
 
+// pid
+
+static inline void csa2pid_mt(pid_i_t *pos, pid_f_t *speed, pid_f_t *iq, pid_f_t *id)
+{
+    pos->kp = csa.pid_pos_kp;
+    pos->out_min = csa.pid_pos_out_min;
+    pos->out_max = csa.pid_pos_out_max;
+    speed->kp = csa.pid_speed_kp;
+    speed->ki = csa.pid_speed_ki;
+    speed->out_min = csa.pid_speed_out_min;
+    speed->out_max = csa.pid_speed_out_max;
+    iq->kp = csa.pid_iq_kp;
+    iq->ki = csa.pid_iq_ki;
+    iq->out_min = csa.pid_iq_out_min;
+    iq->out_max = csa.pid_iq_out_max;
+    id->kp = csa.pid_id_kp;
+    id->ki = csa.pid_id_ki;
+    id->out_min = csa.pid_id_out_min;
+    id->out_max = csa.pid_id_out_max;
+}
+
+
 // trap_planner
 
 static inline void csa2trap_planner_mt(trap_planner_t *tp)
@@ -61,7 +87,9 @@ static inline void csa2trap_planner_mt(trap_planner_t *tp)
 
 static inline void csa2trap_planner(trap_planner_t *tp)
 {
-    memcpy(&tp->pos_tgt, &csa.tp_pos, 4 * 3);
+    tp->pos_tgt = csa.tp_pos;
+    tp->vel_tgt = csa.tp_speed;
+    tp->acc_tgt = csa.tp_accel;
 }
 
 static inline void trap_planner2csa_rst(trap_planner_t *tp)
@@ -69,7 +97,7 @@ static inline void trap_planner2csa_rst(trap_planner_t *tp)
     csa.tp_pos = tp->pos_tgt;
 
     csa.tp_state = tp->state;
-    csa.tp_vel_out = tp->vel_out;
+    csa.tp_vel_out = lroundf(tp->vel_out);
     csa.tp_acc_brake = tp->acc_brake;
 }
 
@@ -78,7 +106,7 @@ static inline void trap_planner2csa(trap_planner_t *tp)
     csa.tgt_pos = tp->pos_out;
 
     csa.tp_state = tp->state;
-    csa.tp_vel_out = tp->vel_out;
+    csa.tp_vel_out = lroundf(tp->vel_out);
     csa.tp_acc_brake = tp->acc_brake;
 }
 

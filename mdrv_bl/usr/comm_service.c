@@ -215,7 +215,7 @@ int _write(int file, char *data, int len)
         cd_frame_t *frm = cd_list_get(&frame_free_head);
         if (frm) {
             len = min(CDN_MAX_PAYLOAD, len);
-            frm->dat[0] = csa.bus_cfg.mac;
+            frm->dat[0] = csa.mac;
             frm->dat[1] = 0x0;
             frm->dat[2] = 2 + len;
             frm->dat[3] = 64;
