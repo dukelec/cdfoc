@@ -15,7 +15,7 @@ reg2r_t csa_w_allow[] = {
         { .offset = offsetof(csa_t, do_reboot),
                 .size = offsetof(csa_t, tp_max_err) + sizeof(csa.tp_max_err) - offsetof(csa_t, do_reboot) },
         { .offset = offsetof(csa_t, pid_pos_kp),
-                .size = offsetof(csa_t, _reserved_tgt_elec_angle) - offsetof(csa_t, pid_pos_kp) }
+                .size = offsetof(csa_t, tgt_elec_angle) - offsetof(csa_t, pid_pos_kp) }
 };
 
 csa_hook_t csa_w_hook[] = {
@@ -76,8 +76,6 @@ const csa_t csa_dft = {
                 { .offset = offsetof(csa_t, tgt_pos), .size = 8 }
         },
 
-        .dbg_str_msk = 0x0, //0 or 0xff,
-
         .dbg_raw_en = 0,
         .dbg_raw = {
                 { .offset = offsetof(csa_t, tgt_vq), .size = 2 },
@@ -88,9 +86,7 @@ const csa_t csa_dft = {
         .tp_speed = 65536*20,
         .tp_accel = 65536*5,
 
-        .cali_angle_elec = (float)M_PI/2,
-        .cali_voltage = SVPWM_FULL / 5,
-
+        .cali_voltage = 6000, // pwm
         .nominal_voltage = 240,
         .tp_max_err = 0x1000,
         .ntc_b = 3970,
@@ -143,14 +139,14 @@ int save_conf(void)
 
 int flash_erase(uint32_t addr, uint32_t len)
 {
-    int ret = -1;
+    int ret = 0;
     uint32_t err_sector = 0xffffffff;
     FLASH_EraseInitTypeDef f;
 
     uint32_t ofs = addr & ~0x08000000;
     if (ofs <= 0x6000 && 0x6000 < ofs + len) {
         d_error("nvm erase: avoid erasing self\n");
-        return ret;
+        return -1;
     }
 
     f.TypeErase = FLASH_TYPEERASE_PAGES;
@@ -170,7 +166,7 @@ int flash_erase(uint32_t addr, uint32_t len)
 
 int flash_write(uint32_t addr, uint32_t len, const uint8_t *buf)
 {
-    int ret = -1;
+    int ret = 0;
 
     uint64_t *dst_dat = (uint64_t *) addr;
     int cnt = (len + 7) / 8;
@@ -319,19 +315,14 @@ void csa_list_show(void)
     CSA_SHOW(0, pwm_dbg0, "");
     CSA_SHOW(0, pwm_dbg1, "");
     CSA_SHOW(0, pwm_uvw, "");
+    CSA_SHOW(0, drv_error_flag, "Detailed gate-driver error flags");
     CSA_SHOW(1, nob_encoder, "Encoder value before adding bias");
     CSA_SHOW(1, nob_pos, "Position before adding bias");
     CSA_SHOW(0, meas_rpm_avg, "");
     CSA_SHOW(0, meas_iq_avg_f, "");
     CSA_SHOW(0, tgt_vq_avg_f, "");
-    CSA_SHOW(0, tp_acc_brake, "Required braking acceleration");
     CSA_SHOW(0, bus_voltage_f, "");
     CSA_SHOW(0, motor_temp_f, "");
-    CSA_SHOW(0, cali_angle_speed_tgt, "Calibration mode speed");
-    CSA_SHOW(0, cali_angle_speed, "");
-    CSA_SHOW(0, cali_angle_elec, "Calibration mode angle");
-    CSA_SHOW(0, drv_error_flag, "Detailed gate-driver error flags");
-    CSA_SHOW(1, dbg_str_msk, "Config which debug strings are sent");
     d_info("\n");
 
     while (frame_free_head.len < FRAME_MAX - 5);

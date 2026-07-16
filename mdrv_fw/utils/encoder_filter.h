@@ -28,12 +28,21 @@ typedef struct {
     // internal
     uint16_t    pos_rec[5];
     int16_t     delta_rec[5];
+    bool        has_init;
 } encoder_filter_t;
 
 
 static inline void encoder_filter(encoder_filter_t *ef, uint16_t input)
 {
     int32_t pos_i32[5];
+
+    if (!ef->has_init) {
+        for (int i = 0; i < 4; i++)
+            ef->pos_rec[i] = input;
+        ef->nob_encoder = input;
+        ef->nob_pos = input;
+        ef->has_init = true;
+    }
 
     for (int i = 0; i < 4; i++)
         ef->pos_rec[i] = ef->pos_rec[i+1];

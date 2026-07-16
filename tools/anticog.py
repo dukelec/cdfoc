@@ -26,10 +26,10 @@ Notes:
 
 """
 
-R_tp_pos = 0x01f8
-R_state = 0x0240
-R_tp_state = 0x0288
-R_sen_i_sq_avg = 0x02b0
+R_tp_pos = 0x0150
+R_state = 0x0400
+R_tp_state = 0x017f
+R_sen_i_sq_avg = 0x04cc
 
 import sys, os
 import struct

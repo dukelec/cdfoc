@@ -80,7 +80,7 @@ typedef struct {
     uint8_t         bus_tx_pre_len;
     uint8_t         _reserved1[13];
 
-    bool            dbg_en;
+    uint8_t         dbg_en;
     #define         _end_common dbg_raw_en
     uint8_t         dbg_raw_en;
     regr_t          dbg_raw[6];
@@ -199,7 +199,7 @@ typedef struct {
     int16_t         _reserved_tgt_id;
     int16_t         tgt_vq;
     int16_t         tgt_vd;
-    int16_t         _reserved_tgt_elec_angle;
+    int16_t         tgt_elec_angle;
     uint8_t         _reserved18[46];
 
     uint8_t         _reserved180[16]; // hall values
@@ -234,22 +234,14 @@ typedef struct {
     int16_t         pwm_uvw[3];
     uint8_t         _reserved183[16];
 
+    uint16_t        drv_error_flag;
     uint16_t        nob_encoder; // no bias
     int32_t         nob_pos;
     float           meas_rpm_avg;
     float           meas_iq_avg_f;
     float           tgt_vq_avg_f;
-
-    float           tp_acc_brake;
-
     float           bus_voltage_f;
     float           motor_temp_f;
-    float           cali_angle_speed_tgt; // target speed [rad/s]
-    float           cali_angle_speed;
-    float           cali_angle_elec;
-
-    uint16_t        drv_error_flag;
-    uint8_t         dbg_str_msk; // bit0: dump_hw_status
 
 } csa_t; // config status area
 

@@ -286,7 +286,7 @@ static void p6_service_poll(void)
         }
     }
 
-    for (int i = 0; !ret_val && i < 5; i++) {
+    for (int i = 0; !ret_val && i < 4; i++) {
         regr_t *regr = csa.qxchg_set + i;
         uint16_t lim_size = min(pkt->len - (src_dat - pkt->dat), regr->size);
         if (!lim_size)

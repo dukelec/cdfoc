@@ -10,9 +10,10 @@
 #ifndef __SVPWM_H__
 #define __SVPWM_H__
 
-#define SVPWM_FULL              16376   // 2047 << 3, 32768 counts = vcc
+#define SVPWM_FULL              16376   // 2047 << 3, 32768 counts = vcc, ±½vcc swing per phase
 #define SVPWM_MAX_DUTY_PCT      92      // 92% pwm max duty
 #define SVPWM_B_MARGIN          320     // bottom margin: 1.95% (320/16376)
+// deliver 15% more power by svpwm (×1.15) limited to max duty, kept as an integer count
 #define SVPWM_MAX_MAG           ((SVPWM_FULL * 115 * SVPWM_MAX_DUTY_PCT) / 10000)
 
 #define DEADTIME_PWM_DUTY       160     // (1÷41504Hz)÷32768×160: 118ns

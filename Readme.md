@@ -31,8 +31,6 @@ The payload is encoded using the CDNET protocol. For detailed information, pleas
  - https://github.com/dukelec/cdnet
  - https://github.com/dukelec/cdnet/wiki/CDNET-Intro-and-Demo
 
-The bootloader and application use the same common CSA configuration fields. The current configuration magic code is `0xcdcd`, and the configuration version is `0x0300`.
-
 
 ## Block Diagram
 
@@ -88,7 +86,7 @@ Write 2 to `state` to enter torque mode, or current mode.
 
 The motor can then be rotated by writing the appropriate q-axis current value to `tgt_iq`.
 
-The current-control value uses a signed 16-bit full-scale representation. A raw 12-bit ADC sample is shifted left by 3 before it participates in the control calculation, so one raw ADC count corresponds to 8 current-control counts. The conversion to physical current depends on the board's current-sense circuit and current-scale configuration.
+The current-control value uses a signed 15-bit full-scale representation stored in an `int16_t` field. One raw 12-bit ADC count corresponds to 8 current-control counts. Conversion to physical current depends on the board's current-sense circuit.
 
 
 ### Speed Mode (state = 3)

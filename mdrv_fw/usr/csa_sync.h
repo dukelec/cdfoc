@@ -98,7 +98,6 @@ static inline void trap_planner2csa_rst(trap_planner_t *tp)
 
     csa.tp_state = tp->state;
     csa.tp_vel_out = lroundf(tp->vel_out);
-    csa.tp_acc_brake = tp->acc_brake;
 }
 
 static inline void trap_planner2csa(trap_planner_t *tp)
@@ -107,7 +106,6 @@ static inline void trap_planner2csa(trap_planner_t *tp)
 
     csa.tp_state = tp->state;
     csa.tp_vel_out = lroundf(tp->vel_out);
-    csa.tp_acc_brake = tp->acc_brake;
 }
 
 #endif

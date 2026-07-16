@@ -257,32 +257,13 @@ void current_loop_update(void)
 
     speed_loop_update();
 
-    float encoder_sub_range = (float)0x10000 / csa.motor_poles;
-    float encoder_sub = csa.meas_encoder - (int)(csa.meas_encoder / encoder_sub_range) * encoder_sub_range; // fmodf
-    float meas_angle_elec = encoder_sub * (M_PIf * 2 / encoder_sub_range);
+    // electrical angle = (meas_encoder · MOTOR_POLES) mod one turn (0x10000), wraps in int16
     csa.meas_elec_angle = (int16_t)(uint16_t)(csa.meas_encoder * csa.motor_poles);
 
-    if (csa.state == ST_VOLTAGE) {
-        if (fabsf(csa.cali_angle_speed - csa.cali_angle_speed_tgt) >= 0.01f) {
-            if (csa.cali_angle_speed < csa.cali_angle_speed_tgt)
-                csa.cali_angle_speed += 0.01f;
-            else
-                csa.cali_angle_speed -= 0.01f;
-        } else {
-            csa.cali_angle_speed = csa.cali_angle_speed_tgt;
-        }
-        csa.cali_angle_elec += csa.cali_angle_speed * (1.0f / CURRENT_LOOP_FREQ);
-        if (csa.cali_angle_elec >= M_PIf * 2)
-            csa.cali_angle_elec -= M_PIf * 2;
-        else if (csa.cali_angle_elec < 0)
-            csa.cali_angle_elec += M_PIf * 2;
-        sin_tmp_angle_elec = sinf(csa.cali_angle_elec);
-        cos_tmp_angle_elec = cosf(csa.cali_angle_elec);
-    } else {
-        csa.cali_angle_speed = 0;
-        sin_tmp_angle_elec = sinf(meas_angle_elec);
-        cos_tmp_angle_elec = cosf(meas_angle_elec);
-    }
+    if (csa.state >= ST_CURRENT)
+        csa.tgt_elec_angle = csa.meas_elec_angle;
+    sin_tmp_angle_elec = sinf(csa.tgt_elec_angle / 65536.0f * (M_PIf * 2));
+    cos_tmp_angle_elec = cosf(csa.tgt_elec_angle / 65536.0f * (M_PIf * 2));
 
     float meas_iq = -i_alpha * sin_tmp_angle_elec + i_beta * cos_tmp_angle_elec;
     float meas_id = i_alpha * cos_tmp_angle_elec + i_beta * sin_tmp_angle_elec;
@@ -295,56 +276,41 @@ void current_loop_update(void)
     csa.meas_iq_avg_f += err_iq * 0.001f;
     csa.meas_iq_avg = clip(lroundf(csa.meas_iq_avg_f), -32768, 32767);
 
-    // voltage/current -> pwm
-    if (csa.state != ST_STOP) {
-        float v_alpha, v_beta;
-        float tgt_vq, tgt_vd;
 
-        if (csa.state == ST_VOLTAGE) {
-            // Open-loop voltage mode: current is measured for reporting only.
-            tgt_vq = csa.tgt_vq;
-            tgt_vd = csa.tgt_vd;
-            pid_f_set_target(&pid_iq, meas_iq);
-            pid_f_set_target(&pid_id, meas_id);
-            pid_f_reset(&pid_iq, tgt_vq);
-            pid_f_reset(&pid_id, tgt_vd);
-        } else {
-            int32_t target_current;
-            if (csa.state >= ST_SPEED) {
-                float current = tgt_iq_bk + (csa.tgt_iq - tgt_iq_bk) * (speed_loop_cnt + 1) / 5.0f;
-                target_current = lroundf(current);
-            } else {
-                target_current = csa.tgt_iq;
-            }
-
-            pid_f_set_target(&pid_iq, target_current + anticog_iq);
-            tgt_vq = pid_f_update(&pid_iq, meas_iq, meas_iq) + anticog_vq;
-            tgt_vd = pid_f_update(&pid_id, meas_id, meas_id);
-            csa.tgt_vq = clip(lroundf(tgt_vq), -32768, 32767);
-            csa.tgt_vd = clip(lroundf(tgt_vd), -32768, 32767);
-            tgt_vq = csa.tgt_vq;
-            tgt_vd = csa.tgt_vd;
-        }
-
-        float err_vq = tgt_vq - csa.tgt_vq_avg_f;
-        csa.tgt_vq_avg_f += err_vq * 0.001f;
-        csa.tgt_vq_avg = clip(lroundf(csa.tgt_vq_avg_f), -32768, 32767);
-
-        v_alpha = tgt_vd * cos_tmp_angle_elec - tgt_vq * sin_tmp_angle_elec;
-        v_beta =  tgt_vd * sin_tmp_angle_elec + tgt_vq * cos_tmp_angle_elec;
-        voltage_mag = svpwm(v_alpha, v_beta, csa.pwm_uvw, csa.pwm_dbg0,
-                csa.state == ST_VOLTAGE ? NULL : csa.meas_i);
-        if (voltage_mag > SVPWM_MAX_MAG)
-            vector_over_limit = voltage_mag;
+    if (csa.state >= ST_CURRENT) {
+        float current = tgt_iq_bk + (csa.tgt_iq - tgt_iq_bk) * (speed_loop_cnt + 1) / 5.0f;
+        int32_t target_current = lroundf(current);
+        pid_f_set_target(&pid_iq, target_current + anticog_iq);
+        float tgt_vq = pid_f_update(&pid_iq, meas_iq, meas_iq) + anticog_vq;
+        float tgt_vd = pid_f_update(&pid_id, meas_id, meas_id);
+        csa.tgt_vq = clip(lroundf(tgt_vq), -32768, 32767);
+        csa.tgt_vd = clip(lroundf(tgt_vd), -32768, 32767);
     } else {
+        pid_f_set_target(&pid_iq, meas_iq);
+        pid_f_set_target(&pid_id, meas_id);
+        pid_f_reset(&pid_iq, csa.tgt_vq);
+        pid_f_reset(&pid_id, csa.tgt_vd);
+    }
+
+    if (csa.state == ST_STOP) {
         csa.tgt_vq = 0;
         csa.tgt_vd = 0;
         pid_f_set_target(&pid_iq, 0);
         pid_f_set_target(&pid_id, 0);
         pid_f_reset(&pid_iq, 0);
         pid_f_reset(&pid_id, 0);
-        memset(csa.pwm_dbg0, 0, 2 * 3 * 3); // include pwm_dbg1 pwm_uvw
     }
+
+    float err_vq = csa.tgt_vq - csa.tgt_vq_avg_f;
+    csa.tgt_vq_avg_f += err_vq * 0.001f;
+    csa.tgt_vq_avg = clip(lroundf(csa.tgt_vq_avg_f), -32768, 32767);
+
+    float v_alpha = csa.tgt_vd * cos_tmp_angle_elec - csa.tgt_vq * sin_tmp_angle_elec;
+    float v_beta =  csa.tgt_vd * sin_tmp_angle_elec + csa.tgt_vq * cos_tmp_angle_elec;
+    voltage_mag = svpwm(v_alpha, v_beta, csa.pwm_uvw, csa.pwm_dbg0, csa.state == ST_VOLTAGE ? NULL : csa.meas_i);
+    if (voltage_mag > SVPWM_MAX_MAG)
+        vector_over_limit = voltage_mag;
+
 
     adc_samp_set_ch(&adc_samp, csa.pwm_uvw, csa.state != ST_STOP && voltage_mag > SVPWM_MAX_MAG / 2);
     motor_pwm_output(csa.pwm_uvw, csa.motor_wire_swap);

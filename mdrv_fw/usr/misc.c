@@ -79,14 +79,12 @@ void cali_elec_angle(void)
     if (pole_cnt == -1) {
         csa.enc_linear_en = false;
         csa.anticog_en = false;
-        csa.cali_angle_elec = 0;
-        csa.cali_angle_speed_tgt = 0;
-        csa.cali_angle_speed = 0;
         if (csa.state != ST_VOLTAGE) {
             uint8_t dat = ST_VOLTAGE;
             state_w_hook_before(0, 1, &dat);
             csa.state = ST_VOLTAGE;
         }
+        csa.tgt_elec_angle = 0;
         csa.tgt_vd = 0;
         csa.tgt_vq = csa.cali_voltage;
         t_last = get_systick();
@@ -181,5 +179,5 @@ void cali_elec_angle(void)
         }
     }
 
-    csa.cali_angle_elec = (float)M_PI/2 * sub_cnt;
+    csa.tgt_elec_angle = 0x10000 / 4 * sub_cnt;
 }

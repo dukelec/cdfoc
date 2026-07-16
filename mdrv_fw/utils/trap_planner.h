@@ -28,7 +28,6 @@ typedef struct {
     float       vel_out;        // current planned velocity
 
     // internal
-    float       acc_brake;      // required braking acceleration
     float       pos_frac;       // fractional part of pos_out
 } trap_planner_t;
 
