@@ -13,8 +13,15 @@ const csa_t csa_dft = {
         .magic_code = 0xcdcd,
         .conf_ver = APP_CONF_VER,
 
-        .bus_net = 0,
-        .bus_cfg = CDCTL_CFG_DFT(0xfe),
+        .mac = 0xfe,
+        .baud_rate_l = 115200,
+        .baud_rate_h = 115200,
+        .bus_filter_m = { 0xff, 0xff },
+        .bus_mode = 1,
+        .bus_idle_wait_len = 0x0a,
+        .bus_tx_permit_len = 0x14,
+        .bus_max_idle_len = 0xc8,
+        .bus_tx_pre_len = 0x01,
         .dbg_en = false
 };
 
@@ -27,7 +34,7 @@ void load_conf(void)
     uint16_t conf_ver = *(uint16_t *)(APP_CONF_ADDR + 2);
     csa = csa_dft;
 
-    if (magic_code == 0xcdcd && (conf_ver >> 8) == (APP_CONF_VER >> 8)) {
+    if (magic_code == 0xcdcd && (conf_ver >> 12) == (APP_CONF_VER >> 12)) {
         memcpy(&csa, (void *)APP_CONF_ADDR, offsetof(csa_t, _end_save));
         csa.conf_from = 1;
         memset(&csa.do_reboot, 0, 3);

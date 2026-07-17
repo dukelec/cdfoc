@@ -64,7 +64,7 @@ static void p1_service_poll(void)
         uint16_t wait_time = rand() / (RAND_MAX / max_time);
         uint8_t mac_start = rx_dat[3];
         uint8_t mac_end = rx_dat[4];
-        uint8_t local_mac = csa.bus_cfg.mac;
+        uint8_t local_mac = csa.mac;
         rx_dat[pkt->len] = '\0';
         char *string = (char *)rx_dat + 5;
         d_debug("p1 search: wait %d (%d), [%02x, %02x] (%02x), str: %s\n",
@@ -114,7 +114,7 @@ static void p8_service_poll(void)
 
     } else if (rx_dat[0] == 0x00 && pkt->len == 6) {
         uint8_t *src_dat = (uint8_t *) get_unaligned32(rx_dat + 1);
-        uint8_t len = min(rx_dat[5], CDN_MAX_DAT - 1);
+        uint8_t len = min(rx_dat[5], CDN_MAX_PAYLOAD - 1);
         memcpy(pkt->dat + 1, src_dat, len);
         d_verbose("nvm read: %p %d\n", src_dat, len);
         pkt->dat[0] = 0;
@@ -193,7 +193,7 @@ static void p5_service_poll(void)
 
     if (rx_dat[0] == 0x00 && pkt->len == 4) {
         uint16_t offset = get_unaligned16(rx_dat + 1);
-        uint8_t len = min(rx_dat[3], CDN_MAX_DAT - 1);
+        uint8_t len = min(rx_dat[3], CDN_MAX_PAYLOAD - 1);
 
         ret_val = csa_hook_exec(false, offset, len, NULL);
         if (!ret_val) {
@@ -243,7 +243,7 @@ static void p5_service_poll(void)
 
     } else if (rx_dat[0] == 0x01 && pkt->len == 4) {
             uint16_t offset = get_unaligned16(rx_dat + 1);
-            uint8_t len = min(rx_dat[3], CDN_MAX_DAT - 1);
+            uint8_t len = min(rx_dat[3], CDN_MAX_PAYLOAD - 1);
             memcpy(pkt->dat + 1, ((void *) &csa_dft) + offset, len);
             d_debug("csa read_dft: %04x %d\n", offset, len);
             pkt->dat[0] = 0;
@@ -286,7 +286,7 @@ static void p6_service_poll(void)
         }
     }
 
-    for (int i = 0; !ret_val && i < 5; i++) {
+    for (int i = 0; !ret_val && i < 4; i++) {
         regr_t *regr = csa.qxchg_set + i;
         uint16_t lim_size = min(pkt->len - (src_dat - pkt->dat), regr->size);
         if (!lim_size)
@@ -359,14 +359,14 @@ int _write(int file, char *data, int len)
     if (csa.dbg_en) {
         cd_frame_t *frm = cd_list_get(&frame_free_head);
         if (frm) {
-            len = min(CDN_MAX_DAT - 2, len);
-            frm->dat[0] = csa.bus_cfg.mac;
+            len = min(CDN_MAX_PAYLOAD, len);
+            frm->dat[0] = csa.mac;
             frm->dat[1] = 0x0;
             frm->dat[2] = 2 + len;
             frm->dat[3] = 64;
             frm->dat[4] = 9;
             memcpy(frm->dat + 5, data, len);
-            cdctl_put_tx_frame(&r_dev.cd_dev, frm);
+            cdctl_send_frame(&r_dev.cd_dev, frm);
             return len;
         }
     }

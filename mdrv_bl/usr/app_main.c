@@ -32,6 +32,16 @@ cdn_ns_t dft_ns = {0};      // CDNET
 static void device_init(void)
 {
     int i;
+    cdctl_cfg_t bus_cfg = {
+            .mac = csa.mac,
+            .baud_l = csa.baud_rate_l,
+            .baud_h = csa.baud_rate_h,
+            .filter_m = { csa.bus_filter_m[0], csa.bus_filter_m[1] },
+            .mode = csa.bus_mode,
+            .tx_permit_len = csa.bus_tx_permit_len,
+            .max_idle_len = csa.bus_max_idle_len,
+            .tx_pre_len = csa.bus_tx_pre_len
+    };
     cdn_init_ns(&dft_ns, &packet_free_head, &frame_free_head);
 
     for (i = 0; i < FRAME_MAX; i++)
@@ -39,19 +49,19 @@ static void device_init(void)
     for (i = 0; i < PACKET_MAX; i++)
         cdn_list_put(&packet_free_head, &packet_alloc[i]);
 
-    int ret = cdctl_dev_init(&r_dev, &frame_free_head, &csa.bus_cfg, &r_spi);
+    int ret = cdctl_dev_init(&r_dev, &frame_free_head, &bus_cfg, &r_spi);
     if (ret) {
         // NRST as GPIO fails occasionally, no MCO output; reboot to recover
         printf("cdctl_dev_init error, reboot ...\n");
         delay_systick(50);
         NVIC_SystemReset();
     }
-    if (!csa.keep_in_bl) {
+    if (!csa.keep_bl) {
         cdctl_set_baud_rate(&r_dev, 115200, 115200);
         cdctl_flush(&r_dev);
     }
 
-    cdn_add_intf(&dft_ns, &r_dev.cd_dev, csa.bus_net, csa.bus_cfg.mac);
+    cdn_add_intf(&dft_ns, &r_dev.cd_dev, 0, csa.mac);
 }
 
 
@@ -86,8 +96,8 @@ void app_main(void)
     printf("\nstart bl...\n");
     load_conf();
     bool dbg_en_bk = csa.dbg_en;
-    csa.keep_in_bl = *bl_args == 0xcdcd0001;
-    if (!csa.keep_in_bl)
+    csa.keep_bl = *bl_args == 0xcdcd0001;
+    if (!csa.keep_bl)
         csa.dbg_en = false; // silence
     delay_systick(50);
     device_init();
@@ -96,7 +106,7 @@ void app_main(void)
     gpio_set_val(&led_g, 1);
 
     uint32_t t_last = get_systick();
-    bool update_baud = csa.keep_in_bl;
+    bool update_baud = csa.keep_bl;
 
     while (true) {
         if (get_systick() - t_last > (update_baud ? 100000 : 200000) / CD_SYSTICK_US_DIV) {
@@ -104,16 +114,16 @@ void app_main(void)
             gpio_set_val(&led_g, !gpio_get_val(&led_g));
         }
 
-        if (!csa.keep_in_bl && !update_baud && get_systick() > 1000000 / CD_SYSTICK_US_DIV) {
+        if (!csa.keep_bl && !update_baud && get_systick() > 1000000 / CD_SYSTICK_US_DIV) {
             update_baud = true;
-            if (csa.bus_cfg.baud_l != 115200 || csa.bus_cfg.baud_h != 115200) {
-                cdctl_set_baud_rate(&r_dev, csa.bus_cfg.baud_l, csa.bus_cfg.baud_h);
+            if (csa.baud_rate_l != 115200 || csa.baud_rate_h != 115200) {
+                cdctl_set_baud_rate(&r_dev, csa.baud_rate_l, csa.baud_rate_h);
                 cdctl_flush(&r_dev);
             }
             csa.dbg_en = dbg_en_bk;
         }
 
-        if (!csa.keep_in_bl && get_systick() > 2000000 / CD_SYSTICK_US_DIV)
+        if (!csa.keep_bl && get_systick() > 2000000 / CD_SYSTICK_US_DIV)
             jump_to_app();
 
         cdctl_poll(&r_dev);

@@ -10,19 +10,22 @@
 #ifndef __SVPWM_H__
 #define __SVPWM_H__
 
-#define SVPWM_MAX_DUTY          0.92f   // 92% pwm max duty
-#define SVPWM_B_MARGIN          40      // bottom margin: 1.95% (40/2047)
-#define SVPWM_MAX_MAG           (2047 * 1.15f * SVPWM_MAX_DUTY) // deliver 15% more power by svpwm
+#define SVPWM_FULL              16376   // 2047 << 3, 32768 counts = vcc, ±½vcc swing per phase
+#define SVPWM_MAX_DUTY_PCT      92      // 92% pwm max duty
+#define SVPWM_B_MARGIN          320     // bottom margin: 1.95% (320/16376)
+// deliver 15% more power by svpwm (×1.15) limited to max duty, kept as an integer count
+#define SVPWM_MAX_MAG           ((SVPWM_FULL * 115 * SVPWM_MAX_DUTY_PCT) / 10000)
 
-#define DEADTIME_PWM_DUTY       20      // (1÷41504Hz)÷4096×20: 118ns
-#define DEADTIME_CUR_THRESHOLD  100
+#define DEADTIME_PWM_DUTY       160     // (1÷41504Hz)÷32768×160: 118ns
+#define DEADTIME_CUR_THRESHOLD  800
 
 
 static inline void svpwm_deadtime_compensate(int16_t *pwm_uvw, const int16_t *sen_i)
 {
     for (int n = 0; n < 3; n++) {
         int16_t i = sen_i[n];
-        int16_t comp = DEADTIME_PWM_DUTY * fminf((float)abs(i) / DEADTIME_CUR_THRESHOLD, 1.0f) + 0.5f;
+        int16_t ai = min(abs(i), DEADTIME_CUR_THRESHOLD);
+        int16_t comp = DIV_ROUND_CLOSEST(DEADTIME_PWM_DUTY * ai, DEADTIME_CUR_THRESHOLD);
         pwm_uvw[n] += i >= 0 ? comp : -comp;
     }
 }
@@ -49,10 +52,10 @@ static inline float svpwm(float v_alpha, float v_beta, int16_t *pwm_uvw, int16_t
 
     // increase the current sensing window
     int16_t out_min = min(pwm_uvw[0], min(pwm_uvw[1], pwm_uvw[2]));
-    int16_t out_ofs = -out_min - 2047 + SVPWM_B_MARGIN;
-    pwm_uvw[0] = clip(pwm_uvw[0] + out_ofs, -2047, 2047);
-    pwm_uvw[1] = clip(pwm_uvw[1] + out_ofs, -2047, 2047);
-    pwm_uvw[2] = clip(pwm_uvw[2] + out_ofs, -2047, 2047);
+    int16_t out_ofs = -out_min - SVPWM_FULL + SVPWM_B_MARGIN;
+    pwm_uvw[0] = clip(pwm_uvw[0] + out_ofs, -SVPWM_FULL, SVPWM_FULL);
+    pwm_uvw[1] = clip(pwm_uvw[1] + out_ofs, -SVPWM_FULL, SVPWM_FULL);
+    pwm_uvw[2] = clip(pwm_uvw[2] + out_ofs, -SVPWM_FULL, SVPWM_FULL);
 
     return mag;
 }

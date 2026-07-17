@@ -49,10 +49,23 @@ list_head_t packet_free_head = {0};
 cdctl_dev_t r_dev = {0};    // CDBUS
 cdn_ns_t dft_ns = {0};      // CDNET
 
+static uint64_t *stack_check = (uint64_t *)((uint32_t)&end + 256);
+static uint32_t last_fault_val = 0xffffffff;
+
 
 static void device_init(void)
 {
     int i;
+    cdctl_cfg_t bus_cfg = {
+            .mac = csa.mac,
+            .baud_l = csa.baud_rate_l,
+            .baud_h = csa.baud_rate_h,
+            .filter_m = { csa.bus_filter_m[0], csa.bus_filter_m[1] },
+            .mode = csa.bus_mode,
+            .tx_permit_len = csa.bus_tx_permit_len,
+            .max_idle_len = csa.bus_max_idle_len,
+            .tx_pre_len = csa.bus_tx_pre_len
+    };
     cdn_init_ns(&dft_ns, &packet_free_head, &frame_free_head);
 
     for (i = 0; i < FRAME_MAX; i++)
@@ -61,9 +74,9 @@ static void device_init(void)
         cdn_list_put(&packet_free_head, &packet_alloc[i]);
 
     spi_wr_init(&r_spi);
-    cdctl_dev_init(&r_dev, &frame_free_head, &csa.bus_cfg, &r_spi, &r_int, EXTI9_5_IRQn);
+    cdctl_dev_init(&r_dev, &frame_free_head, &bus_cfg, &r_spi, &r_int, EXTI9_5_IRQn);
 
-    cdn_add_intf(&dft_ns, &r_dev.cd_dev, 0, csa.bus_cfg.mac);
+    cdn_add_intf(&dft_ns, &r_dev.cd_dev, 0, csa.mac);
 }
 
 
@@ -236,10 +249,51 @@ __attribute__((naked)) void PendSV_Handler(void)
 }
 
 
+void sleep_bg(int ms)
+{
+    uint32_t t_cur = get_systick();
+
+    while (true) {
+        SCB->ICSR = SCB_ICSR_PENDSVSET_Msk;
+        app_motor_maintain();
+
+        if (csa.state != ST_STOP && !gpio_get_val(&drv_fault)) {
+            uint32_t cur_fault_val = (drv_read_reg(0x00) << 16) | drv_read_reg(0x01);
+            csa.enc_cali = false;
+            if (cur_fault_val != last_fault_val) {
+                d_error("drv status: %08lx\n", cur_fault_val);
+                last_fault_val = cur_fault_val;
+            }
+            if (cur_fault_val != 0) {
+                csa.error_flag_.drv_fault = 1;
+                csa.drv_error_flag = cur_fault_val | (cur_fault_val >> 16);
+            }
+        }
+        if (csa.error_flag) {
+            gpio_set_val(&led_r, 1);
+            gpio_set_val(&led_g, 0);
+        } else {
+            gpio_set_val(&led_r, 0);
+            gpio_set_val(&led_g, 1);
+        }
+
+        if (csa.dbg_en >= 2)
+            dump_hw_status();
+
+        if (*stack_check != 0xababcdcd12123434) {
+            printf("stack overflow\n");
+            while (true);
+        }
+
+        if (!ms || get_systick() - t_cur > ms)
+            break;
+    }
+}
+
+
+
 void app_main(void)
 {
-    uint64_t *stack_check = (uint64_t *)((uint32_t)&end + 256);
-
     gpio_set_val(&led_r, 1);
     gpio_set_val(&led_g, 1);
 
@@ -330,53 +384,10 @@ void app_main(void)
     d_info("pwm on.\n");
     gpio_set_val(&led_r, 0);
 
-    uint32_t last_fault_val = 0xffffffff;
-
     while (true) {
-        if (csa.state != ST_STOP && !gpio_get_val(&drv_fault)) {
-            uint32_t cur_fault_val = (drv_read_reg(0x00) << 16) | drv_read_reg(0x01);
-            csa.cali_run = false;
-            if (cur_fault_val != last_fault_val) {
-                d_error("drv status: %08lx\n", cur_fault_val);
-                last_fault_val = cur_fault_val;
-            }
-            if (cur_fault_val != 0) {
-                csa.err_flag_.drv_fault = 1;
-                if (cur_fault_val & (1 << (8+16)))
-                    csa.err_flag_.drv_gdf = 1;
-                if (cur_fault_val & (1 << 7))
-                    csa.err_flag_.drv_otw = 1;
-                if (cur_fault_val & (1 << (6+16)))
-                    csa.err_flag_.drv_otsd = 1;
-                if (cur_fault_val & (1 << (7+16)))
-                    csa.err_flag_.drv_uvlo = 1;
-                if (cur_fault_val & (1 << 6))
-                    csa.err_flag_.drv_cpuv = 1;
-                if (cur_fault_val & (7 << 8))
-                    csa.err_flag_.drv_oc = 1;
-                if (cur_fault_val & (1 << (9+16)))
-                    csa.err_flag_.drv_vds_ocp = 1;
-            }
-        }
-        if (csa.err_flag) {
-            gpio_set_val(&led_r, 1);
-            gpio_set_val(&led_g, 0);
-        } else {
-            gpio_set_val(&led_r, 0);
-            gpio_set_val(&led_g, 1);
-        }
-
-        SCB->ICSR = SCB_ICSR_PENDSVSET_Msk;
-        app_motor_maintain();
+        sleep_bg(0);
         cali_elec_angle();
         sl_maintain();
-        if (csa.dbg_str_msk & (1 << 0))
-            dump_hw_status();
-
-        if (*stack_check != 0xababcdcd12123434) {
-            printf("stack overflow\n");
-            while (true);
-        }
     }
 }
 

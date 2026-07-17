@@ -11,6 +11,9 @@
 #include "app_main.h"
 #include "sensorless.h"
 
+static float sl_angle = 0;
+static float sl_speed = 0;
+
 static float sat(float x, float eps)
 {
     if (x > eps)
@@ -92,41 +95,66 @@ void pll_update(pll_t *pll, float e_alpha, float e_beta)
 
 void sl_maintain(void)
 {
-    float theta_err = csa.pll.theta - csa.cali_angle_elec;
+    float theta_err = remainderf(csa.pll_theta - sl_angle, 2 * M_PIf);
 
     if (csa.state == ST_STOP && csa.sl_state) {
         csa.sl_state = 0;
         csa.sl_start = 0;
+        sl_angle = 0;
+        sl_speed = 0;
         d_info("sl: stop\n");
         return;
     }
 
     if (!csa.sl_state && csa.sl_start) {
-        csa.cali_angle_speed_tgt = 800 * csa.sl_start;
-        csa.cali_current = 400 * csa.sl_start;
-        state_w_hook_before(0, 0, (uint8_t []){ST_CALI});
-        csa.state = ST_CALI;
+        sl_angle = csa.meas_elec_angle / 65536.0f * (2 * M_PIf);
+        sl_speed = 0;
+        state_w_hook_before(0, 0, (uint8_t []){ST_CURRENT});
+        csa.state = ST_CURRENT;
         csa.sl_state = 1; // speed inc
         d_info("sl: inc speed...\n");
+        csa.tgt_id = 3200; // drag current, direction comes from sl_angle ramp
+        csa.tgt_iq = 0;
         return;
     }
 
     if (csa.sl_state == 1) {
-        if (fabsf(csa.cali_angle_speed - csa.cali_angle_speed_tgt) < 0.001f) {
-            csa.cali_current = 10 * csa.sl_start;
+        if (fabsf(sl_speed - 800 * csa.sl_start) < 0.001f) {
+            csa.tgt_id = 800; // lower id to reduce smo angle bias (∝ ΔR·i) before handoff
             csa.sl_state = 2; // current dec
-            d_info("sl: dec speed...\n");
+            d_info("sl: dec current...\n");
         }
         return;
     }
 
     if (csa.sl_state == 2) {
-        if (fabsf(theta_err) < (10 / 180.0f) * M_PIf) {
+        if (fabsf(theta_err) < (20 / 180.0f) * M_PIf
+                && fabsf(csa.pll_omega - 800 * csa.sl_start) < 80) {
             csa.sl_state = 3;
-            csa.cal_current = 500 * csa.sl_start;
-            csa.state = ST_CURRENT; // or ST_SPEED
+            csa.tgt_id = 0;
+            csa.tgt_iq = 4000 * csa.sl_start;
+            //csa.state = ST_SPEED;
             d_info("sl: closeloop...\n");
         }
     }
 }
 
+void sl_angle_update(void)
+{
+    if (csa.sl_state != 1 && csa.sl_state != 2)
+        return;
+
+    float speed_tgt = 800 * csa.sl_start;
+    if (fabsf(sl_speed - speed_tgt) >= 0.01f)
+        sl_speed += sl_speed < speed_tgt ? 0.01f : -0.01f;
+    else
+        sl_speed = speed_tgt;
+
+    sl_angle += sl_speed / CURRENT_LOOP_FREQ;
+    if (sl_angle >= 2 * M_PIf)
+        sl_angle -= 2 * M_PIf;
+    else if (sl_angle < 0)
+        sl_angle += 2 * M_PIf;
+
+    csa.tgt_elec_angle = lroundf(sl_angle / (2 * M_PIf) * 0x10000);
+}

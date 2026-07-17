@@ -48,5 +48,6 @@ void pll_update(pll_t *pll, float e_alpha, float e_beta);
 
 
 void sl_maintain(void);
+void sl_angle_update(void);
 
 #endif
