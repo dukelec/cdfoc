@@ -54,6 +54,7 @@ static uint8_t pos_loop_cnt = 0;
 static uint8_t speed_loop_cnt = 0;
 static float tgt_speed_bk = 0;
 static int16_t tgt_iq_bk = 0;
+static float inv_voltage_ratio = 1.0f;
 
 uint8_t state_w_hook_before(uint16_t sub_offset, uint8_t len, uint8_t *dat)
 {
@@ -112,7 +113,7 @@ uint8_t motor_w_hook_after(uint16_t sub_offset, uint8_t len, uint8_t *dat)
 
 void app_motor_init(void)
 {
-    csa2pid_mt(&pid_pos, &pid_speed, &pid_iq, &pid_id);
+    csa2pid_mt(&pid_pos, &pid_speed, &pid_iq, &pid_id, 1.0f);
     csa2smo_mt(&smo);
     csa2pll_mt(&pll);
     pid_f_reset(&pid_iq, 0);
@@ -137,13 +138,6 @@ void app_motor_maintain(void)
         vector_over_limit = 0;
         t_last = get_systick();
     }
-
-    csa2encoder_filter_mt(&enc_filter);
-    csa2trap_planner_mt(&trap_planner);
-
-    csa2pid_mt(&pid_pos, &pid_speed, &pid_iq, &pid_id);
-    csa2smo_mt(&smo);
-    csa2pll_mt(&pll);
 
     if (adc_samp.has_new_regular) {
         int16_t adc_dc = adc_samp.regular_i[1];
@@ -172,6 +166,14 @@ void app_motor_maintain(void)
         if (csa.bus_voltage > csa.voltage_max)
             csa.error_flag_.bus_ov = 1;
     }
+
+    csa2encoder_filter_mt(&enc_filter);
+    csa2trap_planner_mt(&trap_planner);
+
+    inv_voltage_ratio = (float)csa.nominal_voltage / csa.bus_voltage;
+    csa2pid_mt(&pid_pos, &pid_speed, &pid_iq, &pid_id, inv_voltage_ratio);
+    csa2smo_mt(&smo);
+    csa2pll_mt(&pll);
 }
 
 
@@ -317,7 +319,7 @@ void current_loop_update(void)
         int32_t target_current = lroundf(current);
         pid_f_set_target(&pid_iq, target_current + anticog_iq);
         pid_f_set_target(&pid_id, csa.tgt_id);
-        float tgt_vq = pid_f_update(&pid_iq, meas_iq, meas_iq) + anticog_vq;
+        float tgt_vq = pid_f_update(&pid_iq, meas_iq, meas_iq) + anticog_vq * inv_voltage_ratio;
         float tgt_vd = pid_f_update(&pid_id, meas_id, meas_id);
         csa.tgt_vq = clip(lroundf(tgt_vq), -32768, 32767);
         csa.tgt_vd = clip(lroundf(tgt_vd), -32768, 32767);

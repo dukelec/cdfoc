@@ -58,7 +58,7 @@ static inline void csa2anticog_mt(anticog_t *ac)
 
 // pid
 
-static inline void csa2pid_mt(pid_i_t *pos, pid_f_t *speed, pid_f_t *iq, pid_f_t *id)
+static inline void csa2pid_mt(pid_i_t *pos, pid_f_t *speed, pid_f_t *iq, pid_f_t *id, float v_gain)
 {
     pos->kp = csa.pid_pos_kp;
     pos->out_min = csa.pid_pos_out_min;
@@ -67,12 +67,12 @@ static inline void csa2pid_mt(pid_i_t *pos, pid_f_t *speed, pid_f_t *iq, pid_f_t
     speed->ki = csa.pid_speed_ki;
     speed->out_min = csa.pid_speed_out_min;
     speed->out_max = csa.pid_speed_out_max;
-    iq->kp = csa.pid_iq_kp;
-    iq->ki = csa.pid_iq_ki;
+    iq->kp = csa.pid_iq_kp * v_gain;
+    iq->ki = csa.pid_iq_ki * v_gain;
     iq->out_min = csa.pid_iq_out_min;
     iq->out_max = csa.pid_iq_out_max;
-    id->kp = csa.pid_id_kp;
-    id->ki = csa.pid_id_ki;
+    id->kp = csa.pid_id_kp * v_gain;
+    id->ki = csa.pid_id_ki * v_gain;
     id->out_min = csa.pid_id_out_min;
     id->out_max = csa.pid_id_out_max;
 }
