@@ -62,6 +62,7 @@ static void device_init(void)
             .baud_h = csa.baud_rate_h,
             .filter_m = { csa.bus_filter_m[0], csa.bus_filter_m[1] },
             .mode = csa.bus_mode,
+            .idle_wait_len = csa.bus_idle_wait_len,
             .tx_permit_len = csa.bus_tx_permit_len,
             .max_idle_len = csa.bus_max_idle_len,
             .tx_pre_len = csa.bus_tx_pre_len
